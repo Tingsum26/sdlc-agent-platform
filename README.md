@@ -4,18 +4,19 @@ A public, no-container MVP for a human-controlled software delivery workflow who
 
 ## What is implemented
 
-- Java 17 / Spring Boot Workflow Service with persisted-state ports, version/lease transitions, approvals, immutable structured HTML reports, webhook HMAC/deduplication, mock CI, traceable manual E2E, audit history, Mongo configuration contract, and Fake public runtime.
-- Stateless Local Workflow MCP with six bounded tools, cancellation, correlation IDs, safe errors, and structured stderr diagnostics.
+- Java 17 / Spring Boot Workflow Service with state/audit/artifacts, Mongo document adapters, enterprise identity/Pod assignment, bounded Jira/Confluence/GHES/Jenkins/Splunk adapters, cross-repository Journey analysis, safe HTML reports, and Fake public runtime.
+- Stateless Local Workflow MCP with twelve bounded tools, explicit Pod-import confirmation, cancellation, correlation IDs, safe errors, and structured stderr diagnostics.
 - Central Copilot Agents, Skills, always-on/file-scoped instructions, schemas, policies, MCP catalog, evals, and a versioned bundle manifest.
 - VSIX workbench with Developer, Scrum Master, My Work, Epic, Ticket, Repo Task, Customization, MCP, and Diagnostics views; task freshness polling; exact-version approval; safe HTML reports; bundle install/rollback; and no model API.
 - Shared accessible React report components and a public Web UI validated with UI/UX Pro Max guidance.
-- Browser E2E for `DEMO-123 → MCP → report → approval → mock CI → manual E2E → completed + audit`.
+- Browser E2E for both `DEMO-123 → MCP → report → approval → mock CI → manual E2E` and the fictional `EPIC-DEMO-1 → identity → Pod → assignment → five adapters → Journey HTML` flow.
 
 ## Hard boundaries
 
 - Workflow Service, MCP, VSIX, Web UI, tests, adapters, Jenkins/GitHub CI, and persistence contain no model client. The user starts and supervises Copilot Chat.
 - Public fixtures use `example.invalid`, `REPO_A`, `DEMO-123`, and fictional identities.
 - No Docker, Compose, local MongoDB, embedded database, Testcontainers, MinIO, S3, cloud agent, or Jenkins modification is required.
+- Public integration outcomes are labelled `SIMULATED_PASS`, `CONTRACT_PASS`, `INTERNAL_VALIDATION_REQUIRED`, or `BLOCKED`; simulated/contract results never imply company proof.
 - Company MongoDB, GHES, Jira, Confluence, Jenkins, Splunk, SSO, Teambook, real repositories/Journeys, and reviewer model availability require internal validation.
 - LLM Wiki, embeddings/vector search, cross-repository Journey onboarding, deterministic code-graph experimentation, and team-scale deployment are post-MVP work.
 
@@ -34,6 +35,7 @@ pnpm build
 pnpm audit --audit-level low
 .\scripts\tests\stop-demo.test.ps1
 pnpm e2e:public-mvp
+pnpm exec playwright test e2e/internal-shaped-simulation.spec.ts
 pnpm --filter sdlc-workbench package
 ```
 
@@ -61,3 +63,6 @@ Open `http://127.0.0.1:4173`. Stop with `.\scripts\stop-demo.ps1`. See `docs/dem
 - Public delivery manifest: `docs/handoff/PUBLIC_DELIVERY_MANIFEST.md`
 - Internal Agent handoff: `docs/handoff/INTERNAL_AGENT_HANDOFF.md`
 - Logging contract: `docs/operations/logging-and-diagnostics.md`
+- Implementation inventory: `docs/implementation/internal-shaped-implementation-inventory.md`
+- Contract reference: `docs/reference/internal-shaped-contract-reference.md`
+- Internal connection guide: `docs/handoff/INTERNAL_CONNECTION_GUIDE.md`

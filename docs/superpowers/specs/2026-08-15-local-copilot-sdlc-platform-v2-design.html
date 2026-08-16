@@ -602,8 +602,30 @@
         <div class="callout"><strong>设计基线状态：</strong>本报告可进入内网能力验证和实施计划更新；真实 AWS Toggle、Header 名称、认证和各仓库框架仍需要内网 Agent 输出报告确认。</div>
       </section>
 
+      <section id="implemented-increment">
+        <h2>17. 已实现的 Internal-shaped Public Increment</h2>
+        <p><strong>边界不变：</strong>只有用户在 VS Code 中手动启动的 GitHub Copilot Agent 执行 AI 推理。Workflow Service、Local MCP、VSIX、Web UI、Mongo Adapter 和 CI 均没有模型客户端。</p>
+        <div class="diagram" role="img" aria-label="A human starts local Copilot, which uses Local MCP to call Workflow Service. VSIX reads the same service. The service connects to managed Mongo, enterprise adapters and Journey analysis. Public adapter outcomes are simulated and require internal validation.">
+          <pre>Human in VS Code → GitHub Copilot Agent → Local Workflow MCP (12 tools) → Workflow Service
+                                      VSIX views and HTML ────────────────┘
+Workflow Service → Managed Mongo profile
+                 → Jira · Confluence · GHES · Jenkins · Splunk adapters → SIMULATED_PASS → internal proof
+                 → Journey analyzer · escaped HTML → CONTRACT_PASS → internal proof</pre>
+        </div>
+        <h3>可恢复数据流</h3>
+        <ol>
+          <li>管理员绑定 Enterprise Principal；不要求 Scrum Master 拥有 GitHub 账号或已安装 VSIX。</li>
+          <li>Pod Roster 先校验，再以 Expected Revision 原子导入并记录 Actor/Audit。</li>
+          <li>Ticket 按 Journey/Role 确定性分配；Workflow Service/Mongo 保存状态。</li>
+          <li>五类 Adapter 返回带 Status、Source、Observation Time 的结果；公网只允许 SIMULATED_PASS。</li>
+          <li>Journey Manifest 校验 API/Web/iOS/Android、Hybrid Screen→API、Payload Schema、统一 Header、兼容性、Native Train、Toggle、Provenance 和 E2E Owner。</li>
+          <li>VSIX/Web 以文字加图标显示结果，生成无 Script、已转义的 HTML；下一步明确要求内网 Evidence ID。</li>
+        </ol>
+        <div class="callout"><strong>演示证据：</strong>EPIC-DEMO-1、EMP-100、DEMO-123 和 ACCOUNT_OPENING 都是虚构数据。SIMULATED_PASS/CONTRACT_PASS 不证明公司网络、真实仓库或生产安全。</div>
+      </section>
+
       <section id="references">
-        <h2>17. 官方参考</h2>
+        <h2>18. 官方参考</h2>
         <ul>
           <li><a href="https://code.visualstudio.com/docs/agent-customization/custom-agents">VS Code Custom Agents</a></li>
           <li><a href="https://code.visualstudio.com/docs/agent-customization/agent-skills">VS Code Agent Skills</a></li>

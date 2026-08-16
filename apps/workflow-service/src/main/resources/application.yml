@@ -1,6 +1,9 @@
 spring:
   application:
     name: workflow-service
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   profiles:
     default: fake
 

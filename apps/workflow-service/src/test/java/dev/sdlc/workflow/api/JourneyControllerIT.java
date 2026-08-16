@@ -42,4 +42,13 @@ class JourneyControllerIT {
         mvc.perform(post("/api/v1/journeys/report").header("X-Demo-User", "PRINCIPAL-EMP-100").contentType(MediaType.APPLICATION_JSON).content(MANIFEST))
                 .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML)).andExpect(content().string(org.hamcrest.Matchers.containsString("ACCOUNT_OPENING")));
     }
+
+    @Test
+    void rejectsManifestThatViolatesThePublishedV1Schema() throws Exception {
+        mvc.perform(post("/api/v1/journeys/validate")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(MANIFEST.replace("0123456789012345678901234567890123456789", "short")))
+                .andExpect(status().isBadRequest());
+    }
 }

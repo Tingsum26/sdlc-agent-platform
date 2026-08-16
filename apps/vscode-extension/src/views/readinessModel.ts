@@ -11,7 +11,7 @@ export function buildReadinessRows(
   if (identity) rows.push({
     label: `Identity · ${identity.employeeId}`,
     description: identity.source,
-    tooltip: `${identity.displayName} — source: ${identity.source}`,
+    tooltip: `${identity.displayLabel} — source: ${identity.source}`,
     status: "IDENTIFIED",
   });
   for (const diagnostic of diagnostics) rows.push({

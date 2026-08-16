@@ -9,7 +9,7 @@ export interface WorkflowTask {
   updatedAt: string;
 }
 
-export interface EnterpriseIdentity { employeeId: string; displayName: string; source: string }
+export interface EnterpriseIdentity { employeeId: string; displayLabel: string; source: string }
 export interface IntegrationDiagnostic { provider: string; status: string; observedAt: string; source: string; safeDetail: string }
 export interface NextInternalValidation { complete: boolean; provider?: string; status?: string; instruction?: string }
 

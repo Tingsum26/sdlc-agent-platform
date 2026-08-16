@@ -3,6 +3,7 @@ package dev.sdlc.workflow.api;
 import dev.sdlc.workflow.journey.JourneyAnalysis;
 import dev.sdlc.workflow.journey.JourneyGapAnalyzer;
 import dev.sdlc.workflow.journey.JourneyManifest;
+import dev.sdlc.workflow.journey.JourneyManifestContractValidator;
 import dev.sdlc.workflow.journey.JourneyReportRenderer;
 import dev.sdlc.workflow.security.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,10 +42,6 @@ public class JourneyController {
     }
 
     private static void requireBasicContract(JourneyManifest manifest) {
-        if (manifest == null || !"1.0".equals(manifest.schemaVersion()) || manifest.journeyId() == null
-                || manifest.journeyId().isBlank() || manifest.repositories().size() > 200
-                || manifest.screens().size() > 1000 || manifest.httpEdges().size() > 5000) {
-            throw new IllegalArgumentException("Journey manifest violates the v1 size or identity contract");
-        }
+        new JourneyManifestContractValidator().validate(manifest);
     }
 }

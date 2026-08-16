@@ -16,8 +16,10 @@
 | Workflow state, leases, audit | COMPLETE | `apps/workflow-service` | Java unit/integration tests |
 | REST/Webhook/security errors | COMPLETE | Workflow Service API | HMAC, duplicate, auth, stale-version tests |
 | Structured reports/approval/Jira projection port | COMPLETE | Workflow Service artifact domain | hash, escaping, immutability, retry tests |
-| Company Mongo runtime | PARTIAL | example YML + index contract only | configuration tests; real adapter is internal |
-| Workflow MCP | COMPLETE | `apps/workflow-mcp` | protocol discovery, cancellation, correlation, redaction |
+| Company Mongo runtime shape | COMPLETE | documents, repositories, example YML + index contract | mapping/CAS/configuration tests; connectivity is internal |
+| Enterprise identity/Pod/assignment | COMPLETE | Workflow Service domain/API | deterministic unit/integration tests |
+| Enterprise adapter shape | COMPLETE | Jira/Confluence/GHES/Jenkins/Splunk adapters | deterministic transport and safe-error tests |
+| Workflow MCP | COMPLETE | `apps/workflow-mcp` | 12-tool discovery, bounds, confirmation, cancellation, correlation, redaction |
 | Central Agents/Skills/Instructions | COMPLETE | `.github`, `skills` | customization and bundle contract tests |
 | Policies/Schemas/MCP catalog/Evals | COMPLETE | `policies`, `packages/contracts`, `mcp`, `evals` | strict schema/config tests |
 | VSIX workbench | COMPLETE | `apps/vscode-extension` | polling, ETag, boundary, bundle validation, typecheck, VSIX package |
@@ -28,7 +30,7 @@
 | Full public browser vertical slice | COMPLETE | `e2e/public-mvp.spec.ts` | Playwright Chromium PASS |
 | Logging/diagnostics contract | COMPLETE | service/MCP/VSIX + docs | redaction tests and structured event implementations |
 | LLM Wiki | NOT_STARTED | extension backlog | deliberately excluded from MVP |
-| Cross-repository Journey/code graph onboarding | NOT_STARTED | follow-up plan | real repository evidence is unavailable publicly |
+| Cross-repository Journey manifest/analyzer | COMPLETE | schema, Java analyzer, fixture and HTML | fictional contract/browser tests; real graph remains internal |
 
 状态只使用：`COMPLETE`、`PARTIAL`、`NOT_STARTED`、`NOT_APPLICABLE`。
 
@@ -36,10 +38,11 @@
 
 | 命令/场景 | 结果 | 数量/摘要 | 限制 |
 |---|---|---|---|
-| `.\mvnw.cmd verify` | PASS | 17 unit + 7 integration = 24 tests | Fake repositories; no real Mongo |
-| `pnpm test` | PASS | 38 tests: Contracts 17, MCP 5, UI 8, VSIX 7, Web 1 | no internal adapters |
+| `.\mvnw.cmd verify` | PASS | 37 unit + 12 integration = 49 tests | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
+| `pnpm test` | PASS | 49 tests: Contracts 22, MCP 8, UI 8, VSIX 9, Web 2 | deterministic public adapters only |
 | `pnpm build` | PASS | Contracts, MCP, UI, VSIX and production Web bundle | public build only |
 | `pnpm e2e:public-mvp` | PASS | one full seven-audit-event browser scenario | fictional loopback demo |
+| `pnpm exec playwright test e2e/internal-shaped-simulation.spec.ts` | PASS | identity, Pod, assignment, five diagnostics, Journey and HTML | fictional loopback demo |
 | `.\scripts\tests\stop-demo.test.ps1` | PASS | UTC process identity regression | Windows PowerShell process behavior |
 | `pnpm --filter sdlc-workbench package` | PASS | `.vsix` generated | not signed/published internally |
 | `pnpm audit --audit-level low` | PASS | no known npm vulnerabilities | snapshot of registry advisory data at verification time |
@@ -64,8 +67,8 @@
 | Internal Work Item | 前置条件 | 验收标准 | 报告证据要求 |
 |---|---|---|---|
 | Enterprise identity and audit mapping | GHES/SSO decision | developer and non-GitHub SM paths work | role-only result + evidence IDs |
-| Mongo repositories | managed Mongo config | restart/resume, optimistic lock, indices, backup tested | counts, latency bands, restore result |
-| Jira/Confluence/GHES/Jenkins adapters | delegated credentials | context, milestone comments, PR/check reads work | abstract contract deviation table |
+| Mongo connection validation | managed Mongo config | restart/resume, optimistic lock, indices, backup tested | counts, latency bands, restore result |
+| Jira/Confluence/GHES/Jenkins/Splunk adapter connection | delegated credentials | context, comments, PR/check/build/search reads work | abstract contract deviation table |
 | Signed bundle GHES release | release policy/certificate | hash/signature, compatibility, rollback | install/rollback scenario IDs |
 | Account Opening Journey pilot | approved repo/Journey list | page→API/payload/header/native compatibility map | coverage summary, no repo/API names publicly |
 | Splunk operations | approved source types | correlation search, alerts, redacted support bundle | event counts and evidence IDs |
