@@ -2,6 +2,8 @@
 
 A public, no-container MVP for a human-controlled software delivery workflow whose only AI reasoning runs in an interactive VS Code GitHub Copilot session.
 
+> **Scope notice:** this repository currently contains a tested vertical-slice prototype. It is not the completed platform. The approved target is a seven-public-repository architecture; see `docs/superpowers/specs/2026-08-16-seven-repository-platform-design.md` and the corrected gap audit in `docs/reviews/2026-08-16-seven-repository-gap-audit.md`.
+
 ## What is implemented
 
 - Java 17 / Spring Boot Workflow Service with state/audit/artifacts, Mongo document adapters, enterprise identity/Pod assignment, bounded Jira/Confluence/GHES/Jenkins/Splunk adapters, cross-repository Journey analysis, safe HTML reports, and Fake public runtime.
@@ -58,6 +60,9 @@ Open `http://127.0.0.1:4173`. Stop with `.\scripts\stop-demo.ps1`. See `docs/dem
 
 ## Documents
 
+- Approved seven-repository specification: `docs/superpowers/specs/2026-08-16-seven-repository-platform-design.md`
+- Machine-readable seven-repository output inventory: `docs/architecture/seven-repository-output-inventory.yaml`
+- Seven-repository gap audit: `docs/reviews/2026-08-16-seven-repository-gap-audit.md`
 - Human-readable design: `docs/superpowers/specs/2026-08-15-local-copilot-sdlc-platform-v2-design.html`
 - Pre-implementation review: `docs/reviews/2026-08-16-pre-implementation-review.md`
 - Public delivery manifest: `docs/handoff/PUBLIC_DELIVERY_MANIFEST.md`

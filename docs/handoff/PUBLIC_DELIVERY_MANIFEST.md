@@ -19,10 +19,10 @@
 | Company Mongo runtime shape | COMPLETE | documents, repositories, example YML + index contract | mapping/CAS/configuration tests; connectivity is internal |
 | Enterprise identity/Pod/assignment | COMPLETE | Workflow Service domain/API | deterministic unit/integration tests |
 | Enterprise adapter shape | COMPLETE | Jira/Confluence/GHES/Jenkins/Splunk adapters | deterministic transport and safe-error tests |
-| Workflow MCP | COMPLETE | `apps/workflow-mcp` | 12-tool discovery, bounds, confirmation, cancellation, correlation, redaction |
-| Central Agents/Skills/Instructions | COMPLETE | `.github`, `skills` | customization and bundle contract tests |
-| Policies/Schemas/MCP catalog/Evals | COMPLETE | `policies`, `packages/contracts`, `mcp`, `evals` | strict schema/config tests |
-| VSIX workbench | COMPLETE | `apps/vscode-extension` | polling, ETag, boundary, bundle validation, typecheck, VSIX package |
+| Workflow MCP | PARTIAL | `apps/workflow-mcp` | 12-tool vertical slice passes; full Epic/onboarding/QA/Scrum catalog is not implemented |
+| Central Agents/Skills/Instructions | PARTIAL | `.github`, `skills` | 3 of 13 Agents and a subset of approved Skills/Instructions are present |
+| Policies/Schemas/MCP catalog/Evals | PARTIAL | `policies`, `packages/contracts`, `mcp`, `evals` | slice contracts pass; independent contracts and the complete policy/eval catalog are missing |
+| VSIX workbench | PARTIAL | `apps/vscode-extension` | nine view IDs exist, but most do not yet have independent domain view models/actions |
 | Customization bundle local install/rollback | COMPLETE | VSIX + `manifests` | path-boundary tests; explicit human activation |
 | GHES release signature/distribution | NOT_STARTED | internal-only | requires company GHES/policy |
 | Shared accessible HTML UI | COMPLETE | `packages/ui` | keyboard/status/approval/manual-E2E tests |
@@ -30,9 +30,11 @@
 | Full public browser vertical slice | COMPLETE | `e2e/public-mvp.spec.ts` | Playwright Chromium PASS |
 | Logging/diagnostics contract | COMPLETE | service/MCP/VSIX + docs | redaction tests and structured event implementations |
 | LLM Wiki | NOT_STARTED | extension backlog | deliberately excluded from MVP |
-| Cross-repository Journey manifest/analyzer | COMPLETE | schema, Java analyzer, fixture and HTML | fictional contract/browser tests; real graph remains internal |
+| Cross-repository Journey manifest/analyzer | PARTIAL | schema, Java analyzer, fixture and HTML | fictional analyzer passes; complete onboarding, graph freshness and impact workflow remain missing |
 
 状态只使用：`COMPLETE`、`PARTIAL`、`NOT_STARTED`、`NOT_APPLICABLE`。
+
+> 2026-08-16 re-audit: `COMPLETE` means complete only where the row describes a bounded deliverable. It must not be read as completion of the target platform. The authoritative target and gap inventory are `docs/superpowers/specs/2026-08-16-seven-repository-platform-design.md` and `docs/reviews/2026-08-16-seven-repository-gap-audit.md`.
 
 ## 3. 公网已执行验证
 
