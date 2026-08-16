@@ -5,6 +5,9 @@ import dev.sdlc.workflow.artifact.ArtifactImmutableException;
 import dev.sdlc.workflow.artifact.ArtifactNotFoundException;
 import dev.sdlc.workflow.artifact.UnsafeArtifactContentException;
 import dev.sdlc.workflow.security.UnauthorizedRequestException;
+import dev.sdlc.workflow.identity.IdentityNotFoundException;
+import dev.sdlc.workflow.pod.InvalidPodRosterException;
+import dev.sdlc.workflow.pod.StaleRosterRevisionException;
 import dev.sdlc.workflow.task.IllegalTaskTransitionException;
 import dev.sdlc.workflow.task.StaleTaskVersionException;
 import dev.sdlc.workflow.task.TaskNotFoundException;
@@ -31,18 +34,19 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.UNAUTHORIZED, "Webhook rejected", "Webhook signature validation failed", request);
     }
 
-    @ExceptionHandler({StaleTaskVersionException.class, IllegalTaskTransitionException.class, ArtifactImmutableException.class})
+    @ExceptionHandler({StaleTaskVersionException.class, StaleRosterRevisionException.class,
+            IllegalTaskTransitionException.class, ArtifactImmutableException.class})
     ResponseEntity<Map<String, Object>> conflict(RuntimeException exception, HttpServletRequest request) {
         return problem(HttpStatus.CONFLICT, "Workflow conflict", "The workflow state changed; refresh and retry", request);
     }
 
-    @ExceptionHandler({TaskNotFoundException.class, ArtifactNotFoundException.class})
+    @ExceptionHandler({TaskNotFoundException.class, ArtifactNotFoundException.class, IdentityNotFoundException.class})
     ResponseEntity<Map<String, Object>> notFound(RuntimeException exception, HttpServletRequest request) {
         return problem(HttpStatus.NOT_FOUND, "Resource not found", "The requested resource does not exist", request);
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, IllegalArgumentException.class,
-            UnsafeArtifactContentException.class, ArtifactHashMismatchException.class})
+            UnsafeArtifactContentException.class, ArtifactHashMismatchException.class, InvalidPodRosterException.class})
     ResponseEntity<Map<String, Object>> badRequest(Exception exception, HttpServletRequest request) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid request", "The request failed validation", request);
     }

@@ -2,9 +2,16 @@ package dev.sdlc.workflow.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.sdlc.workflow.approval.ApprovalService;
+import dev.sdlc.workflow.assignment.AssignmentService;
+import dev.sdlc.workflow.assignment.InMemoryTaskAssignmentRepository;
+import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
 import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactStore;
 import dev.sdlc.workflow.artifact.FakeArtifactStore;
+import dev.sdlc.workflow.identity.IdentityBindingService;
+import dev.sdlc.workflow.pod.InMemoryPodRosterRepository;
+import dev.sdlc.workflow.pod.PodRosterRepository;
+import dev.sdlc.workflow.pod.PodRosterService;
 import dev.sdlc.workflow.task.AuditEventRepository;
 import dev.sdlc.workflow.task.InMemoryAuditEventRepository;
 import dev.sdlc.workflow.task.InMemoryWorkflowTaskRepository;
@@ -77,5 +84,33 @@ public class FakeRuntimeConfiguration {
     WebhookSignatureVerifier webhookSignatureVerifier(
             @Value("${workflow.webhook.secret:fictional-local-webhook-secret}") String secret) {
         return new WebhookSignatureVerifier(secret);
+    }
+
+    @Bean
+    IdentityBindingService identityBindingService() {
+        IdentityBindingService service = new IdentityBindingService();
+        service.bindAdminPrincipal("EMP-100", "Fictional Scrum Master", "f***@example.invalid");
+        return service;
+    }
+
+    @Bean
+    PodRosterRepository podRosterRepository() {
+        return new InMemoryPodRosterRepository();
+    }
+
+    @Bean
+    PodRosterService podRosterService(PodRosterRepository rosters, AuditEventRepository audits, Clock clock) {
+        return new PodRosterService(rosters, audits, clock);
+    }
+
+    @Bean
+    TaskAssignmentRepository taskAssignmentRepository() {
+        return new InMemoryTaskAssignmentRepository();
+    }
+
+    @Bean
+    AssignmentService assignmentService(
+            PodRosterRepository rosters, TaskAssignmentRepository assignments, Clock clock) {
+        return new AssignmentService(rosters, assignments, clock);
     }
 }
