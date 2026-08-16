@@ -1,0 +1,27 @@
+package dev.sdlc.workflow.persistence;
+
+import dev.sdlc.workflow.task.AuditEvent;
+import dev.sdlc.workflow.task.AuditEventRepository;
+import java.util.List;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+
+public final class MongoAuditEventRepository implements AuditEventRepository {
+    static final String COLLECTION = "auditEvents";
+    private final MongoOperations mongo;
+
+    public MongoAuditEventRepository(MongoOperations mongo) { this.mongo = mongo; }
+
+    @Override
+    public AuditEvent append(AuditEvent event) {
+        return mongo.insert(AuditEventDocument.fromDomain(event), COLLECTION).toDomain();
+    }
+
+    @Override
+    public List<AuditEvent> findByTaskId(String taskId) {
+        Query query = Query.query(Criteria.where("taskId").is(taskId)).with(Sort.by("sequence"));
+        return mongo.find(query, AuditEventDocument.class, COLLECTION).stream().map(AuditEventDocument::toDomain).toList();
+    }
+}

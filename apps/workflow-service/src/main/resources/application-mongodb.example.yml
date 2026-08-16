@@ -1,4 +1,7 @@
 spring:
+  config:
+    activate:
+      on-profile: mongo
   data:
     mongodb:
       uri: ${WORKFLOW_MONGODB_URI}
@@ -8,6 +11,7 @@ spring:
 workflow:
   persistence:
     provider: mongodb
+    index-manifest: classpath:mongo-indexes-v1.json
 
 management:
   health:
