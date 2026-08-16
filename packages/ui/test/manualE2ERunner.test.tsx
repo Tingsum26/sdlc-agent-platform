@@ -14,6 +14,7 @@ describe("ManualE2ERunner", () => {
 
     expect(submit).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent(/actor role, execution time, build fingerprint, actual result/i);
+    expect(screen.getByRole("alert")).toHaveFocus();
   });
 
   it("submits PASS with actor, time, build, actual result, and evidence", async () => {

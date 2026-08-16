@@ -14,7 +14,11 @@ export class TaskTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem
   getChildren(): vscode.TreeItem[] {
     if (this.viewId === "sdlc.mcpCenter") return [this.command("Open MCP onboarding", "sdlc.openMcpCenter")];
     if (this.viewId === "sdlc.diagnostics") return [this.command("Run diagnostics", "sdlc.checkMcpHealth")];
-    if (this.viewId === "sdlc.customization") return [this.command("Copy /start-ticket command", "sdlc.copyCopilotCommand")];
+    if (this.viewId === "sdlc.customization") return [
+      this.command("Install reviewed bundle", "sdlc.installCustomizationBundle"),
+      this.command("Roll back bundle", "sdlc.rollbackCustomizationBundle"),
+      this.command("Copy /start-ticket command", "sdlc.copyCopilotCommand"),
+    ];
     if (this.tasks.length === 0) return [new vscode.TreeItem("No persisted tasks")];
     return this.tasks.map((task) => {
       const item = new vscode.TreeItem(`${task.scope.ticketId} · ${task.status}`, vscode.TreeItemCollapsibleState.None);

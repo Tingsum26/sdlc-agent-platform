@@ -101,6 +101,11 @@ public final class WorkflowTaskService {
         return tasks.findAll();
     }
 
+    public List<AuditEvent> listAuditEvents(String taskId) {
+        getTask(taskId);
+        return auditEvents.findByTaskId(taskId);
+    }
+
     private WorkflowTask requireVersion(String taskId, long expectedVersion) {
         WorkflowTask task = tasks.findById(taskId).orElseThrow(() -> new TaskNotFoundException(taskId));
         if (task.version() != expectedVersion) {

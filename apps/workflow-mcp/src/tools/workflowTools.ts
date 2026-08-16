@@ -2,16 +2,22 @@ import { randomUUID } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { WorkflowApiError, type WorkflowApiClient } from "../client.js";
+import { logDiagnostic } from "../logging.js";
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value) }],
 });
 
-const safe = async (operation: (correlationId: string) => Promise<unknown>) => {
+const safe = async (tool: string, operation: (correlationId: string) => Promise<unknown>) => {
   const correlationId = randomUUID();
   try {
     return textResult(await operation(correlationId));
   } catch (error) {
+    logDiagnostic("tool_failed", {
+      tool,
+      correlationId,
+      status: error instanceof WorkflowApiError ? error.status : undefined,
+    });
     const message = error instanceof WorkflowApiError
       ? `${error.message} (status ${error.status}, correlation ${error.correlationId})`
       : `Workflow tool failed (correlation ${correlationId})`;
@@ -24,13 +30,13 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
     description: "List persisted workflow tasks visible to the current user.",
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
-  }, (_args, extra) => safe((correlationId) => api.listTasks(correlationId, extra.signal)));
+  }, (_args, extra) => safe("workflow_list_my_tasks", (correlationId) => api.listTasks(correlationId, extra.signal)));
 
   server.registerTool("workflow_get_task_context", {
     description: "Read the persisted task state before starting or resuming local Copilot work.",
     inputSchema: z.object({ taskId: z.string().min(1) }),
     annotations: { readOnlyHint: true },
-  }, ({ taskId }, extra) => safe((correlationId) => api.getTaskContext(taskId, correlationId, extra.signal)));
+  }, ({ taskId }, extra) => safe("workflow_get_task_context", (correlationId) => api.getTaskContext(taskId, correlationId, extra.signal)));
 
   server.registerTool("workflow_claim_task", {
     description: "Claim a task with a bounded lease before local Copilot reasoning begins.",
@@ -39,7 +45,7 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
       expectedVersion: z.number().int().nonnegative(),
       leaseMinutes: z.number().int().min(1).max(120).default(30),
     }),
-  }, ({ taskId, expectedVersion, leaseMinutes }, extra) => safe((correlationId) =>
+  }, ({ taskId, expectedVersion, leaseMinutes }, extra) => safe("workflow_claim_task", (correlationId) =>
     api.claimTask(taskId, expectedVersion, leaseMinutes, correlationId, extra.signal)));
 
   server.registerTool("workflow_submit_artifact", {
@@ -51,7 +57,7 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
       sections: z.array(z.object({ key: z.string(), title: z.string(), body: z.string() })).min(1),
       contentHash: z.string().optional(),
     }),
-  }, ({ taskId, ...artifact }, extra) => safe((correlationId) =>
+  }, ({ taskId, ...artifact }, extra) => safe("workflow_submit_artifact", (correlationId) =>
     api.submitArtifact(taskId, artifact, correlationId, extra.signal)));
 
   server.registerTool("workflow_request_approval", {
@@ -62,7 +68,7 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
       artifactVersion: z.number().int().positive(),
       expectedTaskVersion: z.number().int().nonnegative(),
     }),
-  }, (approval, extra) => safe((correlationId) => api.requestApproval(approval, correlationId, extra.signal)));
+  }, (approval, extra) => safe("workflow_request_approval", (correlationId) => api.requestApproval(approval, correlationId, extra.signal)));
 
   server.registerTool("workflow_complete_task", {
     description: "Confirm the current local result and advance it to its next persisted gate.",
@@ -70,6 +76,6 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
       taskId: z.string().min(1),
       expectedVersion: z.number().int().nonnegative(),
     }),
-  }, ({ taskId, expectedVersion }, extra) => safe((correlationId) =>
+  }, ({ taskId, expectedVersion }, extra) => safe("workflow_complete_task", (correlationId) =>
     api.completeTask(taskId, expectedVersion, correlationId, extra.signal)));
 }

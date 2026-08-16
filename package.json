@@ -9,6 +9,15 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "e2e:public-mvp": "playwright test e2e/public-mvp.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "ajv": "8.18.0"
+    }
   }
 }

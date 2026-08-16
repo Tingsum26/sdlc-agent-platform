@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "mode": "AUDIT_ONLY",
+  "gates": [
+    { "from": "WAITING_FOR_USER_CONFIRMATION", "to": "WAITING_FOR_APPROVAL", "requires": ["humanConfirmation", "artifactVersion", "actorId", "timestamp"] },
+    { "from": "WAITING_FOR_APPROVAL", "to": "WAITING_FOR_CI", "requires": ["humanApproval", "artifactVersion", "taskVersion", "actorId", "timestamp"] },
+    { "from": "WAITING_FOR_CI", "to": "WAITING_FOR_MANUAL_E2E", "requires": ["ciStatus", "buildFingerprint"] },
+    { "from": "WAITING_FOR_MANUAL_E2E", "to": "COMPLETED", "requires": ["manualResult", "actorRole", "executedAt", "buildFingerprint", "actualResult", "evidenceOrWaiver"] }
+  ],
+  "skip": { "allowed": ["DESIGN"], "requires": ["actorId", "reason", "timestamp", "acceptedRisks", "impactedRepositories"] }
+}

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import * as vscode from "vscode";
 import { WorkflowClient, type WorkflowTask } from "./api/workflowClient.js";
 import { checkMcpHealth } from "./diagnostics/mcpHealth.js";
+import { installCustomizationBundle, rollbackCustomizationBundle } from "./customization/bundleInstaller.js";
 import { ExtensionLogger } from "./logging/logger.js";
 import { TaskPoller } from "./polling/taskPoller.js";
 import { TaskTreeProvider } from "./views/taskTreeProvider.js";
@@ -82,6 +83,11 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.env.clipboard.writeText(command);
       void vscode.window.showInformationMessage(`Copied: ${command}`);
     }),
+    vscode.commands.registerCommand("sdlc.installCustomizationBundle", async () => {
+      try { await installCustomizationBundle(context); }
+      catch (error) { logger.error("customization_install_failed", { message: safeMessage(error) }); void vscode.window.showErrorMessage("Customization bundle validation or installation failed. No bundle was activated."); }
+    }),
+    vscode.commands.registerCommand("sdlc.rollbackCustomizationBundle", async () => rollbackCustomizationBundle(context)),
     vscode.commands.registerCommand("sdlc.openMcpCenter", () => openMcpCenter()),
     vscode.commands.registerCommand("sdlc.checkMcpHealth", async () => {
       const results = await checkMcpHealth(client(), hasMcpConfig());

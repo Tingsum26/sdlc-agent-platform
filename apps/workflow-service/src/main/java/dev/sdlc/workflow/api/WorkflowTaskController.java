@@ -7,6 +7,7 @@ import dev.sdlc.workflow.artifact.ArtifactType;
 import dev.sdlc.workflow.approval.ApprovalService;
 import dev.sdlc.workflow.security.CurrentUser;
 import dev.sdlc.workflow.task.TaskStatus;
+import dev.sdlc.workflow.task.AuditEvent;
 import dev.sdlc.workflow.task.TaskType;
 import dev.sdlc.workflow.task.WorkflowScope;
 import dev.sdlc.workflow.task.WorkflowTask;
@@ -19,6 +20,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -103,6 +105,37 @@ public class WorkflowTaskController {
                 TaskStatus.WAITING_FOR_APPROVAL, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
     }
 
+    @PostMapping("/tasks/{taskId}/ci")
+    WorkflowTaskResponse recordCi(
+            @PathVariable String taskId,
+            @Valid @RequestBody CiResultRequest body,
+            HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        if (body.state() != CiResult.PASSED) {
+            return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_CI,
+                    TaskStatus.BLOCKED, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
+        }
+        return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_CI,
+                TaskStatus.WAITING_FOR_MANUAL_E2E, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
+    }
+
+    @PostMapping("/tasks/{taskId}/manual-e2e")
+    WorkflowTaskResponse recordManualE2e(
+            @PathVariable String taskId,
+            @Valid @RequestBody ManualE2eRequest body,
+            HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        TaskStatus target = body.result() == ManualResult.PASS ? TaskStatus.COMPLETED : TaskStatus.BLOCKED;
+        return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_MANUAL_E2E,
+                target, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
+    }
+
+    @GetMapping("/tasks/{taskId}/audit")
+    List<AuditEvent> audit(@PathVariable String taskId, HttpServletRequest request) {
+        CurrentUser.require(request);
+        return tasks.listAuditEvents(taskId);
+    }
+
     @PostMapping("/approvals")
     WorkflowTaskResponse approve(
             @Valid @RequestBody ApprovalRequest body,
@@ -131,6 +164,27 @@ public class WorkflowTaskController {
     }
 
     public record VersionRequest(long expectedVersion) {
+    }
+
+    public enum CiResult { PASSED, FAILED, PENDING }
+
+    public record CiResultRequest(
+            @Min(0) long expectedVersion,
+            @NotNull CiResult state,
+            @NotBlank String buildFingerprint) {
+    }
+
+    public enum ManualResult { PASS, FAIL, BLOCKED }
+
+    public record ManualE2eRequest(
+            @Min(0) long expectedVersion,
+            @NotBlank String caseId,
+            @NotNull ManualResult result,
+            @NotBlank String actorRole,
+            @NotNull Instant executedAt,
+            @NotBlank String buildFingerprint,
+            @NotBlank String actualResult,
+            @NotBlank String evidenceOrWaiver) {
     }
 
     public record SubmitArtifactRequest(
