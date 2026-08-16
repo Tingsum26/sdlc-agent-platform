@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/pod-roster-v1.schema.json",
+  "title": "Pod roster",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "journeyId", "revision", "memberships"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "journeyId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "memberships": {
+      "type": "array",
+      "maxItems": 500,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/membership" }
+    }
+  },
+  "$defs": {
+    "membership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["membershipId", "employeeId", "principalId", "displayLabel", "role", "journeyId", "active", "effectiveFrom", "aliases"],
+      "properties": {
+        "membershipId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{2,63}$" },
+        "employeeId": { "type": "string", "pattern": "^[A-Z0-9_-]{2,63}$" },
+        "principalId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{2,63}$" },
+        "displayLabel": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "role": { "enum": ["SCRUM_MASTER", "BUSINESS_ANALYST", "ARCHITECT", "TECH_LEAD", "API_DEVELOPER", "WEB_DEVELOPER", "IOS_DEVELOPER", "ANDROID_DEVELOPER", "QA"] },
+        "journeyId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$" },
+        "active": { "type": "boolean" },
+        "effectiveFrom": { "type": "string", "format": "date" },
+        "effectiveTo": { "type": "string", "format": "date" },
+        "aliases": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 80 } }
+      }
+    }
+  }
+}
