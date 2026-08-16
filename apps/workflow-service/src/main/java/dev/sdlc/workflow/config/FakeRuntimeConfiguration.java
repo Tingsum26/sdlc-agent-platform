@@ -9,6 +9,7 @@ import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactStore;
 import dev.sdlc.workflow.artifact.FakeArtifactStore;
 import dev.sdlc.workflow.identity.IdentityBindingService;
+import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.pod.InMemoryPodRosterRepository;
 import dev.sdlc.workflow.pod.PodRosterRepository;
 import dev.sdlc.workflow.pod.PodRosterService;
@@ -112,5 +113,10 @@ public class FakeRuntimeConfiguration {
     AssignmentService assignmentService(
             PodRosterRepository rosters, TaskAssignmentRepository assignments, Clock clock) {
         return new AssignmentService(rosters, assignments, clock);
+    }
+
+    @Bean
+    IntegrationDiagnosticService integrationDiagnosticService(Clock clock) {
+        return new IntegrationDiagnosticService(clock, true);
     }
 }

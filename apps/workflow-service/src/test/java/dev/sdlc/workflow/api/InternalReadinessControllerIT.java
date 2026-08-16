@@ -81,4 +81,13 @@ class InternalReadinessControllerIT {
                                 """))
                 .andExpect(status().isConflict());
     }
+
+    @Test
+    void exposesFiveClearlySimulatedEnterpriseDiagnostics() throws Exception {
+        mvc.perform(get("/api/v1/internal-readiness/integrations").header("X-Demo-User", ACTOR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[0].status").value("SIMULATED_PASS"))
+                .andExpect(jsonPath("$[0].source").value("deterministic-fake"));
+    }
 }

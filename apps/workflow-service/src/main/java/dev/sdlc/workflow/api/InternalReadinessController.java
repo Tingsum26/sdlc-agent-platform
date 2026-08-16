@@ -6,6 +6,8 @@ import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
 import dev.sdlc.workflow.identity.EnterprisePrincipal;
 import dev.sdlc.workflow.identity.IdentityBindingService;
 import dev.sdlc.workflow.identity.IdentityNotFoundException;
+import dev.sdlc.workflow.integration.IntegrationDiagnostic;
+import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.pod.PodMembership;
 import dev.sdlc.workflow.pod.PodRoster;
 import dev.sdlc.workflow.pod.PodRosterRepository;
@@ -32,18 +34,21 @@ public class InternalReadinessController {
     private final PodRosterRepository podRosters;
     private final AssignmentService assignmentService;
     private final TaskAssignmentRepository assignments;
+    private final IntegrationDiagnosticService diagnostics;
 
     public InternalReadinessController(
             IdentityBindingService identities,
             PodRosterService podService,
             PodRosterRepository podRosters,
             AssignmentService assignmentService,
-            TaskAssignmentRepository assignments) {
+            TaskAssignmentRepository assignments,
+            IntegrationDiagnosticService diagnostics) {
         this.identities = identities;
         this.podService = podService;
         this.podRosters = podRosters;
         this.assignmentService = assignmentService;
         this.assignments = assignments;
+        this.diagnostics = diagnostics;
     }
 
     @GetMapping("/identity")
@@ -75,6 +80,12 @@ public class InternalReadinessController {
     TaskAssignment assignment(@PathVariable String ticketId, HttpServletRequest request) {
         CurrentUser.require(request);
         return assignments.find(ticketId).orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
+    }
+
+    @GetMapping("/integrations")
+    List<IntegrationDiagnostic> integrations(HttpServletRequest request) {
+        CurrentUser.require(request);
+        return diagnostics.diagnostics();
     }
 
     public record ImportPodRequest(

@@ -8,6 +8,7 @@ import dev.sdlc.workflow.artifact.MongoDocumentArtifactStore;
 import dev.sdlc.workflow.assignment.AssignmentService;
 import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
 import dev.sdlc.workflow.identity.IdentityBindingService;
+import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.persistence.MongoAuditEventRepository;
 import dev.sdlc.workflow.persistence.MongoPodRosterRepository;
 import dev.sdlc.workflow.persistence.MongoTaskAssignmentRepository;
@@ -99,5 +100,10 @@ public class MongoRuntimeConfiguration {
     @Bean
     WebhookSignatureVerifier webhookSignatureVerifier(@Value("${workflow.webhook.secret}") String secret) {
         return new WebhookSignatureVerifier(secret);
+    }
+
+    @Bean
+    IntegrationDiagnosticService integrationDiagnosticService(Clock clock) {
+        return new IntegrationDiagnosticService(clock, false);
     }
 }
