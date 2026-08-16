@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.List;
 
 public final class WorkflowTaskService {
 
@@ -90,6 +91,14 @@ public final class WorkflowTaskService {
             }
         }
         return released;
+    }
+
+    public WorkflowTask getTask(String taskId) {
+        return tasks.findById(taskId).orElseThrow(() -> new TaskNotFoundException(taskId));
+    }
+
+    public List<WorkflowTask> listTasks() {
+        return tasks.findAll();
     }
 
     private WorkflowTask requireVersion(String taskId, long expectedVersion) {
