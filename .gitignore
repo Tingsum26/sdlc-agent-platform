@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 .idea/
+.worktrees/
 .vscode/*
 !.vscode/mcp.example.json
 !.vscode/extensions.json
