@@ -1,0 +1,14 @@
+package dev.sdlc.workflow.task;
+
+public enum TaskStatus {
+    CREATED,
+    WAITING_FOR_LOCAL_COPILOT,
+    LOCAL_COPILOT_RUNNING,
+    WAITING_FOR_USER_CONFIRMATION,
+    WAITING_FOR_APPROVAL,
+    WAITING_FOR_CI,
+    WAITING_FOR_MANUAL_E2E,
+    BLOCKED,
+    COMPLETED,
+    CANCELLED
+}

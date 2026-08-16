@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/sdlc/schemas/approval-v1.schema.json",
+  "title": "Approval v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "approvalId", "taskId", "artifactId", "artifactVersion", "actorId", "actorRole", "decision", "decidedAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "approvalId": { "type": "string", "minLength": 3, "maxLength": 64 },
+    "taskId": { "type": "string", "minLength": 3, "maxLength": 64 },
+    "artifactId": { "type": "string", "minLength": 3, "maxLength": 64 },
+    "artifactVersion": { "type": "integer", "minimum": 1 },
+    "actorId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "actorRole": { "enum": ["BUSINESS_APPROVER", "TECHNICAL_APPROVER", "QA", "SCRUM_MASTER"] },
+    "decision": { "enum": ["APPROVED", "REJECTED"] },
+    "reason": { "type": ["string", "null"], "maxLength": 2000 },
+    "decidedAt": { "type": "string", "format": "date-time" }
+  }
+}
