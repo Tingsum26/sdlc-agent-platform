@@ -63,6 +63,12 @@ public class WorkflowTaskController {
         return tasks.listTasks().stream().map(WorkflowTaskResponse::from).toList();
     }
 
+    @GetMapping("/tasks/{taskId}")
+    WorkflowTaskResponse get(@PathVariable String taskId, HttpServletRequest request) {
+        CurrentUser.require(request);
+        return WorkflowTaskResponse.from(tasks.getTask(taskId));
+    }
+
     @PostMapping("/tasks/{taskId}/claim")
     WorkflowTaskResponse claim(
             @PathVariable String taskId,

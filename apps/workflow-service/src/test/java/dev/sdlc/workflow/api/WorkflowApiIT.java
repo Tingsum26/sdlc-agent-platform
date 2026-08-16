@@ -23,7 +23,7 @@ class WorkflowApiIT {
 
     @Test
     void createsAndListsAWorkflowFromAFictionalTicket() throws Exception {
-        mvc.perform(post("/api/v1/workflows/from-ticket")
+        String created = mvc.perform(post("/api/v1/workflows/from-ticket")
                         .header("X-Demo-User", "developer-1")
                         .header("X-Correlation-ID", "corr-create")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -37,7 +37,13 @@ class WorkflowApiIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.scope.ticketId").value("DEMO-123"))
                 .andExpect(jsonPath("$.status").value("WAITING_FOR_LOCAL_COPILOT"))
-                .andExpect(jsonPath("$.version").value(0));
+                .andExpect(jsonPath("$.version").value(0))
+                .andReturn().getResponse().getContentAsString();
+        String taskId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(created).path("taskId").asText();
+
+        mvc.perform(get("/api/v1/tasks/{taskId}", taskId).header("X-Demo-User", "developer-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").value(taskId));
 
         mvc.perform(get("/api/v1/tasks").header("X-Demo-User", "developer-1"))
                 .andExpect(status().isOk())
@@ -71,7 +77,13 @@ class WorkflowApiIT {
     void requiresAnAuthenticatedDemoUserForMutations() throws Exception {
         mvc.perform(post("/api/v1/workflows/from-ticket")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content("""
+                                {
+                                  "ticketId":"DEMO-UNAUTHORIZED",
+                                  "repositoryAlias":"REPO_A",
+                                  "targetCommit":"2123456789abcdef0123456789abcdef01234567"
+                                }
+                                """))
                 .andExpect(status().isUnauthorized());
     }
 }
