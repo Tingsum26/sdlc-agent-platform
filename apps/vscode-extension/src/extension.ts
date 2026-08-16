@@ -7,10 +7,12 @@ import { installCustomizationBundle, rollbackCustomizationBundle } from "./custo
 import { ExtensionLogger } from "./logging/logger.js";
 import { TaskPoller } from "./polling/taskPoller.js";
 import { TaskTreeProvider } from "./views/taskTreeProvider.js";
+import { ReadinessTreeProvider } from "./views/readinessTreeProvider.js";
 import { WorkflowStatusBar } from "./views/statusBar.js";
 import { openApprovalPanel } from "./webview/approvalPanel.js";
 import { escapeHtml, shell } from "./webview/html.js";
 import { openReportPanel } from "./webview/reportPanel.js";
+import { openJourneyReportPanel } from "./webview/journeyReportPanel.js";
 
 const viewIds = ["sdlc.developer", "sdlc.scrumMaster", "sdlc.myWork", "sdlc.epic", "sdlc.ticket",
   "sdlc.repoTask", "sdlc.customization", "sdlc.mcpCenter", "sdlc.diagnostics"];
@@ -21,13 +23,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const config = () => vscode.workspace.getConfiguration("sdlc");
   const client = () => new WorkflowClient(config().get<string>("workflowServiceUrl", "http://127.0.0.1:8080"),
     fetch, config().get<string>("demoActorId") || undefined);
-  const providers = viewIds.map((id) => new TaskTreeProvider(id));
+  const taskViewIds = viewIds.filter((id) => id !== "sdlc.diagnostics");
+  const providers = taskViewIds.map((id) => new TaskTreeProvider(id));
+  const readinessProvider = new ReadinessTreeProvider();
   const status = new WorkflowStatusBar();
   let tasks: WorkflowTask[] = [];
 
-  for (let index = 0; index < viewIds.length; index += 1) {
-    context.subscriptions.push(vscode.window.registerTreeDataProvider(viewIds[index]!, providers[index]!));
+  for (let index = 0; index < taskViewIds.length; index += 1) {
+    context.subscriptions.push(vscode.window.registerTreeDataProvider(taskViewIds[index]!, providers[index]!));
   }
+  context.subscriptions.push(vscode.window.registerTreeDataProvider("sdlc.diagnostics", readinessProvider));
 
   const refresh = async () => {
     tasks = await client().listTasks();
@@ -35,6 +40,17 @@ export function activate(context: vscode.ExtensionContext): void {
     const actionable = tasks.filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status)).length;
     status.update(tasks.length, actionable);
     logger.info("tasks_refreshed", { total: tasks.length, actionable });
+    try {
+      const readinessClient = client();
+      const [identity, diagnostics, next] = await Promise.all([
+        readinessClient.getIdentity(), readinessClient.getIntegrationDiagnostics(), readinessClient.getNextInternalValidation(),
+      ]);
+      readinessProvider.setReadiness(identity, diagnostics, next);
+      logger.info("readiness_refreshed", { diagnostics: diagnostics.length, nextComplete: next.complete });
+    } catch (error) {
+      readinessProvider.setError("Workflow Service readiness endpoints are unavailable. Check Diagnostics and retry.");
+      logger.error("readiness_refresh_failed", { message: safeMessage(error) });
+    }
   };
 
   const poller = new TaskPoller(refresh, () => vscode.window.state.focused,
@@ -65,6 +81,18 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!versionText) return;
       try { openReportPanel(`${artifactId} v${versionText}`, await client().getReport(artifactId, Number(versionText))); }
       catch (error) { logger.error("open_report_failed", { message: safeMessage(error) }); }
+    }),
+    vscode.commands.registerCommand("sdlc.openJourneyReport", async () => {
+      const picked = await vscode.window.showOpenDialog({ title: "Select a reviewed Journey manifest", canSelectMany: false, filters: { "Journey manifest": ["json"] } });
+      if (!picked?.[0]) return;
+      try {
+        const bytes = await vscode.workspace.fs.readFile(picked[0]);
+        const manifest = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+        openJourneyReportPanel(await client().renderJourneyReport(manifest));
+      } catch (error) {
+        logger.error("journey_report_failed", { message: safeMessage(error) });
+        void vscode.window.showErrorMessage("Journey report failed. Validate the manifest and open Diagnostics.");
+      }
     }),
     vscode.commands.registerCommand("sdlc.approve", async () => {
       const taskId = await vscode.window.showInputBox({ title: "Task ID" }); if (!taskId) return;

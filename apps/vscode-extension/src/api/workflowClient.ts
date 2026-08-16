@@ -9,6 +9,10 @@ export interface WorkflowTask {
   updatedAt: string;
 }
 
+export interface EnterpriseIdentity { employeeId: string; displayName: string; source: string }
+export interface IntegrationDiagnostic { provider: string; status: string; observedAt: string; source: string; safeDetail: string }
+export interface NextInternalValidation { complete: boolean; provider?: string; status?: string; instruction?: string }
+
 export class WorkflowClient {
   private etag: string | undefined;
   private cachedTasks: WorkflowTask[] = [];
@@ -57,6 +61,26 @@ export class WorkflowClient {
       const response = await this.fetcher(`${this.baseUrl}/actuator/health`, { headers: this.headers() });
       return response.ok;
     } catch { return false; }
+  }
+
+  getIdentity(): Promise<EnterpriseIdentity> {
+    return this.json("/api/v1/internal-readiness/identity") as Promise<EnterpriseIdentity>;
+  }
+
+  getIntegrationDiagnostics(): Promise<IntegrationDiagnostic[]> {
+    return this.json("/api/v1/internal-readiness/integrations") as Promise<IntegrationDiagnostic[]>;
+  }
+
+  getNextInternalValidation(): Promise<NextInternalValidation> {
+    return this.json("/api/v1/internal-readiness/next-validation") as Promise<NextInternalValidation>;
+  }
+
+  async renderJourneyReport(manifest: unknown): Promise<string> {
+    const response = await this.fetcher(`${this.baseUrl}/api/v1/journeys/report`, {
+      method: "POST", headers: this.headers(), body: JSON.stringify(manifest),
+    });
+    await this.requireOk(response);
+    return response.text();
   }
 
   private async json(path: string, init: RequestInit = {}): Promise<unknown> {
