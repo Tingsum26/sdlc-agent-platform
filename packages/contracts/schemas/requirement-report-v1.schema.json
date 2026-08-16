@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/sdlc/schemas/requirement-report-v1.schema.json",
+  "title": "Requirement Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "ticketIds", "objective", "acceptanceCriteria", "codeEvidence", "compatibility", "testStrategy", "decisions", "openQuestions"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "ticketIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "objective": { "type": "string", "minLength": 1, "maxLength": 10000 },
+    "acceptanceCriteria": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "codeEvidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "compatibility": { "type": "string", "minLength": 1 },
+    "testStrategy": { "type": "string", "minLength": 1 },
+    "decisions": { "type": "array", "items": { "type": "string" } },
+    "openQuestions": { "type": "array", "items": { "type": "string" } }
+  }
+}
