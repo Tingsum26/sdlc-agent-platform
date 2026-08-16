@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: workflow-service
+  profiles:
+    default: fake
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never

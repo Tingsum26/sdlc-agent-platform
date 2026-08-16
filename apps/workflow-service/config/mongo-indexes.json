@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "databaseEnvironmentVariable": "WORKFLOW_MONGODB_DATABASE",
+  "collections": [
+    {
+      "name": "workflowTasks",
+      "indexes": [
+        { "name": "uk_task_id", "keys": { "taskId": 1 }, "unique": true },
+        { "name": "uk_idempotency_key", "keys": { "idempotencyKey": 1 }, "unique": true, "sparse": true },
+        { "name": "ix_assignee_status_updated", "keys": { "assigneeId": 1, "status": 1, "updatedAt": -1 } },
+        { "name": "ix_scope_commit_type", "keys": { "scope.repositoryAlias": 1, "scope.targetCommit": 1, "type": 1 } }
+      ]
+    },
+    {
+      "name": "auditEvents",
+      "indexes": [
+        { "name": "ix_task_sequence", "keys": { "taskId": 1, "sequence": 1 }, "unique": true },
+        { "name": "ix_correlation_time", "keys": { "correlationId": 1, "occurredAt": -1 } }
+      ]
+    }
+  ]
+}
