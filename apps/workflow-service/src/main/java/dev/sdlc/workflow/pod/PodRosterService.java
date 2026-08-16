@@ -36,6 +36,12 @@ public final class PodRosterService {
         return saved;
     }
 
+    public void validateRoster(String journeyId, List<PodMembership> rows) {
+        Objects.requireNonNull(rows, "rows");
+        requireText(journeyId, "journeyId");
+        validate(journeyId, rows, LocalDate.now(clock));
+    }
+
     private static void validate(String journeyId, List<PodMembership> rows, LocalDate today) {
         Set<String> memberships = new HashSet<>();
         Set<String> activeEmployees = new HashSet<>();

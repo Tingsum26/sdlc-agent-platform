@@ -63,6 +63,36 @@ export class WorkflowApiClient {
     }, correlationId, signal);
   }
 
+  getIdentity(correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request("/api/v1/internal-readiness/identity", { method: "GET" }, correlationId, signal);
+  }
+
+  validatePodRoster(roster: unknown, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request("/api/v1/internal-readiness/pods/validate", {
+      method: "POST", body: JSON.stringify(roster),
+    }, correlationId, signal);
+  }
+
+  importPodRoster(roster: unknown, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request("/api/v1/internal-readiness/pods/import", {
+      method: "POST", body: JSON.stringify(roster),
+    }, correlationId, signal);
+  }
+
+  getIntegrationDiagnostics(correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request("/api/v1/internal-readiness/integrations", { method: "GET" }, correlationId, signal);
+  }
+
+  analyzeJourney(manifest: unknown, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request("/api/v1/journeys/analyze", {
+      method: "POST", body: JSON.stringify(manifest),
+    }, correlationId, signal);
+  }
+
+  getNextInternalValidation(correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request("/api/v1/internal-readiness/next-validation", { method: "GET" }, correlationId, signal);
+  }
+
   private async request(
     path: string,
     init: RequestInit,

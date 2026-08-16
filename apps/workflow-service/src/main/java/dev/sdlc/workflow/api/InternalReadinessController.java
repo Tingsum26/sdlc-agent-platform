@@ -70,6 +70,13 @@ public class InternalReadinessController {
                 principalId, CorrelationIdFilter.from(request));
     }
 
+    @PostMapping("/pods/validate")
+    java.util.Map<String, Object> validatePod(@Valid @RequestBody ImportPodRequest body, HttpServletRequest request) {
+        CurrentUser.require(request);
+        podService.validateRoster(body.journeyId(), body.memberships());
+        return java.util.Map.of("valid", true, "journeyId", body.journeyId(), "rowCount", body.memberships().size());
+    }
+
     @PostMapping("/assignments")
     TaskAssignment assign(@Valid @RequestBody AssignmentRequest body, HttpServletRequest request) {
         CurrentUser.require(request);
@@ -86,6 +93,18 @@ public class InternalReadinessController {
     List<IntegrationDiagnostic> integrations(HttpServletRequest request) {
         CurrentUser.require(request);
         return diagnostics.diagnostics();
+    }
+
+    @GetMapping("/next-validation")
+    java.util.Map<String, Object> nextValidation(HttpServletRequest request) {
+        CurrentUser.require(request);
+        IntegrationDiagnostic next = diagnostics.diagnostics().stream()
+                .filter(item -> item.status() != dev.sdlc.workflow.evidence.EvidenceStatus.CONTRACT_PASS)
+                .findFirst().orElse(null);
+        return next == null
+                ? java.util.Map.of("complete", true)
+                : java.util.Map.of("complete", false, "provider", next.provider(), "status", next.status(),
+                        "instruction", "Run this provider check on the company network and attach sanitized evidence.");
     }
 
     public record ImportPodRequest(

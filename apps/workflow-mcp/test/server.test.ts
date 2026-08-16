@@ -7,7 +7,7 @@ import { createWorkflowMcpServer } from "../src/server.js";
 describe("workflow MCP", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("discovers the six bounded workflow tools", async () => {
+  it("discovers the bounded workflow and internal-readiness tools", async () => {
     const fetcher = vi.fn<typeof fetch>();
     const server = createWorkflowMcpServer(new WorkflowApiClient("http://127.0.0.1:8080", fetcher));
     const client = new Client({ name: "test-client", version: "1.0.0" });
@@ -17,12 +17,18 @@ describe("workflow MCP", () => {
 
     const result = await client.listTools();
     expect(result.tools.map((tool) => tool.name).sort()).toEqual([
+      "workflow_analyze_journey",
       "workflow_claim_task",
       "workflow_complete_task",
+      "workflow_get_identity",
+      "workflow_get_integration_diagnostics",
+      "workflow_get_next_internal_validation",
       "workflow_get_task_context",
+      "workflow_import_pod_roster",
       "workflow_list_my_tasks",
       "workflow_request_approval",
       "workflow_submit_artifact",
+      "workflow_validate_pod_roster",
     ]);
     await client.close();
     await server.close();
