@@ -1,7 +1,7 @@
 # Internal-shaped simulation increment design
 
-**Date:** 2026-08-16  
-**Status:** Approved concept; written-spec review pending  
+**Date:** 2026-08-16
+**Status:** Approved concept; written-spec review pending
 **Parent design:** `2026-08-15-local-copilot-sdlc-platform-v2-design.md`
 
 ## 1. Purpose
