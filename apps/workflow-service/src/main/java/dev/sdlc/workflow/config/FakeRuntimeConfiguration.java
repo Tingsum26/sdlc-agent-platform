@@ -8,7 +8,10 @@ import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
 import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactStore;
 import dev.sdlc.workflow.artifact.FakeArtifactStore;
+import dev.sdlc.workflow.identity.DirectoryPersonService;
+import dev.sdlc.workflow.identity.EnrollmentCodeService;
 import dev.sdlc.workflow.identity.IdentityBindingService;
+import dev.sdlc.workflow.identity.OnboardingStatus;
 import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.pod.InMemoryPodRosterRepository;
 import dev.sdlc.workflow.pod.PodRosterRepository;
@@ -88,10 +91,23 @@ public class FakeRuntimeConfiguration {
     }
 
     @Bean
-    IdentityBindingService identityBindingService() {
+    DirectoryPersonService directoryPersonService(Clock clock) {
+        return new DirectoryPersonService(clock);
+    }
+
+    @Bean
+    IdentityBindingService identityBindingService(DirectoryPersonService directory) {
         IdentityBindingService service = new IdentityBindingService();
-        service.bindAdminPrincipal("EMP-100", "Fictional Scrum Master", "f***@example.invalid");
+        dev.sdlc.workflow.identity.EnterprisePrincipal sm =
+                service.bindAdminPrincipal("EMP-100", "Fictional Scrum Master", "f***@example.invalid");
+        // TODO(INTERNAL): INTERNAL-IDN-002 Seed real admin-principal provisioning instead of the fictional EMP-100.
+        directory.upsert(sm.principalId(), sm.employeeId(), sm.displayLabel(), OnboardingStatus.ONBOARDED);
         return service;
+    }
+
+    @Bean
+    EnrollmentCodeService enrollmentCodeService(IdentityBindingService bindings, Clock clock) {
+        return new EnrollmentCodeService(bindings, clock);
     }
 
     @Bean

@@ -7,6 +7,8 @@ import dev.sdlc.workflow.artifact.ArtifactStore;
 import dev.sdlc.workflow.artifact.MongoDocumentArtifactStore;
 import dev.sdlc.workflow.assignment.AssignmentService;
 import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
+import dev.sdlc.workflow.identity.DirectoryPersonService;
+import dev.sdlc.workflow.identity.EnrollmentCodeService;
 import dev.sdlc.workflow.identity.IdentityBindingService;
 import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.persistence.MongoAuditEventRepository;
@@ -84,7 +86,15 @@ public class MongoRuntimeConfiguration {
     }
 
     @Bean
+    DirectoryPersonService directoryPersonService(Clock clock) { return new DirectoryPersonService(clock); }
+
+    @Bean
     IdentityBindingService identityBindingService() { return new IdentityBindingService(); }
+
+    @Bean
+    EnrollmentCodeService enrollmentCodeService(IdentityBindingService bindings, Clock clock) {
+        return new EnrollmentCodeService(bindings, clock);
+    }
 
     @Bean
     PodRosterService podRosterService(PodRosterRepository rosters, AuditEventRepository audits, Clock clock) {

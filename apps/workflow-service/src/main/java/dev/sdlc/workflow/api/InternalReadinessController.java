@@ -3,9 +3,13 @@ package dev.sdlc.workflow.api;
 import dev.sdlc.workflow.assignment.AssignmentService;
 import dev.sdlc.workflow.assignment.TaskAssignment;
 import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
+import dev.sdlc.workflow.identity.DirectoryPerson;
+import dev.sdlc.workflow.identity.DirectoryPersonService;
+import dev.sdlc.workflow.identity.EnrollmentCodeService;
 import dev.sdlc.workflow.identity.EnterprisePrincipal;
 import dev.sdlc.workflow.identity.IdentityBindingService;
 import dev.sdlc.workflow.identity.IdentityNotFoundException;
+import dev.sdlc.workflow.identity.OnboardingStatus;
 import dev.sdlc.workflow.integration.IntegrationDiagnostic;
 import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.pod.PodMembership;
@@ -35,6 +39,8 @@ public class InternalReadinessController {
     private final AssignmentService assignmentService;
     private final TaskAssignmentRepository assignments;
     private final IntegrationDiagnosticService diagnostics;
+    private final EnrollmentCodeService enrollmentCodes;
+    private final DirectoryPersonService directory;
 
     public InternalReadinessController(
             IdentityBindingService identities,
@@ -42,13 +48,17 @@ public class InternalReadinessController {
             PodRosterRepository podRosters,
             AssignmentService assignmentService,
             TaskAssignmentRepository assignments,
-            IntegrationDiagnosticService diagnostics) {
+            IntegrationDiagnosticService diagnostics,
+            EnrollmentCodeService enrollmentCodes,
+            DirectoryPersonService directory) {
         this.identities = identities;
         this.podService = podService;
         this.podRosters = podRosters;
         this.assignmentService = assignmentService;
         this.assignments = assignments;
         this.diagnostics = diagnostics;
+        this.enrollmentCodes = enrollmentCodes;
+        this.directory = directory;
     }
 
     @GetMapping("/identity")
@@ -66,8 +76,14 @@ public class InternalReadinessController {
     @PostMapping("/pods/import")
     PodRoster importPod(@Valid @RequestBody ImportPodRequest body, HttpServletRequest request) {
         String principalId = CurrentUser.require(request).actorId();
-        return podService.importRoster(body.journeyId(), body.expectedRevision(), body.memberships(),
+        PodRoster saved = podService.importRoster(body.journeyId(), body.expectedRevision(), body.memberships(),
                 principalId, CorrelationIdFilter.from(request));
+        // TODO(INTERNAL): INTERNAL-POD-001 Replace manual roster import with Teambook/HR sync when approved.
+        for (PodMembership membership : saved.memberships()) {
+            directory.upsertFromRoster(membership.principalId(), membership.employeeId(),
+                    membership.displayLabel());
+        }
+        return saved;
     }
 
     @PostMapping("/pods/validate")
@@ -75,6 +91,37 @@ public class InternalReadinessController {
         CurrentUser.require(request);
         podService.validateRoster(body.journeyId(), body.memberships());
         return java.util.Map.of("valid", true, "journeyId", body.journeyId(), "rowCount", body.memberships().size());
+    }
+
+    @GetMapping("/pods/{journeyId}/members")
+    List<DirectoryPerson> members(@PathVariable String journeyId, HttpServletRequest request) {
+        CurrentUser.require(request);
+        PodRoster roster = podRosters.find(journeyId)
+                .orElseThrow(() -> new IllegalArgumentException("Pod roster not found"));
+        return roster.memberships().stream()
+                .map(PodMembership::principalId)
+                .map(directory::findByPrincipalId)
+                .flatMap(java.util.Optional::stream)
+                .toList();
+    }
+
+    @PostMapping("/identity/enrollment")
+    java.util.Map<String, Object> issueEnrollment(@Valid @RequestBody EnrollmentRequest body,
+            HttpServletRequest request) {
+        CurrentUser.require(request);
+        // TODO(INTERNAL): INTERNAL-IDN-001 Replace demo enrollment-code issuance with the corporate
+        // SSO/manual admin binding flow.
+        String code = enrollmentCodes.issueCode(body.employeeId());
+        return java.util.Map.of("code", code, "expiresInMinutes", 15);
+    }
+
+    @PostMapping("/identity/bind")
+    EnterprisePrincipal bind(@Valid @RequestBody BindRequest body, HttpServletRequest request) {
+        CurrentUser.require(request);
+        EnterprisePrincipal principal = enrollmentCodes.bind(body.code(), body.displayLabel(), body.maskedEmail());
+        directory.upsert(principal.principalId(), principal.employeeId(), principal.displayLabel(),
+                OnboardingStatus.ONBOARDED);
+        return principal;
     }
 
     @PostMapping("/assignments")
@@ -121,5 +168,14 @@ public class InternalReadinessController {
             @NotBlank String journeyId,
             @NotBlank String requiredRole,
             String explicitPrincipalId) {
+    }
+
+    public record EnrollmentRequest(@NotBlank String employeeId) {
+    }
+
+    public record BindRequest(
+            @NotBlank String code,
+            @NotBlank String displayLabel,
+            String maskedEmail) {
     }
 }
