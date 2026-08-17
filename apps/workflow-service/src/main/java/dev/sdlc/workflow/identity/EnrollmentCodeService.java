@@ -19,6 +19,10 @@ public final class EnrollmentCodeService {
     private final IdentityBindingService bindings;
     private final Clock clock;
 
+    public int ttlMinutes() {
+        return (int) CODE_TTL.toMinutes();
+    }
+
     public EnrollmentCodeService(IdentityBindingService bindings, Clock clock) {
         this.bindings = bindings;
         this.clock = clock;

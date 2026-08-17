@@ -75,6 +75,30 @@ class InternalReadinessIdentityIT {
                         .header("X-Demo-User", "PRINCIPAL-EMP-100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].principalId").value("PRINCIPAL-EMP-201"))
+                .andExpect(jsonPath("$[0].role").value("DEVELOPER"))
                 .andExpect(jsonPath("$[0].onboardingStatus").value("NOT_ONBOARDED"));
+
+        String issued = mvc.perform(post("/api/v1/internal-readiness/identity/enrollment")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"employeeId\":\"EMP-201\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String code = json.readTree(issued).path("code").asText();
+
+        mvc.perform(post("/api/v1/internal-readiness/identity/bind")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + code + "\",\"displayLabel\":\"Fictional Developer\","
+                                + "\"maskedEmail\":\"d***@example.invalid\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.principalId").value("PRINCIPAL-EMP-201"));
+
+        mvc.perform(get("/api/v1/internal-readiness/pods/{journeyId}/members", "ACCOUNT_OPENING")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].principalId").value("PRINCIPAL-EMP-201"))
+                .andExpect(jsonPath("$[0].role").value("DEVELOPER"))
+                .andExpect(jsonPath("$[0].onboardingStatus").value("ONBOARDED"));
     }
 }

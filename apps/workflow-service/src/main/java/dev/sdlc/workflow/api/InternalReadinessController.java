@@ -94,14 +94,19 @@ public class InternalReadinessController {
     }
 
     @GetMapping("/pods/{journeyId}/members")
-    List<DirectoryPerson> members(@PathVariable String journeyId, HttpServletRequest request) {
+    List<RosterMember> members(@PathVariable String journeyId, HttpServletRequest request) {
         CurrentUser.require(request);
         PodRoster roster = podRosters.find(journeyId)
                 .orElseThrow(() -> new IllegalArgumentException("Pod roster not found"));
         return roster.memberships().stream()
-                .map(PodMembership::principalId)
-                .map(directory::findByPrincipalId)
-                .flatMap(java.util.Optional::stream)
+                .map(membership -> new RosterMember(
+                        membership.principalId(),
+                        membership.employeeId(),
+                        membership.displayLabel(),
+                        membership.role(),
+                        directory.findByPrincipalId(membership.principalId())
+                                .map(DirectoryPerson::onboardingStatus)
+                                .orElse(OnboardingStatus.NOT_ONBOARDED)))
                 .toList();
     }
 
@@ -112,7 +117,7 @@ public class InternalReadinessController {
         // TODO(INTERNAL): INTERNAL-IDN-001 Replace demo enrollment-code issuance with the corporate
         // SSO/manual admin binding flow.
         String code = enrollmentCodes.issueCode(body.employeeId());
-        return java.util.Map.of("code", code, "expiresInMinutes", 15);
+        return java.util.Map.of("code", code, "expiresInMinutes", enrollmentCodes.ttlMinutes());
     }
 
     @PostMapping("/identity/bind")
@@ -171,6 +176,14 @@ public class InternalReadinessController {
     }
 
     public record EnrollmentRequest(@NotBlank String employeeId) {
+    }
+
+    public record RosterMember(
+            String principalId,
+            String employeeId,
+            String displayLabel,
+            String role,
+            OnboardingStatus onboardingStatus) {
     }
 
     public record BindRequest(
