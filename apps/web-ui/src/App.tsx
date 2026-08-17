@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, TaskList, type TaskListItem, type TaskStatus } from "@sdlc/ui";
 import "@sdlc/ui/tokens.css";
 import "./app.css";
+import { parsePodCsv } from "./podCsv";
 
 interface ApiTask {
   taskId: string; type: string; status: string;
@@ -12,6 +13,9 @@ interface ApiTask {
 interface Identity { employeeId: string; displayLabel: string; source: string }
 interface Diagnostic { provider: string; status: string; observedAt: string; source: string; safeDetail: string }
 interface JourneyAnalysis { status: string; totalEdges: number; provenEdges: number; gaps: Array<{ code: string; detail: string }> }
+
+interface Member { principalId: string; employeeId: string; displayLabel: string; role: string; onboardingStatus: string }
+interface Roster { revision: number }
 
 const headers = { "Content-Type": "application/json", "X-Demo-User": "developer-1" };
 const readinessHeaders = { "Content-Type": "application/json", "X-Demo-User": "PRINCIPAL-EMP-100", "X-Correlation-ID": "fictional-readiness-ui" };
@@ -44,6 +48,11 @@ export function App() {
   const [analysis, setAnalysis] = useState<JourneyAnalysis>();
   const [reportHtml, setReportHtml] = useState<string>();
   const [readinessError, setReadinessError] = useState<string>();
+  const [members, setMembers] = useState<Member[]>([]);
+  const [rosterImporting, setRosterImporting] = useState(false);
+  const [rosterError, setRosterError] = useState<string>();
+  const [assigning, setAssigning] = useState(false);
+  const [queueAssignment, setQueueAssignment] = useState<{ ticketId: string; principalId: string; reason: string }>();
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -98,6 +107,41 @@ export function App() {
     finally { setReadinessLoading(false); }
   };
 
+  const importRoster = async () => {
+    setRosterImporting(true); setRosterError(undefined);
+    try {
+      const csvResponse = await fetch("/fixtures/pod-roster.csv");
+      if (!csvResponse.ok) throw new Error("pod-csv-missing");
+      const rows = parsePodCsv(await csvResponse.text());
+      const rosterResponse = await fetch("/api/v1/internal-readiness/pods/ACCOUNT_OPENING", { headers: readinessHeaders });
+      const expectedRevision = rosterResponse.ok ? ((await rosterResponse.json() as Roster).revision ?? 0) : 0;
+      const importResponse = await fetch("/api/v1/internal-readiness/pods/import", {
+        method: "POST", headers: readinessHeaders, body: JSON.stringify({
+          journeyId: "ACCOUNT_OPENING", expectedRevision,
+          memberships: rows.map((row) => ({
+            membershipId: `MEM-${row.employeeId}`, employeeId: row.employeeId, principalId: row.principalId,
+            displayLabel: row.displayLabel, role: row.role, journeyId: row.journeyId, active: row.active,
+            effectiveFrom: row.effectiveFrom, aliases: [],
+          })),
+        }),
+      });
+      if (!importResponse.ok) throw new Error("pod-import-failed");
+      setMembers(await json<Member[]>("/api/v1/internal-readiness/pods/ACCOUNT_OPENING/members"));
+    } catch { setRosterError("pod-roster-import-failed"); }
+    finally { setRosterImporting(false); }
+  };
+
+  const assignDeveloper = async () => {
+    setAssigning(true);
+    try {
+      const assigned = await json<{ ticketId: string; principalId: string; reason: string }>(
+        "/api/v1/internal-readiness/assignments", {
+          method: "POST", body: JSON.stringify({ ticketId: "DEMO-123", journeyId: "ACCOUNT_OPENING", requiredRole: "DEVELOPER" }),
+        });
+      setQueueAssignment(assigned);
+    } finally { setAssigning(false); }
+  };
+
   async function json<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(path, { ...init, headers: readinessHeaders });
     if (!response.ok) throw new Error(`status ${response.status}`);
@@ -133,6 +177,27 @@ export function App() {
         {analysis && <section aria-labelledby="journey-result"><h3 id="journey-result">Journey · {analysis.status}</h3><p>{analysis.provenEdges} of {analysis.totalEdges} HTTP relationships include provenance.</p>
           {analysis.gaps.length > 0 && <ul>{analysis.gaps.map((gap) => <li key={gap.code}><strong>{gap.code}</strong> — {gap.detail}</li>)}</ul>}</section>}
         {reportHtml && <iframe className="journey-report" title="Journey readiness HTML report" sandbox="" srcDoc={reportHtml} />}
+      </section>
+      <section className="sdlc-card sdlc-stack readiness" aria-labelledby="pod-title">
+        <div className="section-heading"><div><p className="eyebrow">M1 · Identity &amp; Pod</p><h2 id="pod-title">Pod roster and assignment</h2></div>
+          <button type="button" disabled={rosterImporting} aria-busy={rosterImporting} onClick={() => void importRoster()}>
+            {rosterImporting ? "Importing roster…" : "Import fictitious Pod roster (CSV)"}
+          </button></div>
+        {rosterError && <ErrorState title="Pod roster unavailable" correlationId={rosterError} onRetry={() => void importRoster()} />}
+        {members.length > 0 && <div className="table-scroll"><table><caption>ACCOUNT_OPENING Pod members</caption>
+          <thead><tr><th scope="col">Employee</th><th scope="col">Label</th><th scope="col">Role</th><th scope="col">Onboarding</th></tr></thead>
+          <tbody>{members.map((member) => <tr key={member.principalId}>
+            <th scope="row">{member.employeeId}</th><td>{member.displayLabel}</td><td>{member.role}</td>
+            <td><span aria-hidden="true">◆ </span>{member.onboardingStatus}</td></tr>)}</tbody></table></div>}
+        <div className="sdlc-actions">
+          <button type="button" disabled={assigning || members.length === 0} aria-busy={assigning} onClick={() => void assignDeveloper()}>
+            {assigning ? "Assigning…" : "Assign DEMO-123 to first active DEVELOPER"}
+          </button>
+        </div>
+        {queueAssignment && <p role="status">Assigned {queueAssignment.ticketId} · {queueAssignment.principalId} · {queueAssignment.reason}</p>}
+        {queueAssignment && members.some((member) =>
+          member.principalId === queueAssignment.principalId && member.onboardingStatus === "NOT_ONBOARDED") &&
+          <p className="sdlc-muted">ASSIGNEE_NOT_ONBOARDED — this fictitious assignee has not bound a workbench identity yet.</p>}
       </section>
     </main>
   </>;
