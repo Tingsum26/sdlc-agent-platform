@@ -38,7 +38,7 @@ The machine-readable accountability list is `docs/architecture/seven-repository-
 | `sdlc-workflow-service` | Spring Boot workflow state, MongoDB, policy execution, audit, projections, enterprise adapters, Splunk logs | AI reasoning and local workspace access |
 | `sdlc-workflow-mcp` | Local stdio MCP, bounded Copilot tools, Service client, Outbox, local diagnostics | Server Webhooks, direct Mongo access, AI reasoning |
 | `sdlc-copilot-customizations` | Agents, Skills, Instructions, Prompts, Hooks, MCP profiles, Policies, Templates, Evals, routing and bundles | Runtime tasks, company employee/Journey data |
-| `sdlc-vscode-workbench` | VSIX HTML/Webview UI, nine views, refresh, bundle/MCP onboarding, diagnostics | Model invocation and canonical state |
+| `sdlc-vscode-workbench` | VSIX HTML/Webview UI, eight views, refresh, bundle/MCP onboarding, diagnostics | Model invocation and canonical state |
 | `sdlc-reference-demo` | Fictional cross-channel Journey, mocks, browser E2E, contract smoke tests, manual QA examples | Production Scrum Board and company integrations |
 
 The platform does not use Git submodules. Each component releases independently, and `sdlc-agent-platform/platform-bom.yaml` identifies a verified combination.
@@ -94,10 +94,10 @@ flowchart TD
 - **Epic Workflow** owns the shared business goal, Journey scope, Requirement Contract, cross-channel design, API Contract, dependency DAG, compatibility, Feature Flags, Native train, aggregate risk, and overall E2E.
 - **Ticket Workflow** owns one delivery unit's stages, artifacts, owner, approvals, risks, and Jira projection.
 - **Repo Task** owns the changes for one repository: base commit, branch, plan, tests, PR, review, CI, and merge commit.
-- **Developer View** is a role-oriented overview.
-- **My Work** is the authenticated person's assignment queue.
+- **My Work** is the authenticated person's landing view: assignments, available Pod work, approvals, recovery, and next actions.
 - **Ticket View** is a delivery aggregate.
-- **Repo Task View** is a code-level drill-down and is not a duplicate Ticket view.
+- **Repo Task Detail** is a code-level drill-down nested under Ticket View; it is not a duplicate top-level Ticket view.
+- **Developer View** does not exist; its role is covered by My Work.
 
 An Epic can start from a Jira Epic, several Jira tickets, a manually entered emergency change, or a Jira Epic plus an unrecorded change. Manual changes record actor, time, reason, affected scope, communication status, and the Jira backfill requirement.
 
@@ -320,19 +320,18 @@ The release bundle contains `agents/`, `skills/`, `instructions/`, `prompts/`, `
 
 ## 14. VSIX repository
 
-The extension provides nine distinct views:
+The extension provides eight distinct views:
 
-1. Developer View
+1. My Work
 2. Scrum Master View
-3. My Work
-4. Epic View
-5. Ticket View
-6. Repo Task View
-7. Customization Center
-8. MCP Center
-9. Diagnostics
+3. Epic View
+4. Ticket View (with nested Repo Task Detail)
+5. Identity / Pod Configuration
+6. Customization Center
+7. MCP Center
+8. Diagnostics
 
-The views must use separate view models and entity semantics rather than one generic task tree with different titles. Formal reports render as accessible HTML/Webviews, guided by the UI/UX Pro Max design system. Status is never color-only.
+Developer View was merged into My Work, and Repo Task Detail is nested under Ticket View rather than being a top-level view. The views must use separate view models and entity semantics rather than one generic task tree with different titles. Formal reports render as accessible HTML/Webviews, guided by the UI/UX Pro Max design system. Status is never color-only.
 
 Data refresh occurs when a view opens, when the VS Code window regains focus, on a configurable 30–60 second poll, and by manual refresh. ETags/versions avoid unnecessary reads. Every card shows observation time and `LIVE`, `DELAYED`, `STALE`, or `OFFLINE`.
 
@@ -374,20 +373,30 @@ Public release artifacts are:
 
 GitHub Actions may compile, test, lint, validate contracts, run E2E, package, create checksums/SBOMs, and publish releases. It does not call a model. Internal dependency transport—GHES Packages, Nexus, Artifactory, or mirrored release bundles—is selected by the internal agent.
 
-## 19. Migration from the current monorepo
+## 19. Public runnable milestone
+
+Every milestone ends with a runnable public experience so the platform can be tried on an ordinary VS Code installation before any internal rollout.
+
+**Public Run Definition:** the Workflow Service starts from an executable JAR with the `fake` profile (in-memory repositories, `DeterministicFakeTransport`, fictional identities such as `EMP-100 Fictional Scrum Master`, and `example.invalid` data); the web demo serves on `127.0.0.1`; the VSIX connects to `http://127.0.0.1:8080`; the Local MCP runs over stdio; the customization bundle installs through the VSIX Customization Center; and Copilot Chat drives the SDLC flow with fictitious data only. No MongoDB, Docker, GridFS, S3, or company service is required. The `Public Developer Quick Start` scripts and a browser E2E are the acceptance gate of every milestone.
+
+## 20. TODO(INTERNAL) convention
+
+Every point that needs internal-network configuration or company-specific wiring carries a code comment of the form `TODO(INTERNAL): <INTERNAL-XXX> <one-line action>` in Java/TypeScript, or `# TODO(INTERNAL): <INTERNAL-XXX> ...` in scripts, YAML, and Markdown. Each marker has a stable ID registered in `docs/handoff/INTERNAL_TODO.md` in `sdlc-agent-platform`, with component, file, configuration action, required internal evidence, and rollback notes. The internal completion report template lists every `INTERNAL-XXX` ID with a `DONE` / `BLOCKED` / `NOT_APPLICABLE` status. A platform CI check counts `TODO(INTERNAL)` markers per released file so a registered internal configuration point cannot silently disappear.
+
+## 21. Migration from the current monorepo
 
 1. **M0 — Freeze and inventory:** tag the baseline; map every file to keep, move, rewrite, or retire; delete nothing.
 2. **M1 — Contracts:** extract existing schemas/types/DTOs; add Epic, Ticket, Repo Task, events and missing artifacts; remove duplicates.
 3. **M2 — Workflow Service:** move Java and tests; retain the current Ticket slice; then add Epic, Repo Task, freshness, Scrum and Jira projection.
 4. **M3 — Local MCP:** move current tools; consume released contracts; add the full catalog, Outbox, diagnostics and redaction.
 5. **M4 — Customizations:** move the existing three Agents and four Skills; add all approved Agents, Skills, Instructions, Policies, Templates, Hooks, Evals and bundle release metadata.
-6. **M5 — VSIX:** move the extension; replace generic trees with nine view models; add onboarding, freshness, resume and diagnostics.
+6. **M5 — VSIX:** move the extension; replace generic trees with the eight distinct view models; add onboarding, freshness, resume and diagnostics.
 7. **M6 — Reference Demo:** move Web UI and Playwright; use only fictional cross-channel data; cover the entire workflow.
 8. **M7 — Platform cleanup:** after destination verification, remove migrated runtime code from the original repository and retain architecture, BOM, reports and handoff.
 
 Migration follows copy -> verify -> switch -> clean. Existing implementation is not destructively removed before destination repositories pass their acceptance checks.
 
-## 20. Definition of Done
+## 22. Definition of Done
 
 ### Platform
 
@@ -425,7 +434,7 @@ Migration follows copy -> verify -> switch -> clean. Existing implementation is 
 
 ### VSIX
 
-- Nine views have distinct models and actions.
+- The eight views have distinct models and actions.
 - Accessible HTML reports, timestamps, freshness and offline behavior work.
 - Resume, customization install, MCP onboarding and diagnostics work.
 - No model API is invoked.
@@ -436,7 +445,7 @@ Migration follows copy -> verify -> switch -> clean. Existing implementation is 
 - API/Web/iOS/Android, Native delay, flag, compatibility, manual E2E, accessibility and tagging are demonstrated.
 - Browser E2E and contract smoke tests pass without Docker.
 
-## 21. Deferred extensions
+## 23. Deferred extensions
 
 - LLM Wiki and generated team wiki
 - S3 Artifact provider
@@ -448,16 +457,16 @@ Migration follows copy -> verify -> switch -> clean. Existing implementation is 
 - richer deterministic graph aggregation
 - full knowledge graph governance and ACL-aware retrieval
 
-## 22. Current baseline gap audit
+## 24. Current baseline gap audit
 
 The current PR contains three Agents—Requirement Analyst, Solution Architect, and PR Reviewer—against the required thirteen. It contains `start-ticket`, `resume-workflow`, `prepare-pr`, and `importing-pod-members` Skills, but not the approved Epic, code-context, design, implementation, QA, onboarding, compatibility, and Scrum Master catalog.
 
 The current Workflow Service implements a useful Ticket vertical slice, identity/Pod examples, Mongo-shaped ports, mock enterprise adapters, and a Journey analyzer. It does not yet implement the complete Epic/Ticket/Repo Task hierarchy, Epic revision/staleness propagation, full Jira projection lifecycle, Scrum artifacts, complete assignment/routing, production authentication, or all artifact types.
 
-The current VSIX declares nine views but largely reuses a generic task tree. The current MCP exposes twelve slice-oriented tools rather than the approved workflow and onboarding catalog. Shared contracts are embedded in the monorepo and lack independent release ownership. The Web UI and E2E are reference-demo material rather than a production runtime component.
+The current VSIX declares nine contributed view IDs—including the removed Developer View and a top-level Repo Task View—and largely reuses a generic task tree; the approved target is eight distinct view models with Repo Task Detail nested under Ticket View. The current MCP exposes twelve slice-oriented tools rather than the approved workflow and onboarding catalog. Shared contracts are embedded in the monorepo and lack independent release ownership. The Web UI and E2E are reference-demo material rather than a production runtime component.
 
 Accordingly, these areas are `PARTIAL`; passing tests prove the implemented slice and do not prove completion of the target platform.
 
-## 23. Internal handoff evidence
+## 25. Internal handoff evidence
 
 The internal agent must return a redacted report rather than code. It covers environment facts, GHES/Jira/Confluence/Jenkins/Mongo/Splunk connectivity, company policy deviations, bundle discovery, real repository/Journey pilot coverage, screenshots where allowed, test commands and outcomes, latency bands, security/accessibility review, failures, workarounds, and unresolved decisions. Public review uses that report because internal code cannot be uploaded.

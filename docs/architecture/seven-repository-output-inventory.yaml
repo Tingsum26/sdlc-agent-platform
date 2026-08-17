@@ -30,6 +30,10 @@ repositories:
         name: redacted internal completion report template
       - id: PLATFORM-VERIFY-001
         name: cross-repository verification index
+      - id: PLATFORM-VERIFY-002
+        name: public runnable end-to-end acceptance and Quick Start
+      - id: PLATFORM-HANDOFF-003
+        name: TODO(INTERNAL) registry for internal configuration points
       - id: PLATFORM-SEC-001
         name: threat, privacy, and public-fixture rules
 
@@ -183,22 +187,20 @@ repositories:
     purpose: human-ui-onboarding-status-and-diagnostics
     outputs:
       - id: VSIX-VIEW-001
-        name: Developer View
+        name: My Work
       - id: VSIX-VIEW-002
         name: Scrum Master View
       - id: VSIX-VIEW-003
-        name: My Work
-      - id: VSIX-VIEW-004
         name: Epic View
+      - id: VSIX-VIEW-004
+        name: Ticket View with nested Repo Task Detail
       - id: VSIX-VIEW-005
-        name: Ticket View
+        name: Identity and Pod Configuration
       - id: VSIX-VIEW-006
-        name: Repo Task View
-      - id: VSIX-VIEW-007
         name: Customization Center
-      - id: VSIX-VIEW-008
+      - id: VSIX-VIEW-007
         name: MCP Center
-      - id: VSIX-VIEW-009
+      - id: VSIX-VIEW-008
         name: Diagnostics
       - id: VSIX-HTML-001
         name: accessible human-readable HTML report renderer
