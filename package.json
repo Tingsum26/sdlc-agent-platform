@@ -10,7 +10,8 @@
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
-    "e2e:public-mvp": "playwright test e2e/public-mvp.spec.ts"
+    "e2e:public-mvp": "playwright test e2e/public-mvp.spec.ts",
+    "e2e:m1": "playwright test e2e/m1-identity-pod.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.55.1"
