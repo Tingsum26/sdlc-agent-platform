@@ -53,6 +53,7 @@ export function App() {
   const [rosterError, setRosterError] = useState<string>();
   const [assigning, setAssigning] = useState(false);
   const [queueAssignment, setQueueAssignment] = useState<{ ticketId: string; principalId: string; reason: string }>();
+  const [assignmentError, setAssignmentError] = useState<string>();
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -132,13 +133,16 @@ export function App() {
   };
 
   const assignDeveloper = async () => {
-    setAssigning(true);
+    setAssigning(true); setAssignmentError(undefined);
     try {
       const assigned = await json<{ ticketId: string; principalId: string; reason: string }>(
         "/api/v1/internal-readiness/assignments", {
           method: "POST", body: JSON.stringify({ ticketId: "DEMO-123", journeyId: "ACCOUNT_OPENING", requiredRole: "DEVELOPER" }),
         });
       setQueueAssignment(assigned);
+    } catch {
+      setQueueAssignment(undefined);
+      setAssignmentError("pod-assignment-failed");
     } finally { setAssigning(false); }
   };
 
@@ -184,6 +188,7 @@ export function App() {
             {rosterImporting ? "Importing roster…" : "Import fictitious Pod roster (CSV)"}
           </button></div>
         {rosterError && <ErrorState title="Pod roster unavailable" correlationId={rosterError} onRetry={() => void importRoster()} />}
+        {assignmentError && <ErrorState title="Assignment unavailable" correlationId={assignmentError} onRetry={() => void assignDeveloper()} />}
         {members.length > 0 && <div className="table-scroll"><table><caption>ACCOUNT_OPENING Pod members</caption>
           <thead><tr><th scope="col">Employee</th><th scope="col">Label</th><th scope="col">Role</th><th scope="col">Onboarding</th></tr></thead>
           <tbody>{members.map((member) => <tr key={member.principalId}>
