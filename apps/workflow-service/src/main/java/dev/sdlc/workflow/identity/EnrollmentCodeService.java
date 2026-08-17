@@ -37,15 +37,13 @@ public final class EnrollmentCodeService {
         if (code == null || code.isBlank()) {
             throw new IllegalArgumentException("code is required");
         }
-        Enrollment enrollment = pending.get(code);
+        Enrollment enrollment = pending.remove(code);
         if (enrollment == null) {
             throw new IllegalArgumentException("Unknown enrollment code");
         }
         if (clock.instant().isAfter(enrollment.expiresAt())) {
-            pending.remove(code);
             throw new IllegalArgumentException("Enrollment code expired");
         }
-        pending.remove(code);
         return bindings.bindAdminPrincipal(enrollment.employeeId(), displayLabel, maskedEmail);
     }
 

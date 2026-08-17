@@ -8,6 +8,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class EnrollmentCodeServiceTest {
@@ -43,6 +47,34 @@ class EnrollmentCodeServiceTest {
         clock.advance(Duration.ofMinutes(16));
 
         assertThrows(IllegalArgumentException.class, () -> service.bind(code, "Fictional BA", "b***@example.invalid"));
+    }
+
+    @Test
+    void onlyOneThreadCanBindTheSameCode() throws Exception {
+        EnrollmentCodeService service = new EnrollmentCodeService(new IdentityBindingService(), Clock.systemUTC());
+        String code = service.issueCode("EMP-780");
+        int threads = 8;
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch go = new CountDownLatch(1);
+        AtomicInteger successes = new AtomicInteger();
+        List<Thread> workers = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            workers.add(new Thread(() -> {
+                ready.countDown();
+                try { go.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+                try {
+                    service.bind(code, "Fictional " + Thread.currentThread().getName(), "w***@example.invalid");
+                    successes.incrementAndGet();
+                } catch (IllegalArgumentException expected) {
+                    // unknown code for every loser
+                }
+            }));
+            workers.get(i).start();
+        }
+        ready.await();
+        go.countDown();
+        for (Thread worker : workers) { worker.join(); }
+        assertEquals(1, successes.get());
     }
 
     private static final class MutableClock extends Clock {
