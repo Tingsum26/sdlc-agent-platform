@@ -29,7 +29,7 @@ public final class ChangeRequestService {
         this.clock = clock;
     }
 
-    public EpicChangeRequest create(String epicId, String reason, ChangeUrgency urgency, String description,
+    public synchronized EpicChangeRequest create(String epicId, String reason, ChangeUrgency urgency, String description,
             List<String> affectedTicketIds, String actorId, String correlationId) {
         epics.findById(epicId).orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicId));
         String changeRequestId = "CR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
@@ -42,7 +42,7 @@ public final class ChangeRequestService {
         return request;
     }
 
-    public EpicChangeRequest approve(String changeRequestId, long expectedVersion, String actorId, String actorRole,
+    public synchronized EpicChangeRequest approve(String changeRequestId, long expectedVersion, String actorId, String actorRole,
             String correlationId) {
         EpicChangeRequest request = requireVersion(changeRequestId, expectedVersion);
         if (request.status() != ChangeRequestStatus.DRAFT) {
@@ -67,7 +67,7 @@ public final class ChangeRequestService {
         return updated;
     }
 
-    public EpicChangeRequest reject(String changeRequestId, long expectedVersion, String actorId, String correlationId) {
+    public synchronized EpicChangeRequest reject(String changeRequestId, long expectedVersion, String actorId, String correlationId) {
         EpicChangeRequest request = requireVersion(changeRequestId, expectedVersion);
         if (request.status() != ChangeRequestStatus.DRAFT) {
             throw new IllegalStateException("Change request is not DRAFT");

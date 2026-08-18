@@ -25,7 +25,7 @@ public final class DependencyService {
         this.clock = clock;
     }
 
-    public Dependency add(String epicId, String fromTicketId, String toTicketId, String actorId, String correlationId) {
+    public synchronized Dependency add(String epicId, String fromTicketId, String toTicketId, String actorId, String correlationId) {
         epics.findById(epicId).orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicId));
         if (fromTicketId.equals(toTicketId)) {
             throw new IllegalArgumentException("A ticket cannot depend on itself");
@@ -50,7 +50,7 @@ public final class DependencyService {
         return dependency;
     }
 
-    public Dependency resolve(String dependencyId, long expectedVersion, String actorId, String correlationId) {
+    public synchronized Dependency resolve(String dependencyId, long expectedVersion, String actorId, String correlationId) {
         Dependency dependency = requireVersion(dependencyId, expectedVersion);
         if (dependency.status() != DependencyStatus.BLOCKING) {
             throw new IllegalStateException("Dependency is not BLOCKING");

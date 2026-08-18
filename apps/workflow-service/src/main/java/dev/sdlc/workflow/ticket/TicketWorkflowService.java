@@ -56,7 +56,7 @@ public final class TicketWorkflowService {
         this.clock = clock;
     }
 
-    public TicketWorkflow create(String epicId, String ticketId, Channel channel, String actorId, String correlationId) {
+    public synchronized TicketWorkflow create(String epicId, String ticketId, Channel channel, String actorId, String correlationId) {
         requireText(ticketId, "ticketId");
         epics.findById(epicId).orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicId));
         if (epics.findById(epicId).orElseThrow().status() != EpicStatus.ACTIVE) {
@@ -74,7 +74,7 @@ public final class TicketWorkflowService {
         return ticket;
     }
 
-    public TicketWorkflow transition(String ticketId, long expectedVersion, TicketDeliveryStatus target,
+    public synchronized TicketWorkflow transition(String ticketId, long expectedVersion, TicketDeliveryStatus target,
             String actorId, String correlationId) {
         TicketWorkflow ticket = requireVersion(ticketId, expectedVersion);
         if (!ALLOWED.getOrDefault(ticket.status(), Set.of()).contains(target)) {
@@ -92,7 +92,7 @@ public final class TicketWorkflowService {
         return changed;
     }
 
-    public TicketWorkflow markChangePending(String ticketId, String actorId, String correlationId) {
+    public synchronized TicketWorkflow markChangePending(String ticketId, String actorId, String correlationId) {
         TicketWorkflow ticket = ticket(ticketId);
         TicketWorkflow flagged = ticket.withChangeFlag(true, clock.instant());
         tickets.save(flagged);
@@ -101,7 +101,7 @@ public final class TicketWorkflowService {
         return flagged;
     }
 
-    public TicketWorkflow ackChange(String ticketId, long expectedVersion, String actorId, String correlationId) {
+    public synchronized TicketWorkflow ackChange(String ticketId, long expectedVersion, String actorId, String correlationId) {
         TicketWorkflow ticket = requireVersion(ticketId, expectedVersion);
         TicketWorkflow acked = ticket.withChangeFlag(false, clock.instant());
         tickets.save(acked);

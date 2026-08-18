@@ -19,7 +19,7 @@ public final class EpicWorkflowService {
         this.clock = clock;
     }
 
-    public EpicWorkflow create(String epicId, String title, String journeyId, String actorId, String correlationId) {
+    public synchronized EpicWorkflow create(String epicId, String title, String journeyId, String actorId, String correlationId) {
         requireText(epicId, "epicId");
         requireText(title, "title");
         requireText(journeyId, "journeyId");
@@ -34,7 +34,7 @@ public final class EpicWorkflowService {
         return epic;
     }
 
-    public EpicWorkflow activate(String epicId, long expectedVersion, String actorId, String correlationId) {
+    public synchronized EpicWorkflow activate(String epicId, long expectedVersion, String actorId, String correlationId) {
         EpicWorkflow epic = requireVersion(epicId, expectedVersion);
         if (epic.status() != EpicStatus.CREATED) {
             throw new IllegalStateException("Epic is not CREATED");

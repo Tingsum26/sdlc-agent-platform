@@ -18,7 +18,7 @@ public final class SkipService {
         this.clock = clock;
     }
 
-    public SkipResult skip(String taskId, long expectedVersion, String reason, String discussedWith,
+    public synchronized SkipResult skip(String taskId, long expectedVersion, String reason, String discussedWith,
             String actorId, String actorRole, String correlationId) {
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("reason is required");

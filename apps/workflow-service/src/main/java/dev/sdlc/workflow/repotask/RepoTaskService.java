@@ -36,7 +36,7 @@ public final class RepoTaskService {
         this.clock = clock;
     }
 
-    public RepoTask create(String ticketId, String repositoryAlias, String baseCommit, String actorId,
+    public synchronized RepoTask create(String ticketId, String repositoryAlias, String baseCommit, String actorId,
             String correlationId) {
         tickets.ticket(ticketId);
         String repoTaskId = "REPO-TASK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
@@ -49,7 +49,7 @@ public final class RepoTaskService {
         return repoTask;
     }
 
-    public RepoTask transition(String repoTaskId, long expectedVersion, RepoTaskStatus target, String actorId,
+    public synchronized RepoTask transition(String repoTaskId, long expectedVersion, RepoTaskStatus target, String actorId,
             String correlationId) {
         RepoTask repoTask = requireVersion(repoTaskId, expectedVersion);
         if (!ALLOWED.getOrDefault(repoTask.status(), Set.of()).contains(target)) {

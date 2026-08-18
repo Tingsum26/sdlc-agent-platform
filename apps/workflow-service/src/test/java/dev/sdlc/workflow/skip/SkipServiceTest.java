@@ -63,4 +63,45 @@ class SkipServiceTest {
         assertThrows(IllegalArgumentException.class, () -> fixture.skips()
                 .skip("TASK-M2-3", 0, " ", "w", "EMP-100", "DEVELOPER", "corr-2"));
     }
+
+    @Test
+    void skipsARunningStageAndKeepsTheClaimRecord() {
+        Fixture fixture = fixture();
+        fixture.tasks().createTask("TASK-M2-4", TaskType.DESIGN,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "skip:DEMO-123-d", "EMP-100", "corr-1");
+        fixture.tasks().claimTask("TASK-M2-4", "EMP-100", java.time.Duration.ofMinutes(15), 0, "corr-2");
+
+        SkipResult result = fixture.skips().skip("TASK-M2-4", 1, "Fictional fast-track",
+                "Fictional architect", "EMP-100", "DEVELOPER", "corr-3");
+
+        assertEquals(TaskStatus.COMPLETED, result.task().status());
+        assertEquals("DESIGN", result.attestation().stageType());
+    }
+
+    @Test
+    void skipsAWaitingForConfirmationStage() {
+        Fixture fixture = fixture();
+        fixture.tasks().createTask("TASK-M2-5", TaskType.REQUIREMENT_ANALYSIS,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "skip:DEMO-123-e", "EMP-100", "corr-1");
+        fixture.tasks().claimTask("TASK-M2-5", "EMP-100", java.time.Duration.ofMinutes(15), 0, "corr-2");
+        fixture.tasks().transition("TASK-M2-5", TaskStatus.LOCAL_COPILOT_RUNNING, TaskStatus.WAITING_FOR_USER_CONFIRMATION,
+                1, "EMP-100", "corr-3");
+
+        SkipResult result = fixture.skips().skip("TASK-M2-5", 2, "Fictional fast-track",
+                "Fictional architect", "EMP-100", "DEVELOPER", "corr-4");
+
+        assertEquals(TaskStatus.COMPLETED, result.task().status());
+    }
+
+    @Test
+    void rejectsBlankActorRole() {
+        Fixture fixture = fixture();
+        fixture.tasks().createTask("TASK-M2-6", TaskType.DESIGN,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "skip:DEMO-123-f", "EMP-100", "corr-1");
+        assertThrows(IllegalArgumentException.class, () -> fixture.skips()
+                .skip("TASK-M2-6", 0, "Fictional fast-track", "Fictional architect", "EMP-100", " ", "corr-2"));
+    }
 }
