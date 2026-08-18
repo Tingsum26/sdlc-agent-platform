@@ -45,7 +45,7 @@ describe("copilot format intersection", () => {
     expect(content).not.toContain("claude:");
   });
 
-  it("every agent references only existing tools or local MCP", () => {
+  it("every agent declares the sdlc-workflow MCP tools and a non-empty tool list", () => {
     const content = readdirSync(resolve(root, "central/agents")).filter((name) => name.endsWith(".agent.md"))
       .map((name) => readFileSync(resolve(root, "central/agents", name), "utf8")).join("\n");
     expect(content).toContain("sdlc-workflow");
