@@ -11,9 +11,9 @@ A repository enters the platform or its onboarding is missing.
 
 ## Procedure
 1. Scan structure, build files, entry points, tests, and deployment notes.
-2. Produce `docs/architecture/overview.md`, module notes, build/test/run commands, and `.agent-context.yaml`.
+2. Draft the content for `docs/architecture/overview.md`, module notes, build/test/run commands, and `.agent-context.yaml`; the human places it in the repository via PR.
 3. Mark each claim with the source commit; mark unknowns `KNOWN_GAP`.
-4. Submit the onboarding artifact for human review.
+4. Present the onboarding draft for human review and PR.
 
 ## Output contract
-Repository onboarding artifact plus the context file. Never claim a full call graph when only static reading was possible.
+Repository onboarding draft plus the context file content, for the human to PR. Never claim a full call graph when only static reading was possible.

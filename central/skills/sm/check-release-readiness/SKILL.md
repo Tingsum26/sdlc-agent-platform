@@ -10,7 +10,7 @@ version: "1.0"
 A release window approaches.
 
 ## Procedure
-1. Read ticket statuses (MERGED/RELEASED/FLAG_ENABLED/E2E_VERIFIED), CI, and manual E2E results.
+1. Read ticket statuses (MERGED/RELEASED/FLAG_ENABLED/E2E_VERIFIED), CI, and manual E2E results via `workflow_epic_resume`.
 2. Verify the flag plan, native release-train window, and rollback rule.
 3. List open gates and who must act.
 

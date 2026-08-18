@@ -13,7 +13,7 @@ Journey or compatibility analysis needs caller→endpoint edges and no graph sca
 1. Collect endpoints (controllers/routes/OpenAPI) and clients (Feign/WebClient/RestTemplate/fetch/Retrofit/URLSession).
 2. Match by service name, method, and normalized path.
 3. Label each edge with confidence and evidence; `AI_INFERRED` for unresolved matches.
-4. Submit edges into the journey manifest.
+4. Include the edges in the journey manifest draft for the human to commit.
 
 ## Output contract
 HTTP edges with provenance. This is the Level-0 fallback and must never claim scanner-grade completeness.
