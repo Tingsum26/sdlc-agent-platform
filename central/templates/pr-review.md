@@ -1,4 +1,5 @@
 # PR Review — {prId}
+- Reviewer model: {modelId}
 
 ## Findings (BLOCKER → LOW)
 | Severity | Location | Evidence | Impact | Violation | Remediation |

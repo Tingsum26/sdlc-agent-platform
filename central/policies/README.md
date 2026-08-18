@@ -8,7 +8,7 @@ Policies are machine-readable JSON consumed by the workflow policy loader.
 - `REQUIRE_EVIDENCE` — the action proceeds only when the named evidence is attached.
 
 ## Event vocabulary
-- Lifecycle: `commit`, `artifact-submit`, `stage-advance`, `stage-skip`, `merge-gate`.
+- Lifecycle: `commit`, `artifact-submit`, `log`, `stage-advance`, `stage-skip`, `merge-gate`.
 - Domain deltas: `api-change`, `native-change`, `flag-introduction`, `pod-assignment`, `manual-e2e-result`, `jira-comment`.
 - Review steps: `pr-review`, `tagging-review`.
 A policy may listen to a single event or an array of events.
