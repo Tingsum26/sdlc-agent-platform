@@ -71,4 +71,12 @@ class JourneyFreshnessServiceTest {
         fixture.service().observe("ACCOUNT_OPENING", "WEB_REPO", COMMIT_A, NOW.plusSeconds(1));
         assertEquals(JourneyFreshness.LIVE, fixture.service().freshnessFor(MANIFEST).get("WEB_REPO"));
     }
+
+    @Test
+    void staleMarkOutranksDelayedForOldObservations() {
+        Fixture fixture = fixture();
+        fixture.service().observe("ACCOUNT_OPENING", "WEB_REPO", COMMIT_A, NOW.minus(Duration.ofHours(48)));
+        fixture.service().markStale("ACCOUNT_OPENING", "WEB_REPO", NOW.minus(Duration.ofHours(48)));
+        assertEquals(JourneyFreshness.STALE, fixture.service().freshnessFor(MANIFEST).get("WEB_REPO"));
+    }
 }
