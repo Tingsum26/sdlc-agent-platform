@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0",
+  "journeyId": "ACCOUNT_OPENING",
+  "domainId": "CUSTOMER",
+  "version": 1,
+  "repositories": [
+    { "alias": "API_REPO", "role": "API", "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "alias": "WEB_REPO", "role": "WEB", "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "alias": "IOS_REPO", "role": "IOS", "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "alias": "ANDROID_REPO", "role": "ANDROID", "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  ],
+  "screens": [
+    { "screenId": "OPEN_ACCOUNT", "client": "WEB", "repositoryAlias": "WEB_REPO" },
+    { "screenId": "IDENTITY_DETAILS", "client": "IOS", "repositoryAlias": "IOS_REPO" }
+  ],
+  "httpEdges": [
+    {
+      "edgeId": "EDGE_1",
+      "caller": "WEB_REPO",
+      "apiRepositoryAlias": "API_REPO",
+      "method": "POST",
+      "normalizedPath": "/accounts",
+      "requestSchemaRef": "schema/request",
+      "responseSchemaRef": "schema/response",
+      "commonHeaderRule": "X-Company-Context",
+      "authenticationClass": "OAUTH",
+      "compatibility": "ADDITIVE_WITH_FLAG",
+      "provenance": { "source": "CODE_SCAN", "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "evidenceId": "EVIDENCE_1" }
+    }
+  ],
+  "releasePolicy": { "webApiFirst": true, "nativeReleaseTrain": "MONTHLY_NATIVE", "compatibilityWindowDays": 60, "rollbackRule": "disable AWS toggle" },
+  "featureFlag": { "required": true, "provider": "AWS_APP_CONFIG", "ownerRole": "PRODUCT_OWNER" },
+  "e2eOwners": [ { "scenario": "HAPPY_PATH", "ownerRole": "QA" } ]
+}

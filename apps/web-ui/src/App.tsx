@@ -74,6 +74,11 @@ export function App() {
   const [m2Busy, setM2Busy] = useState<string>();
   const [jiraDraft, setJiraDraft] = useState<JiraDraftState>();
   const [ciLine, setCiLine] = useState<CiStateLine>();
+  const [journeyFixture, setJourneyFixture] = useState<any>();
+  const [journeyFreshness, setJourneyFreshness] = useState<Record<string, string>>({});
+  const [observeLine, setObserveLine] = useState<string>();
+  const [journeyReportHtml, setJourneyReportHtml] = useState<string>();
+  const [journeyError, setJourneyError] = useState<string>();
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -398,6 +403,61 @@ export function App() {
     } catch { setDependencyError("advance-api-failed"); } finally { setM2Busy(undefined); }
   };
 
+  const loadJourneyFixture = async () => {
+    setJourneyError(undefined);
+    try {
+      const fixtureResponse = await fetch("/fixtures/journey-account-opening.json");
+      if (!fixtureResponse.ok) throw new Error(`status ${fixtureResponse.status}`);
+      setJourneyFixture(await fixtureResponse.json());
+    } catch { setJourneyError("journey-fixture-load-failed"); }
+  };
+
+  const observeApiRepo = async () => {
+    setJourneyError(undefined);
+    try {
+      await m2Api("/api/v1/journeys/observations", {
+        method: "POST",
+        body: JSON.stringify({
+          journeyId: "ACCOUNT_OPENING", repositoryAlias: "API_REPO",
+          commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        }),
+      });
+      setObserveLine("Observed API_REPO");
+    } catch { setJourneyError("journey-observe-failed"); }
+  };
+
+  const markWebRepoStale = async () => {
+    setJourneyError(undefined);
+    try {
+      await m2Api("/api/v1/journeys/observations/stale", {
+        method: "POST",
+        body: JSON.stringify({ journeyId: "ACCOUNT_OPENING", repositoryAlias: "WEB_REPO" }),
+      });
+      setObserveLine("Marked WEB_REPO stale");
+    } catch { setJourneyError("journey-stale-failed"); }
+  };
+
+  const refreshJourneyReport = async () => {
+    setJourneyError(undefined);
+    try {
+      let fixture = journeyFixture;
+      if (!fixture) {
+        const fixtureResponse = await fetch("/fixtures/journey-account-opening.json");
+        if (!fixtureResponse.ok) throw new Error(`status ${fixtureResponse.status}`);
+        fixture = await fixtureResponse.json();
+        setJourneyFixture(fixture);
+      }
+      setJourneyFreshness(await m2Api<Record<string, string>>("/api/v1/journeys/freshness", {
+        method: "POST", body: JSON.stringify(fixture),
+      }));
+      const reportResponse = await fetch("/api/v1/journeys/report", {
+        method: "POST", headers: readinessHeaders, body: JSON.stringify(fixture),
+      });
+      if (!reportResponse.ok) throw new Error(`status ${reportResponse.status}`);
+      setJourneyReportHtml(await reportResponse.text());
+    } catch { setJourneyError("journey-refresh-failed"); }
+  };
+
   async function json<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(path, { ...init, headers: readinessHeaders });
     if (!response.ok) throw new Error(`status ${response.status}`);
@@ -514,6 +574,25 @@ export function App() {
         </div>
         {jiraDraft && <p role="status">{jiraDraft.projectionId} · {jiraDraft.milestoneId} · {jiraDraft.status} · attempts {jiraDraft.attempts}</p>}
         {ciLine && <p role="status">{ciLine.ticketId} · {ciLine.status} · {ciLine.detailsUrl}</p>}
+      </section>
+      <section className="sdlc-card sdlc-stack readiness" aria-labelledby="m4-title">
+        <div className="section-heading"><div><p className="eyebrow">M4 · Journey freshness</p><h2 id="m4-title">Account Opening journey and freshness</h2></div></div>
+        <div className="sdlc-actions">
+          <button type="button" onClick={() => void loadJourneyFixture()}>Load Account Opening journey</button>
+          <button type="button" onClick={() => void observeApiRepo()}>Observe API_REPO (LIVE)</button>
+          <button type="button" onClick={() => void markWebRepoStale()}>Mark WEB_REPO stale</button>
+          <button type="button" onClick={() => void refreshJourneyReport()}>Refresh journey report</button>
+        </div>
+        {journeyError && <ErrorState title="Journey demo unavailable" correlationId={journeyError} onRetry={() => setJourneyError(undefined)} />}
+        {observeLine && <p role="status">{observeLine}</p>}
+        {Object.keys(journeyFreshness).length > 0 && (
+          <ul>
+            {Object.entries(journeyFreshness).map(([alias, freshness]) => (
+              <li key={alias}>{alias} — {freshness}</li>
+            ))}
+          </ul>
+        )}
+        {journeyReportHtml && <iframe className="journey-report" title="Journey readiness HTML report" sandbox="" srcDoc={journeyReportHtml} />}
       </section>
     </main>
   </>;
