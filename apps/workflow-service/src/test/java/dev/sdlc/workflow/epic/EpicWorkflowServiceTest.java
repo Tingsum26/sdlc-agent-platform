@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.sdlc.workflow.audit.InMemoryDomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,6 @@ class EpicWorkflowServiceTest {
     void rejectsStaleActivation() {
         EpicWorkflowService service = service();
         service.create("EPIC-M2-1", "Fictional epic", "ACCOUNT_OPENING", "EMP-100", "corr-1");
-        assertThrows(IllegalStateException.class, () -> service.activate("EPIC-M2-1", 5, "EMP-100", "corr-2"));
+        assertThrows(WorkflowConflictException.class, () -> service.activate("EPIC-M2-1", 5, "EMP-100", "corr-2"));
     }
 }

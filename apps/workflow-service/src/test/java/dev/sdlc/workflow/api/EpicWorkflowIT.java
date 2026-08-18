@@ -140,6 +140,37 @@ class EpicWorkflowIT {
                 .andExpect(jsonPath("$.tickets").isArray())
                 .andExpect(jsonPath("$.tickets").isNotEmpty())
                 .andExpect(jsonPath("$.auditTrail[?(@.action=='EPIC_CREATED')]").isNotEmpty());
+
+        String skipped = mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ticketId":"DEMO-456","repositoryAlias":"REPO_A","targetCommit":"0123456789abcdef0123456789abcdef01234567"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String skipTaskId = json.readTree(skipped).path("taskId").asText();
+        long skipTaskVersion = json.readTree(skipped).path("version").asLong();
+
+        mvc.perform(post("/api/v1/tasks/{taskId}/skip", skipTaskId)
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":" + skipTaskVersion + ",\"reason\":\"Fictional fast-track\","
+                                + "\"discussedWith\":\"Fictional architect\",\"actorRole\":\"DEVELOPER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.attestation.stageType").isNotEmpty());
+
+        mvc.perform(get("/api/v1/tasks/{taskId}/skips", skipTaskId)
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].reason").value("Fictional fast-track"));
+    }
+
+    @Test
+    void requiresAnAuthenticatedDemoUser() throws Exception {
+        mvc.perform(get("/api/v1/epics/EPIC-M2-1"))
+                .andExpect(status().isUnauthorized());
     }
 
     private static JsonNode findById(JsonNode array, String ticketId) {

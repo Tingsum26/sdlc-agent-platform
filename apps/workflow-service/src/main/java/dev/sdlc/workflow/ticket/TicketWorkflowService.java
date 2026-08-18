@@ -2,6 +2,7 @@ package dev.sdlc.workflow.ticket;
 
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.dependency.DependencyRepository;
 import dev.sdlc.workflow.dependency.DependencyStatus;
 import dev.sdlc.workflow.epic.Channel;
@@ -60,7 +61,7 @@ public final class TicketWorkflowService {
         requireText(ticketId, "ticketId");
         epics.findById(epicId).orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicId));
         if (epics.findById(epicId).orElseThrow().status() != EpicStatus.ACTIVE) {
-            throw new IllegalStateException("Epic must be ACTIVE to attach tickets");
+            throw new WorkflowConflictException("Epic must be ACTIVE to attach tickets");
         }
         if (tickets.findById(ticketId).isPresent()) {
             throw new IllegalArgumentException("Ticket already exists: " + ticketId);
@@ -78,11 +79,11 @@ public final class TicketWorkflowService {
             String actorId, String correlationId) {
         TicketWorkflow ticket = requireVersion(ticketId, expectedVersion);
         if (!ALLOWED.getOrDefault(ticket.status(), Set.of()).contains(target)) {
-            throw new IllegalStateException("Transition not allowed: " + ticket.status() + " -> " + target);
+            throw new WorkflowConflictException("Transition not allowed: " + ticket.status() + " -> " + target);
         }
         if (target == TicketDeliveryStatus.MERGED && dependencies.findByEpicId(ticket.epicId()).stream()
                 .anyMatch(dep -> dep.toTicketId().equals(ticketId) && dep.status() == DependencyStatus.BLOCKING)) {
-            throw new IllegalStateException("Ticket is blocked by an unresolved dependency");
+            throw new WorkflowConflictException("Ticket is blocked by an unresolved dependency");
         }
         TicketWorkflow changed = ticket.transitionedTo(target, clock.instant());
         tickets.save(changed);
@@ -121,7 +122,7 @@ public final class TicketWorkflowService {
     private TicketWorkflow requireVersion(String ticketId, long expectedVersion) {
         TicketWorkflow ticket = ticket(ticketId);
         if (ticket.version() != expectedVersion) {
-            throw new IllegalStateException("Expected ticket version " + expectedVersion + " but was " + ticket.version());
+            throw new WorkflowConflictException("Expected ticket version " + expectedVersion + " but was " + ticket.version());
         }
         return ticket;
     }

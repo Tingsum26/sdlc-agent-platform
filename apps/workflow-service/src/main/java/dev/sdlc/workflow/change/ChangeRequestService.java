@@ -2,6 +2,7 @@ package dev.sdlc.workflow.change;
 
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.epic.EpicWorkflowRepository;
 import dev.sdlc.workflow.ticket.TicketWorkflowService;
 import java.time.Clock;
@@ -46,13 +47,13 @@ public final class ChangeRequestService {
             String correlationId) {
         EpicChangeRequest request = requireVersion(changeRequestId, expectedVersion);
         if (request.status() != ChangeRequestStatus.DRAFT) {
-            throw new IllegalStateException("Change request is not DRAFT");
+            throw new WorkflowConflictException("Change request is not DRAFT");
         }
         if (!APPROVER_ROLES.contains(actorRole)) {
             throw new IllegalArgumentException("Approver role must be BUSINESS_OWNER or TECHNICAL_OWNER");
         }
         if (request.approvedRoles().contains(actorRole)) {
-            throw new IllegalStateException("Role already approved this change request");
+            throw new WorkflowConflictException("Role already approved this change request");
         }
         EpicChangeRequest updated = request.withApproval(actorRole, clock.instant());
         if (updated.status() == ChangeRequestStatus.APPROVED) {
@@ -70,7 +71,7 @@ public final class ChangeRequestService {
     public synchronized EpicChangeRequest reject(String changeRequestId, long expectedVersion, String actorId, String correlationId) {
         EpicChangeRequest request = requireVersion(changeRequestId, expectedVersion);
         if (request.status() != ChangeRequestStatus.DRAFT) {
-            throw new IllegalStateException("Change request is not DRAFT");
+            throw new WorkflowConflictException("Change request is not DRAFT");
         }
         EpicChangeRequest rejected = request.rejectedNow(clock.instant());
         requests.save(rejected);
@@ -87,7 +88,7 @@ public final class ChangeRequestService {
         EpicChangeRequest request = requests.findById(changeRequestId)
                 .orElseThrow(() -> new IllegalArgumentException("Change request not found: " + changeRequestId));
         if (request.version() != expectedVersion) {
-            throw new IllegalStateException(
+            throw new WorkflowConflictException(
                     "Expected change request version " + expectedVersion + " but was " + request.version());
         }
         return request;

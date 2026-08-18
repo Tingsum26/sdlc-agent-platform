@@ -2,6 +2,7 @@ package dev.sdlc.workflow.dependency;
 
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.epic.EpicWorkflowRepository;
 import dev.sdlc.workflow.ticket.TicketWorkflowService;
 import java.time.Clock;
@@ -53,7 +54,7 @@ public final class DependencyService {
     public synchronized Dependency resolve(String dependencyId, long expectedVersion, String actorId, String correlationId) {
         Dependency dependency = requireVersion(dependencyId, expectedVersion);
         if (dependency.status() != DependencyStatus.BLOCKING) {
-            throw new IllegalStateException("Dependency is not BLOCKING");
+            throw new WorkflowConflictException("Dependency is not BLOCKING");
         }
         Dependency resolved = dependency.resolved(clock.instant());
         dependencies.save(resolved);
@@ -70,7 +71,7 @@ public final class DependencyService {
         Dependency dependency = dependencies.findById(dependencyId)
                 .orElseThrow(() -> new IllegalArgumentException("Dependency not found: " + dependencyId));
         if (dependency.version() != expectedVersion) {
-            throw new IllegalStateException(
+            throw new WorkflowConflictException(
                     "Expected dependency version " + expectedVersion + " but was " + dependency.version());
         }
         return dependency;

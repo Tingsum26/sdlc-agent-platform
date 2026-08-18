@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.sdlc.workflow.audit.InMemoryDomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.dependency.InMemoryDependencyRepository;
 import dev.sdlc.workflow.epic.Channel;
 import dev.sdlc.workflow.epic.EpicWorkflowService;
@@ -41,7 +42,7 @@ class RepoTaskServiceTest {
         RepoTask task = service.create("M2-API-1", "REPO_A", "0123456789abcdef", "EMP-100", "corr-1");
         RepoTask progressed = service.transition(task.repoTaskId(), 0, RepoTaskStatus.IN_PROGRESS, "EMP-100", "corr-2");
         assertEquals(RepoTaskStatus.IN_PROGRESS, progressed.status());
-        assertThrows(IllegalStateException.class, () -> service
+        assertThrows(WorkflowConflictException.class, () -> service
                 .transition(task.repoTaskId(), 1, RepoTaskStatus.MERGED, "EMP-100", "corr-3"));
     }
 

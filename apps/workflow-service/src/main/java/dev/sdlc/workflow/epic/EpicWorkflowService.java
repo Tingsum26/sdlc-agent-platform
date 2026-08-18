@@ -2,6 +2,7 @@ package dev.sdlc.workflow.epic;
 
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -37,7 +38,7 @@ public final class EpicWorkflowService {
     public synchronized EpicWorkflow activate(String epicId, long expectedVersion, String actorId, String correlationId) {
         EpicWorkflow epic = requireVersion(epicId, expectedVersion);
         if (epic.status() != EpicStatus.CREATED) {
-            throw new IllegalStateException("Epic is not CREATED");
+            throw new WorkflowConflictException("Epic is not CREATED");
         }
         EpicWorkflow activated = epic.transitionedTo(EpicStatus.ACTIVE, clock.instant());
         epics.save(activated);
@@ -57,7 +58,7 @@ public final class EpicWorkflowService {
     private EpicWorkflow requireVersion(String epicId, long expectedVersion) {
         EpicWorkflow epic = get(epicId);
         if (epic.version() != expectedVersion) {
-            throw new IllegalStateException("Expected epic version " + expectedVersion + " but was " + epic.version());
+            throw new WorkflowConflictException("Expected epic version " + expectedVersion + " but was " + epic.version());
         }
         return epic;
     }

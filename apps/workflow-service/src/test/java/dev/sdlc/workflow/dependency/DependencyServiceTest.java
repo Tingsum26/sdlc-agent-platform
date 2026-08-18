@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.sdlc.workflow.audit.InMemoryDomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.epic.Channel;
 import dev.sdlc.workflow.epic.EpicWorkflowService;
 import dev.sdlc.workflow.epic.InMemoryEpicWorkflowRepository;
@@ -55,7 +56,7 @@ class DependencyServiceTest {
         Dependency added = fixture.dependencies().add("EPIC-M2-1", "M2-API-1", "M2-WEB-1", "EMP-100", "corr-1");
         Dependency resolved = fixture.dependencies().resolve(added.dependencyId(), 0, "EMP-100", "corr-2");
         assertEquals(DependencyStatus.RESOLVED, resolved.status());
-        assertThrows(IllegalStateException.class,
+        assertThrows(WorkflowConflictException.class,
                 () -> fixture.dependencies().resolve(added.dependencyId(), 0, "EMP-100", "corr-3"));
     }
 }

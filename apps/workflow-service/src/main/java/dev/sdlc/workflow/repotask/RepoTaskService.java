@@ -2,6 +2,7 @@ package dev.sdlc.workflow.repotask;
 
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.ticket.TicketWorkflowService;
 import java.time.Clock;
 import java.time.Instant;
@@ -53,7 +54,7 @@ public final class RepoTaskService {
             String correlationId) {
         RepoTask repoTask = requireVersion(repoTaskId, expectedVersion);
         if (!ALLOWED.getOrDefault(repoTask.status(), Set.of()).contains(target)) {
-            throw new IllegalStateException("Repo task transition not allowed: " + repoTask.status() + " -> " + target);
+            throw new WorkflowConflictException("Repo task transition not allowed: " + repoTask.status() + " -> " + target);
         }
         RepoTask changed = repoTask.transitionedTo(target, clock.instant());
         repoTasks.save(changed);
@@ -71,7 +72,7 @@ public final class RepoTaskService {
         RepoTask repoTask = repoTasks.findById(repoTaskId)
                 .orElseThrow(() -> new IllegalArgumentException("Repo task not found: " + repoTaskId));
         if (repoTask.version() != expectedVersion) {
-            throw new IllegalStateException(
+            throw new WorkflowConflictException(
                     "Expected repo task version " + expectedVersion + " but was " + repoTask.version());
         }
         return repoTask;

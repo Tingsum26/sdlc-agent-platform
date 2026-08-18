@@ -4,6 +4,7 @@ import dev.sdlc.workflow.artifact.ArtifactHashMismatchException;
 import dev.sdlc.workflow.artifact.ArtifactImmutableException;
 import dev.sdlc.workflow.artifact.ArtifactNotFoundException;
 import dev.sdlc.workflow.artifact.UnsafeArtifactContentException;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.security.UnauthorizedRequestException;
 import dev.sdlc.workflow.identity.IdentityNotFoundException;
 import dev.sdlc.workflow.pod.InvalidPodRosterException;
@@ -35,7 +36,7 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler({StaleTaskVersionException.class, StaleRosterRevisionException.class,
-            IllegalTaskTransitionException.class, ArtifactImmutableException.class, IllegalStateException.class})
+            IllegalTaskTransitionException.class, ArtifactImmutableException.class, WorkflowConflictException.class})
     ResponseEntity<Map<String, Object>> conflict(RuntimeException exception, HttpServletRequest request) {
         return problem(HttpStatus.CONFLICT, "Workflow conflict", "The workflow state changed; refresh and retry", request);
     }

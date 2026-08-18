@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.sdlc.workflow.audit.InMemoryDomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.dependency.Dependency;
 import dev.sdlc.workflow.dependency.DependencyKind;
 import dev.sdlc.workflow.dependency.DependencyService;
@@ -77,7 +78,7 @@ class TicketWorkflowServiceTest {
     void rejectsInvalidTransitions() {
         Fixture fixture = fixture();
         fixture.tickets().create("EPIC-M2-1", "M2-API-1", Channel.API, "EMP-100", "corr-1");
-        assertThrows(IllegalStateException.class, () -> fixture.tickets()
+        assertThrows(WorkflowConflictException.class, () -> fixture.tickets()
                 .transition("M2-API-1", 0, TicketDeliveryStatus.MERGED, "EMP-100", "corr-2"));
     }
 
@@ -101,7 +102,7 @@ class TicketWorkflowServiceTest {
                 DependencyKind.REQUIRES_BEFORE, DependencyStatus.BLOCKING, 0, NOW));
 
         long mergeVersion = version;
-        assertThrows(IllegalStateException.class, () -> fixture.tickets()
+        assertThrows(WorkflowConflictException.class, () -> fixture.tickets()
                 .transition("M2-WEB-1", mergeVersion, TicketDeliveryStatus.MERGED, "EMP-100", "corr-3"));
     }
 

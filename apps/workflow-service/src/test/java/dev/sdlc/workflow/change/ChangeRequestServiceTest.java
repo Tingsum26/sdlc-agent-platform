@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.sdlc.workflow.audit.InMemoryDomainAuditEventRepository;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.dependency.InMemoryDependencyRepository;
 import dev.sdlc.workflow.epic.Channel;
 import dev.sdlc.workflow.epic.EpicWorkflowService;
@@ -59,7 +60,7 @@ class ChangeRequestServiceTest {
         EpicChangeRequest created = fixture.changes().create("EPIC-M2-1", "Fictional scope change",
                 ChangeUrgency.STANDARD, "Fictional detail", List.of(), "EMP-100", "corr-1");
         fixture.changes().approve(created.changeRequestId(), 0, "EMP-100", "BUSINESS_OWNER", "corr-2");
-        assertThrows(IllegalStateException.class, () -> fixture.changes()
+        assertThrows(WorkflowConflictException.class, () -> fixture.changes()
                 .approve(created.changeRequestId(), 1, "EMP-100", "BUSINESS_OWNER", "corr-3"));
     }
 
@@ -81,7 +82,7 @@ class ChangeRequestServiceTest {
                 List.of(), "EMP-100", "corr-1");
         EpicChangeRequest rejected = fixture.changes().reject(created.changeRequestId(), 0, "EMP-100", "corr-2");
         assertEquals(ChangeRequestStatus.REJECTED, rejected.status());
-        assertThrows(IllegalStateException.class, () -> fixture.changes()
+        assertThrows(WorkflowConflictException.class, () -> fixture.changes()
                 .approve(created.changeRequestId(), 1, "EMP-100", "BUSINESS_OWNER", "corr-3"));
     }
 }
