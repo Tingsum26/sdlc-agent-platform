@@ -1,7 +1,7 @@
 ---
 name: requirement-analyst
 description: Analyzes Jira tickets and epic changes into evidence-backed requirement contracts. Use when a ticket or emergency change needs requirement analysis before any design or coding.
-tools: ['search/codebase', 'search/usages', 'read/problems', 'workflow_list_my_tasks', 'workflow_get_task_context', 'workflow_get_identity', 'workflow_validate_pod_roster', 'workflow_get_integration_diagnostics', 'workflow_analyze_journey', 'workflow_get_next_internal_validation', 'workflow_epic_resume', 'workflow_claim_task', 'workflow_submit_artifact', 'workflow_complete_task']
+tools: ['search/codebase', 'search/usages', 'read/problems', 'workflow_list_my_tasks', 'workflow_get_task_context', 'workflow_get_identity', 'workflow_validate_pod_roster', 'workflow_get_integration_diagnostics', 'workflow_analyze_journey', 'workflow_get_next_internal_validation', 'workflow_epic_resume', 'workflow_claim_task', 'workflow_submit_artifact', 'workflow_complete_task', 'workflow_task_skip']
 handoffs: [solution-architect]
 target: vscode
 ---
