@@ -124,4 +124,87 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
     description: "Read the next company-network validation action; it never claims simulated evidence is real.",
     inputSchema: z.object({}), annotations: { readOnlyHint: true },
   }, (_args, extra) => safe("workflow_get_next_internal_validation", (correlationId) => api.getNextInternalValidation(correlationId, extra.signal)));
+
+  server.registerTool("workflow_epic_create", {
+    description: "Create a fictional Epic workflow aggregate.",
+    inputSchema: z.object({
+      epicId: z.string().min(3).max(80), title: z.string().min(1), journeyId: z.string().min(3).max(80),
+    }),
+  }, (args, extra) => safe("workflow_epic_create", (correlationId) => api.createEpic(args, correlationId, extra.signal)));
+
+  server.registerTool("workflow_epic_activate", {
+    description: "Activate a CREATED epic before attaching tickets.",
+    inputSchema: z.object({ epicId: z.string().min(1), expectedVersion: z.number().int().nonnegative() }),
+  }, ({ epicId, expectedVersion }, extra) => safe("workflow_epic_activate",
+    (correlationId) => api.activateEpic(epicId, expectedVersion, correlationId, extra.signal)));
+
+  server.registerTool("workflow_epic_attach_ticket", {
+    description: "Attach a channel ticket (API/WEB/IOS/ANDROID) to an active epic.",
+    inputSchema: z.object({
+      epicId: z.string().min(1), ticketId: z.string().min(1),
+      channel: z.enum(["API", "WEB", "IOS", "ANDROID"]),
+    }),
+  }, ({ epicId, ticketId, channel }, extra) => safe("workflow_epic_attach_ticket",
+    (correlationId) => api.attachTicket(epicId, { ticketId, channel }, correlationId, extra.signal)));
+
+  server.registerTool("workflow_ticket_advance", {
+    description: "Advance a ticket along its delivery status machine with an exact version.",
+    inputSchema: z.object({
+      ticketId: z.string().min(1), expectedVersion: z.number().int().nonnegative(),
+      target: z.enum(["PLANNED", "IN_ANALYSIS", "WAITING_FOR_APPROVAL", "IN_DEVELOPMENT", "PR_OPEN",
+        "CI_PASSED", "MERGED", "RELEASED", "FLAG_ENABLED", "E2E_VERIFIED", "BLOCKED", "CANCELLED"]),
+    }),
+  }, ({ ticketId, expectedVersion, target }, extra) => safe("workflow_ticket_advance",
+    (correlationId) => api.advanceTicket(ticketId, expectedVersion, target, correlationId, extra.signal)));
+
+  server.registerTool("workflow_ticket_add_repo_task", {
+    description: "Create a repo-level implementation task under a ticket.",
+    inputSchema: z.object({
+      ticketId: z.string().min(1), repositoryAlias: z.string().min(1), baseCommit: z.string().min(1),
+    }),
+  }, ({ ticketId, repositoryAlias, baseCommit }, extra) => safe("workflow_ticket_add_repo_task",
+    (correlationId) => api.addRepoTask(ticketId, repositoryAlias, baseCommit, correlationId, extra.signal)));
+
+  server.registerTool("workflow_epic_add_dependency", {
+    description: "Record a REQUIRES_BEFORE dependency between two tickets of one epic.",
+    inputSchema: z.object({
+      epicId: z.string().min(1), fromTicketId: z.string().min(1), toTicketId: z.string().min(1),
+    }),
+  }, ({ epicId, fromTicketId, toTicketId }, extra) => safe("workflow_epic_add_dependency",
+    (correlationId) => api.addDependency(epicId, fromTicketId, toTicketId, correlationId, extra.signal)));
+
+  server.registerTool("workflow_epic_create_change_request", {
+    description: "Create an emergency change request against an epic.",
+    inputSchema: z.object({
+      epicId: z.string().min(1), reason: z.string().min(1),
+      urgency: z.enum(["STANDARD", "URGENT"]), description: z.string().min(1),
+      affectedTicketIds: z.array(z.string().min(1)).max(200),
+    }),
+  }, ({ epicId, ...body }, extra) => safe("workflow_epic_create_change_request",
+    (correlationId) => api.createChangeRequest(epicId, body, correlationId, extra.signal)));
+
+  server.registerTool("workflow_epic_approve_change_request", {
+    description: "Approve a change request as BUSINESS_OWNER or TECHNICAL_OWNER; both roles are required.",
+    inputSchema: z.object({
+      changeRequestId: z.string().min(1), expectedVersion: z.number().int().nonnegative(),
+      actorRole: z.enum(["BUSINESS_OWNER", "TECHNICAL_OWNER"]),
+    }),
+  }, ({ changeRequestId, expectedVersion, actorRole }, extra) => safe("workflow_epic_approve_change_request",
+    (correlationId) => api.approveChangeRequest(changeRequestId, expectedVersion, actorRole, correlationId, extra.signal)));
+
+  server.registerTool("workflow_task_skip", {
+    description: "Skip a stage with a persisted attestation (reason, discussed-with, actor role).",
+    inputSchema: z.object({
+      taskId: z.string().min(1), expectedVersion: z.number().int().nonnegative(),
+      reason: z.string().min(1), discussedWith: z.string().optional(), actorRole: z.string().min(1),
+    }),
+  }, ({ taskId, ...body }, extra) => safe("workflow_task_skip",
+    (correlationId) => api.skipTask(taskId, body, correlationId, extra.signal)));
+
+  server.registerTool("workflow_epic_resume", {
+    description: "Read persisted epic state, open tasks, next actions, and the audit trail after a shutdown.",
+    inputSchema: z.object({ epicId: z.string().min(1) }),
+    annotations: { readOnlyHint: true },
+  }, ({ epicId }, extra) => safe("workflow_epic_resume",
+    (correlationId) => api.resumeEpic(epicId, correlationId, extra.signal)));
 }

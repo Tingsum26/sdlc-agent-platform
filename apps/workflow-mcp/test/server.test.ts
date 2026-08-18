@@ -20,6 +20,13 @@ describe("workflow MCP", () => {
       "workflow_analyze_journey",
       "workflow_claim_task",
       "workflow_complete_task",
+      "workflow_epic_activate",
+      "workflow_epic_add_dependency",
+      "workflow_epic_approve_change_request",
+      "workflow_epic_attach_ticket",
+      "workflow_epic_create",
+      "workflow_epic_create_change_request",
+      "workflow_epic_resume",
       "workflow_get_identity",
       "workflow_get_integration_diagnostics",
       "workflow_get_next_internal_validation",
@@ -28,6 +35,9 @@ describe("workflow MCP", () => {
       "workflow_list_my_tasks",
       "workflow_request_approval",
       "workflow_submit_artifact",
+      "workflow_task_skip",
+      "workflow_ticket_add_repo_task",
+      "workflow_ticket_advance",
       "workflow_validate_pod_roster",
     ]);
     await client.close();

@@ -93,6 +93,67 @@ export class WorkflowApiClient {
     return this.request("/api/v1/internal-readiness/next-validation", { method: "GET" }, correlationId, signal);
   }
 
+  createEpic(epic: unknown, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request("/api/v1/epics", { method: "POST", body: JSON.stringify(epic) }, correlationId, signal);
+  }
+
+  activateEpic(epicId: string, expectedVersion: number, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/epics/${encodeURIComponent(epicId)}/activate`, {
+      method: "POST", body: JSON.stringify({ expectedVersion }),
+    }, correlationId, signal);
+  }
+
+  attachTicket(epicId: string, body: unknown, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/epics/${encodeURIComponent(epicId)}/tickets`, {
+      method: "POST", body: JSON.stringify(body),
+    }, correlationId, signal);
+  }
+
+  advanceTicket(ticketId: string, expectedVersion: number, target: string,
+    correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/tickets/${encodeURIComponent(ticketId)}/advance`, {
+      method: "POST", body: JSON.stringify({ expectedVersion, target }),
+    }, correlationId, signal);
+  }
+
+  addRepoTask(ticketId: string, repositoryAlias: string, baseCommit: string,
+    correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/tickets/${encodeURIComponent(ticketId)}/repo-tasks`, {
+      method: "POST", body: JSON.stringify({ repositoryAlias, baseCommit }),
+    }, correlationId, signal);
+  }
+
+  addDependency(epicId: string, fromTicketId: string, toTicketId: string,
+    correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/epics/${encodeURIComponent(epicId)}/dependencies`, {
+      method: "POST", body: JSON.stringify({ fromTicketId, toTicketId }),
+    }, correlationId, signal);
+  }
+
+  createChangeRequest(epicId: string, body: unknown,
+    correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/epics/${encodeURIComponent(epicId)}/change-requests`, {
+      method: "POST", body: JSON.stringify(body),
+    }, correlationId, signal);
+  }
+
+  approveChangeRequest(changeRequestId: string, expectedVersion: number, actorRole: string,
+    correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/change-requests/${encodeURIComponent(changeRequestId)}/approve`, {
+      method: "POST", body: JSON.stringify({ expectedVersion, actorRole }),
+    }, correlationId, signal);
+  }
+
+  skipTask(taskId: string, body: unknown, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/tasks/${encodeURIComponent(taskId)}/skip`, {
+      method: "POST", body: JSON.stringify(body),
+    }, correlationId, signal);
+  }
+
+  resumeEpic(epicId: string, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/epics/${encodeURIComponent(epicId)}/resume`, { method: "GET" }, correlationId, signal);
+  }
+
   private async request(
     path: string,
     init: RequestInit,
