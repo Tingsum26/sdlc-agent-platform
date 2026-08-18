@@ -7,7 +7,7 @@
   "skills": 33,
   "instructions": 19,
   "policies": 15,
-  "templates": 19,
+  "templates": 20,
   "referencesFile": "central/REFERENCES.md",
   "compatibility": {
     "vscode": ">=1.100",

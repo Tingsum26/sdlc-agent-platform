@@ -70,7 +70,7 @@ describe("central catalog", () => {
     expect(manifest.skills).toBe(33);
     expect(manifest.instructions).toBe(19);
     expect(manifest.policies).toBe(15);
-    expect(manifest.templates).toBe(19);
+    expect(manifest.templates).toBe(20);
     expect(existsSync(`${root}/${manifest.referencesFile}`)).toBe(true);
   });
 
