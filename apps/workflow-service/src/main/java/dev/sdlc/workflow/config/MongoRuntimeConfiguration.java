@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.sdlc.workflow.approval.ApprovalService;
 import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactStore;
+import dev.sdlc.workflow.artifact.JiraProjectionClient;
 import dev.sdlc.workflow.artifact.MongoDocumentArtifactStore;
 import dev.sdlc.workflow.assignment.AssignmentService;
 import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
@@ -21,7 +22,13 @@ import dev.sdlc.workflow.epic.InMemoryEpicWorkflowRepository;
 import dev.sdlc.workflow.identity.DirectoryPersonService;
 import dev.sdlc.workflow.identity.EnrollmentCodeService;
 import dev.sdlc.workflow.identity.IdentityBindingService;
+import dev.sdlc.workflow.integration.CiStatusAdapter;
 import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
+import dev.sdlc.workflow.integration.MockCiStatusAdapter;
+import dev.sdlc.workflow.jiraprojection.FakeJiraProjectionClient;
+import dev.sdlc.workflow.jiraprojection.InMemoryJiraProjectionRepository;
+import dev.sdlc.workflow.jiraprojection.JiraProjectionRepository;
+import dev.sdlc.workflow.jiraprojection.JiraProjectionService;
 import dev.sdlc.workflow.persistence.MongoAuditEventRepository;
 import dev.sdlc.workflow.persistence.MongoPodRosterRepository;
 import dev.sdlc.workflow.persistence.MongoTaskAssignmentRepository;
@@ -206,5 +213,28 @@ public class MongoRuntimeConfiguration {
     @Bean
     SkipService skipService(WorkflowTaskService workflowTasks, SkipAttestationRepository attestations, Clock clock) {
         return new SkipService(workflowTasks, attestations, clock);
+    }
+
+    @Bean
+    JiraProjectionRepository jiraProjectionRepository() {
+        return new InMemoryJiraProjectionRepository();
+    }
+
+    @Bean
+    JiraProjectionClient jiraProjectionClient() {
+        // TODO(INTERNAL): INTERNAL-JIRA-001 Replace the fake projection client with the real Jira comment API.
+        return new FakeJiraProjectionClient();
+    }
+
+    @Bean
+    JiraProjectionService jiraProjectionService(JiraProjectionRepository projections,
+            JiraProjectionClient client, Clock clock) {
+        return new JiraProjectionService(projections, client, clock);
+    }
+
+    @Bean
+    CiStatusAdapter ciStatusAdapter() {
+        // TODO(INTERNAL): INTERNAL-CI-001 Replace the mock CI adapter with the real Jenkins adapter.
+        return new MockCiStatusAdapter();
     }
 }

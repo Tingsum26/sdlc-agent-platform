@@ -70,4 +70,18 @@ class JiraProjectionServiceTest {
         fixture.service().flushPending("EMP-100", "corr-2");
         assertEquals(0, fixture.service().flushPending("EMP-100", "corr-3").size());
     }
+
+    @Test
+    void failedProjectionsAreNotRetried() {
+        Fixture fixture = fixture();
+        fixture.client().failNext();
+        fixture.client().failNext();
+        fixture.client().failNext();
+        fixture.service().enqueue("DEMO-123", "REQ-APPROVED", "Requirement approved", "EMP-100", "corr-1");
+        fixture.service().flushPending("EMP-100", "corr-2");
+        fixture.service().flushPending("EMP-100", "corr-3");
+        JiraProjection failed = fixture.service().flushPending("EMP-100", "corr-4").get(0);
+        assertEquals(JiraProjectionStatus.JIRA_ARTIFACT_SYNC_FAILED, failed.status());
+        assertEquals(0, fixture.service().flushPending("EMP-100", "corr-5").size());
+    }
 }

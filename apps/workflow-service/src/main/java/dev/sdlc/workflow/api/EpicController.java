@@ -1,15 +1,22 @@
 package dev.sdlc.workflow.api;
 
+import dev.sdlc.workflow.artifact.JiraProjectionStatus;
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
 import dev.sdlc.workflow.change.ChangeRequestService;
 import dev.sdlc.workflow.change.ChangeUrgency;
 import dev.sdlc.workflow.change.EpicChangeRequest;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.dependency.Dependency;
 import dev.sdlc.workflow.dependency.DependencyService;
 import dev.sdlc.workflow.epic.Channel;
 import dev.sdlc.workflow.epic.EpicWorkflow;
 import dev.sdlc.workflow.epic.EpicWorkflowService;
+import dev.sdlc.workflow.integration.CiState;
+import dev.sdlc.workflow.integration.CiStatus;
+import dev.sdlc.workflow.integration.CiStatusAdapter;
+import dev.sdlc.workflow.jiraprojection.JiraProjection;
+import dev.sdlc.workflow.jiraprojection.JiraProjectionService;
 import dev.sdlc.workflow.repotask.RepoTask;
 import dev.sdlc.workflow.repotask.RepoTaskService;
 import dev.sdlc.workflow.security.CurrentUser;
@@ -51,10 +58,13 @@ public class EpicController {
     private final SkipService skips;
     private final WorkflowTaskService workflowTasks;
     private final DomainAuditEventRepository audits;
+    private final JiraProjectionService jiraProjections;
+    private final CiStatusAdapter ciStatusAdapter;
 
     public EpicController(EpicWorkflowService epics, TicketWorkflowService tickets, RepoTaskService repoTasks,
             DependencyService dependencies, ChangeRequestService changeRequests, SkipService skips,
-            WorkflowTaskService workflowTasks, DomainAuditEventRepository audits) {
+            WorkflowTaskService workflowTasks, DomainAuditEventRepository audits,
+            JiraProjectionService jiraProjections, CiStatusAdapter ciStatusAdapter) {
         this.epics = epics;
         this.tickets = tickets;
         this.repoTasks = repoTasks;
@@ -63,6 +73,8 @@ public class EpicController {
         this.skips = skips;
         this.workflowTasks = workflowTasks;
         this.audits = audits;
+        this.jiraProjections = jiraProjections;
+        this.ciStatusAdapter = ciStatusAdapter;
     }
 
     @PostMapping("/epics")
@@ -115,6 +127,57 @@ public class EpicController {
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
         return tickets.ackChange(ticketId, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request));
+    }
+
+    @PostMapping("/jira-drafts")
+    ResponseEntity<JiraProjection> createJiraDraft(@Valid @RequestBody JiraDraftRequest body,
+            HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        // TODO(INTERNAL): INTERNAL-JIRA-001 Route the projection outbox to the real Jira comment API.
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(jiraProjections.enqueue(body.ticketId(), body.milestoneId(), body.summary(),
+                        user.actorId(), CorrelationIdFilter.from(request)));
+    }
+
+    @PostMapping("/jira-drafts/{projectionId}/publish")
+    JiraProjection publishJiraDraft(@PathVariable String projectionId, @Valid @RequestBody VersionRequest body,
+            HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        JiraProjection draft = jiraProjections.get(projectionId);
+        if (draft.status() != JiraProjectionStatus.JIRA_ARTIFACT_SYNC_PENDING) {
+            throw new WorkflowConflictException("Projection is not pending");
+        }
+        return jiraProjections.flushPending(user.actorId(), CorrelationIdFilter.from(request)).stream()
+                .filter(item -> item.projectionId().equals(projectionId))
+                .findFirst()
+                .orElseThrow(() -> new WorkflowConflictException("Projection is not pending"));
+    }
+
+    @PostMapping("/jira-drafts/retry")
+    List<JiraProjection> retryJiraDrafts(HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        return jiraProjections.flushPending(user.actorId(), CorrelationIdFilter.from(request));
+    }
+
+    @GetMapping("/jira-drafts/{projectionId}")
+    JiraProjection jiraDraft(@PathVariable String projectionId, HttpServletRequest request) {
+        CurrentUser.require(request);
+        return jiraProjections.get(projectionId);
+    }
+
+    @PostMapping("/tickets/{ticketId}/ci")
+    Map<String, Object> recordCi(@PathVariable String ticketId, @Valid @RequestBody CiRequest body,
+            HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        // TODO(INTERNAL): INTERNAL-CI-001 Route CI status to the real Jenkins adapter; the fake profile uses the
+        // mock PASSED adapter.
+        CiStatus status = ciStatusAdapter.getStatus(body.repositoryAlias(), body.revision());
+        TicketWorkflow ticket = tickets.ticket(ticketId);
+        TicketWorkflow advanced = tickets.transition(ticketId, ticket.version(),
+                status.state() == CiState.PASSED ? TicketDeliveryStatus.CI_PASSED : TicketDeliveryStatus.BLOCKED,
+                user.actorId(), CorrelationIdFilter.from(request));
+        return Map.of("ticket", advanced, "status", advanced.status().name(), "state", status.state().name(),
+                "detailsUrl", status.detailsUrl());
     }
 
     @PostMapping("/tickets/{ticketId}/repo-tasks")
@@ -252,6 +315,13 @@ public class EpicController {
     }
 
     public record AdvanceRequest(@Min(0) long expectedVersion, @NotNull TicketDeliveryStatus target) {
+    }
+
+    public record JiraDraftRequest(@NotBlank String ticketId, @NotBlank String milestoneId,
+            @NotBlank String summary) {
+    }
+
+    public record CiRequest(@NotBlank String repositoryAlias, @NotBlank String revision) {
     }
 
     public record RepoTaskRequest(@NotBlank String repositoryAlias, @NotBlank String baseCommit) {
