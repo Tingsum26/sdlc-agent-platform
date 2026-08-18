@@ -9,7 +9,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Emits allowlisted structured audit events to Splunk through the diagnostic
  * adapter. Only the fields in the adapter's allowlist survive; everything
- * else is dropped by the sanitizer, so callers may pass rich detail safely.
+ * else is dropped by the sanitizer, so callers may pass rich detail; string
+ * values are sanitized for {@code keyword=value} secrets only.
  *
  * Emission is best-effort: a failed publish is logged and swallowed so that
  * observability can never break the primary workflow operation.

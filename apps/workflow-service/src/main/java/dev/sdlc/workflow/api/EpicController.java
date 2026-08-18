@@ -181,7 +181,7 @@ public class EpicController {
         TicketWorkflow advanced = tickets.transition(ticketId, ticket.version(),
                 status.state() == CiState.PASSED ? TicketDeliveryStatus.CI_PASSED : TicketDeliveryStatus.BLOCKED,
                 user.actorId(), correlationId);
-        splunkAudit.ciStatus(ticketId, body.repositoryAlias(), advanced.status().name(), correlationId);
+        splunkAudit.ciStatus(ticketId, body.repositoryAlias(), status.state().name(), correlationId);
         return Map.of("ticket", advanced, "status", advanced.status().name(), "state", status.state().name(),
                 "detailsUrl", status.detailsUrl());
     }
