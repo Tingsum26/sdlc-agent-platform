@@ -20,4 +20,4 @@ A ticket has no persisted requirement-analysis task, or the human asks to start 
 8. Stop. Do not design, edit code, push a branch, open a PR, or approve on behalf of a person.
 
 ## Output contract
-Artifact type `REQUIREMENT_REPORT` matching the requirement-contract schema. If onboarding or code evidence is missing, mark `BLOCKED_BY_CONTEXT` and state the smallest evidence needed. A user may explicitly skip a later design approval; record that decision and actor in the workflow, but never silently skip this requirement confirmation.
+Artifact type `REQUIREMENT_REPORT` matching the requirement-contract schema. If onboarding or code evidence is missing, mark `BLOCKED_BY_CONTEXT` and state the smallest evidence needed. A user may explicitly skip a later design approval; record that decision and actor in the workflow via `workflow_task_skip`, but never silently skip this requirement confirmation.
