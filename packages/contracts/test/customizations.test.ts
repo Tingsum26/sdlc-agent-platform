@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -31,5 +31,24 @@ describe("central Copilot customizations", () => {
     expect(source).toMatch(/read.only|只读/i);
     expect(source).toMatch(/evidence|证据/i);
     expect(source).toMatch(/severity|严重/i);
+  });
+});
+
+describe("copilot format intersection", () => {
+  it("uses no Claude-only fields in agents or skills", () => {
+    const scan = (dir: string) => readdirSync(dir, { recursive: true } as never)
+      .filter((name) => String(name).endsWith(".agent.md") || String(name).endsWith("SKILL.md"))
+      .map((name) => readFileSync(resolve(dir, String(name)), "utf8"))
+      .join("\n");
+    const content = scan(resolve(root, "central/agents")) + scan(resolve(root, "central/skills"));
+    expect(content).not.toMatch(/allowed-tools|agent-instructions:/);
+    expect(content).not.toContain("claude:");
+  });
+
+  it("every agent references only existing tools or local MCP", () => {
+    const content = readdirSync(resolve(root, "central/agents")).filter((name) => name.endsWith(".agent.md"))
+      .map((name) => readFileSync(resolve(root, "central/agents", name), "utf8")).join("\n");
+    expect(content).toContain("sdlc-workflow");
+    expect(content).not.toMatch(/tools:\s*\[\s*\]/);
   });
 });
