@@ -22,6 +22,9 @@ interface TicketState { ticketId: string; channel: string; status: string; pendi
 interface ChangeRequestState { changeRequestId: string; status: string; approvedRoles: string[]; requiredApprovals: number; version: number }
 interface ResumeState { epic: EpicState; tickets: Array<{ ticket: TicketState; nextAction: string }>; auditTrail: Array<{ action: string; actorId: string; occurredAt: string }> }
 
+interface JiraDraftState { projectionId: string; ticketId: string; milestoneId: string; summary: string; status: string; attempts: number }
+interface CiStateLine { ticketId: string; status: string; detailsUrl: string }
+
 const headers = { "Content-Type": "application/json", "X-Demo-User": "developer-1" };
 const readinessHeaders = { "Content-Type": "application/json", "X-Demo-User": "PRINCIPAL-EMP-100", "X-Correlation-ID": "fictional-readiness-ui" };
 const ref = "0123456789012345678901234567890123456789";
@@ -69,6 +72,8 @@ export function App() {
   const [resume, setResume] = useState<ResumeState>();
   const [skipLine, setSkipLine] = useState<string>();
   const [m2Busy, setM2Busy] = useState<string>();
+  const [jiraDraft, setJiraDraft] = useState<JiraDraftState>();
+  const [ciLine, setCiLine] = useState<CiStateLine>();
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -337,6 +342,62 @@ export function App() {
     } catch { setDependencyError("resume-failed"); } finally { setM2Busy(undefined); }
   };
 
+  const draftJiraComment = async () => {
+    setM2Busy("jira");
+    try {
+      setJiraDraft(await m2Api<JiraDraftState>("/api/v1/jira-drafts", {
+        method: "POST", body: JSON.stringify({ ticketId: "DEMO-123", milestoneId: "REQ-APPROVED", summary: "Requirement approved" }),
+      }));
+    } catch { setDependencyError("jira-draft-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const publishJiraComment = async () => {
+    if (!jiraDraft) return;
+    setM2Busy("jira");
+    try {
+      setJiraDraft(await m2Api<JiraDraftState>(`/api/v1/jira-drafts/${jiraDraft.projectionId}/publish`, {
+        method: "POST",
+      }));
+    } catch { setDependencyError("jira-publish-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const retryJiraComments = async () => {
+    setM2Busy("jira");
+    try {
+      const updated = await m2Api<JiraDraftState[]>("/api/v1/jira-drafts/retry", { method: "POST", body: "{}" });
+      const mine = updated.find((item) => item.projectionId === jiraDraft?.projectionId);
+      if (mine) setJiraDraft(mine);
+    } catch { setDependencyError("jira-retry-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const recordJenkinsCi = async () => {
+    setM2Busy("ci");
+    try {
+      const result = await m2Api<{ ticket: TicketState; status: string; detailsUrl: string }>("/api/v1/tickets/M2-API-1/ci", {
+        method: "POST", body: JSON.stringify({ repositoryAlias: "REPO_A", revision: "0123456789abcdef" }),
+      });
+      setCiLine({ ticketId: result.ticket.ticketId, status: result.ticket.status, detailsUrl: result.detailsUrl });
+      await refreshTickets(epic!.epicId);
+    } catch { setDependencyError("ci-record-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const advanceApiTicketToPr = async () => {
+    const ticket = tickets.find((item) => item.ticketId === "M2-API-1");
+    if (!ticket) return;
+    setM2Busy("advance-api");
+    const path: Array<"IN_ANALYSIS" | "WAITING_FOR_APPROVAL" | "IN_DEVELOPMENT" | "PR_OPEN"> =
+      ["IN_ANALYSIS", "WAITING_FOR_APPROVAL", "IN_DEVELOPMENT", "PR_OPEN"];
+    try {
+      let current = ticket;
+      for (const target of path) {
+        current = await m2Api<TicketState>(`/api/v1/tickets/${current.ticketId}/advance`, {
+          method: "POST", body: JSON.stringify({ expectedVersion: current.version, target }),
+        });
+      }
+      await refreshTickets(epic!.epicId);
+    } catch { setDependencyError("advance-api-failed"); } finally { setM2Busy(undefined); }
+  };
+
   async function json<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(path, { ...init, headers: readinessHeaders });
     if (!response.ok) throw new Error(`status ${response.status}`);
@@ -441,6 +502,18 @@ export function App() {
         {resume && <section aria-labelledby="resume-title"><h3 id="resume-title">Resume context · {resume.epic.status}</h3>
           <ul>{resume.tickets.map((item) => <li key={item.ticket.ticketId}>{item.ticket.ticketId} · {item.ticket.status} → {item.nextAction}</li>)}</ul>
           <p className="sdlc-muted">Audit trail: {resume.auditTrail.map((event) => event.action).join(" · ")}</p></section>}
+      </section>
+      <section className="sdlc-card sdlc-stack readiness" aria-labelledby="m3-title">
+        <div className="section-heading"><div><p className="eyebrow">M3 · Enterprise adapters</p><h2 id="m3-title">Jira projection and Jenkins CI</h2></div></div>
+        <div className="sdlc-actions">
+          <button type="button" disabled={Boolean(m2Busy) || Boolean(jiraDraft)} aria-busy={Boolean(m2Busy)} onClick={() => void draftJiraComment()}>Draft Jira comment for DEMO-123</button>
+          <button type="button" disabled={Boolean(m2Busy) || !jiraDraft || jiraDraft.status !== "JIRA_ARTIFACT_SYNC_PENDING"} aria-busy={Boolean(m2Busy)} onClick={() => void publishJiraComment()}>Confirm publish Jira comment</button>
+          <button type="button" disabled={Boolean(m2Busy) || !jiraDraft} aria-busy={Boolean(m2Busy)} onClick={() => void retryJiraComments()}>Retry pending Jira comments</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-API-1" && item.status === "PLANNED")} aria-busy={Boolean(m2Busy)} onClick={() => void advanceApiTicketToPr()}>Advance M2-API-1 to PR_OPEN</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-API-1" && item.status === "PR_OPEN")} aria-busy={Boolean(m2Busy)} onClick={() => void recordJenkinsCi()}>Record Jenkins CI for M2-API-1</button>
+        </div>
+        {jiraDraft && <p role="status">{jiraDraft.projectionId} · {jiraDraft.milestoneId} · {jiraDraft.status} · attempts {jiraDraft.attempts}</p>}
+        {ciLine && <p role="status">{ciLine.ticketId} · {ciLine.status} · {ciLine.detailsUrl}</p>}
       </section>
     </main>
   </>;
