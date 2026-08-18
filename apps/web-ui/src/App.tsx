@@ -17,6 +17,11 @@ interface JourneyAnalysis { status: string; totalEdges: number; provenEdges: num
 interface Member { principalId: string; employeeId: string; displayLabel: string; role: string; onboardingStatus: string }
 interface Roster { revision: number }
 
+interface EpicState { epicId: string; title: string; status: string; version: number }
+interface TicketState { ticketId: string; channel: string; status: string; pendingChangeConfirmation: boolean; version: number }
+interface ChangeRequestState { changeRequestId: string; status: string; approvedRoles: string[]; requiredApprovals: number; version: number }
+interface ResumeState { epic: EpicState; tickets: Array<{ ticket: TicketState; nextAction: string }>; auditTrail: Array<{ action: string; actorId: string; occurredAt: string }> }
+
 const headers = { "Content-Type": "application/json", "X-Demo-User": "developer-1" };
 const readinessHeaders = { "Content-Type": "application/json", "X-Demo-User": "PRINCIPAL-EMP-100", "X-Correlation-ID": "fictional-readiness-ui" };
 const ref = "0123456789012345678901234567890123456789";
@@ -54,6 +59,15 @@ export function App() {
   const [assigning, setAssigning] = useState(false);
   const [queueAssignment, setQueueAssignment] = useState<{ ticketId: string; principalId: string; reason: string }>();
   const [assignmentError, setAssignmentError] = useState<string>();
+  const [epic, setEpic] = useState<EpicState>();
+  const [tickets, setTickets] = useState<TicketState[]>([]);
+  const [repoTaskLine, setRepoTaskLine] = useState<string>();
+  const [dependencyLine, setDependencyLine] = useState<string>();
+  const [dependencyError, setDependencyError] = useState<string>();
+  const [changeRequest, setChangeRequest] = useState<ChangeRequestState>();
+  const [resume, setResume] = useState<ResumeState>();
+  const [skipLine, setSkipLine] = useState<string>();
+  const [m2Busy, setM2Busy] = useState<string>();
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -146,6 +160,176 @@ export function App() {
     } finally { setAssigning(false); }
   };
 
+  const m2Api = async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
+    const response = await fetch(path, { ...init, headers: readinessHeaders });
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    return response.json() as Promise<T>;
+  };
+
+  const refreshTickets = async (epicId: string) => {
+    setTickets(await m2Api<TicketState[]>(`/api/v1/epics/${epicId}/tickets`));
+  };
+
+  const createEpic = async () => {
+    setM2Busy("epic");
+    try {
+      const created = await m2Api<EpicState>("/api/v1/epics", { method: "POST", body: JSON.stringify({
+        epicId: "EPIC-M2-1", title: "Fictional M2 epic", journeyId: "ACCOUNT_OPENING",
+      }) });
+      setEpic(created);
+    } catch { setDependencyError("epic-create-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const activateEpic = async () => {
+    if (!epic) return;
+    setM2Busy("activate");
+    try {
+      setEpic(await m2Api<EpicState>(`/api/v1/epics/${epic.epicId}/activate`, {
+        method: "POST", body: JSON.stringify({ expectedVersion: epic.version }),
+      }));
+    } catch { setDependencyError("epic-activate-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const attachTickets = async () => {
+    if (!epic) return;
+    setM2Busy("attach");
+    try {
+      for (const [ticketId, channel] of [["M2-API-1", "API"], ["M2-WEB-1", "WEB"], ["M2-IOS-1", "IOS"], ["M2-AND-1", "ANDROID"]] as const) {
+        await m2Api(`/api/v1/epics/${epic.epicId}/tickets`, { method: "POST", body: JSON.stringify({ ticketId, channel }) });
+      }
+      await refreshTickets(epic.epicId);
+    } catch { setDependencyError("attach-tickets-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const addRepoTask = async () => {
+    setM2Busy("repotask");
+    try {
+      const task = await m2Api<{ repoTaskId: string; status: string }>("/api/v1/tickets/M2-API-1/repo-tasks", {
+        method: "POST", body: JSON.stringify({ repositoryAlias: "REPO_A", baseCommit: "0123456789abcdef" }),
+      });
+      setRepoTaskLine(`${task.repoTaskId} · ${task.status}`);
+    } catch { setDependencyError("repo-task-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const addDependency = async () => {
+    if (!epic) return;
+    setM2Busy("dependency");
+    try {
+      const dep = await m2Api<{ dependencyId: string; fromTicketId: string; toTicketId: string; status: string }>(
+        `/api/v1/epics/${epic.epicId}/dependencies`, {
+          method: "POST", body: JSON.stringify({ fromTicketId: "M2-API-1", toTicketId: "M2-WEB-1" }),
+        });
+      setDependencyLine(`${dep.fromTicketId} → ${dep.toTicketId} · ${dep.status}`);
+    } catch { setDependencyError("dependency-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const advanceWebTicket = async () => {
+    const ticket = tickets.find((item) => item.ticketId === "M2-WEB-1");
+    if (!ticket) return;
+    setM2Busy("advance");
+    const path: Array<"IN_ANALYSIS" | "WAITING_FOR_APPROVAL" | "IN_DEVELOPMENT" | "PR_OPEN" | "CI_PASSED"> =
+      ["IN_ANALYSIS", "WAITING_FOR_APPROVAL", "IN_DEVELOPMENT", "PR_OPEN", "CI_PASSED"];
+    try {
+      let current = ticket;
+      for (const target of path) {
+        current = await m2Api<TicketState>(`/api/v1/tickets/${current.ticketId}/advance`, {
+          method: "POST", body: JSON.stringify({ expectedVersion: current.version, target }),
+        });
+      }
+      await refreshTickets(epic!.epicId);
+    } catch { setDependencyError("advance-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const mergeWebTicket = async () => {
+    const ticket = tickets.find((item) => item.ticketId === "M2-WEB-1");
+    if (!ticket) return;
+    setM2Busy("merge"); setDependencyError(undefined);
+    try {
+      await m2Api(`/api/v1/tickets/${ticket.ticketId}/advance`, {
+        method: "POST", body: JSON.stringify({ expectedVersion: ticket.version, target: "MERGED" }),
+      });
+      await refreshTickets(epic!.epicId);
+    } catch {
+      setDependencyError("MERGE_BLOCKED_BY_DEPENDENCY");
+      await refreshTickets(epic!.epicId);
+    } finally { setM2Busy(undefined); }
+  };
+
+  const resolveDependency = async () => {
+    if (!epic) return;
+    setM2Busy("resolve"); setDependencyError(undefined);
+    try {
+      const deps = await m2Api<Array<{ dependencyId: string; version: number }>>(`/api/v1/epics/${epic.epicId}/dependencies`);
+      const blocking = deps[0];
+      await m2Api(`/api/v1/dependencies/${blocking.dependencyId}/resolve`, {
+        method: "POST", body: JSON.stringify({ expectedVersion: blocking.version }),
+      });
+      setDependencyLine(`RESOLVED ${blocking.dependencyId}`);
+    } catch { setDependencyError("dependency-resolve-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const createChangeRequest = async () => {
+    if (!epic) return;
+    setM2Busy("changerequest");
+    try {
+      setChangeRequest(await m2Api<ChangeRequestState>(`/api/v1/epics/${epic.epicId}/change-requests`, {
+        method: "POST", body: JSON.stringify({
+          reason: "Fictional urgent scope change", urgency: "URGENT", description: "Fictional detail",
+          affectedTicketIds: ["M2-API-1", "M2-WEB-1"],
+        }),
+      }));
+    } catch { setDependencyError("change-request-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const approveChange = async (role: "BUSINESS_OWNER" | "TECHNICAL_OWNER") => {
+    if (!changeRequest) return;
+    setM2Busy("approve");
+    try {
+      const updated = await m2Api<ChangeRequestState>(`/api/v1/change-requests/${changeRequest.changeRequestId}/approve`, {
+        method: "POST", body: JSON.stringify({ expectedVersion: changeRequest.version, actorRole: role }),
+      });
+      setChangeRequest(updated);
+      if (epic) await refreshTickets(epic.epicId);
+    } catch { setDependencyError("change-approve-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const ackChangeOnApi = async () => {
+    const ticket = tickets.find((item) => item.ticketId === "M2-API-1");
+    if (!ticket) return;
+    setM2Busy("ack");
+    try {
+      await m2Api(`/api/v1/tickets/${ticket.ticketId}/ack-change`, {
+        method: "POST", body: JSON.stringify({ expectedVersion: ticket.version }),
+      });
+      await refreshTickets(epic!.epicId);
+    } catch { setDependencyError("ack-change-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const skipFirstTask = async () => {
+    const task = tasks[0];
+    if (!task) return;
+    setM2Busy("skip");
+    try {
+      const result = await m2Api<{ attestation: { taskId: string; stageType: string; reason: string } }>(
+        `/api/v1/tasks/${task.taskId}/skip`, {
+          method: "POST", body: JSON.stringify({
+            expectedVersion: task.version, reason: "Fictional fast-track", discussedWith: "Fictional architect",
+            actorRole: "DEVELOPER",
+          }),
+        });
+      setSkipLine(`SKIPPED ${result.attestation.taskId} · ${result.attestation.stageType} · ${result.attestation.reason}`);
+      await refresh();
+    } catch { setDependencyError("skip-failed"); } finally { setM2Busy(undefined); }
+  };
+
+  const showResume = async () => {
+    if (!epic) return;
+    setM2Busy("resume");
+    try {
+      setResume(await m2Api<ResumeState>(`/api/v1/epics/${epic.epicId}/resume`));
+    } catch { setDependencyError("resume-failed"); } finally { setM2Busy(undefined); }
+  };
+
   async function json<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(path, { ...init, headers: readinessHeaders });
     if (!response.ok) throw new Error(`status ${response.status}`);
@@ -203,6 +387,39 @@ export function App() {
         {queueAssignment && members.some((member) =>
           member.principalId === queueAssignment.principalId && member.onboardingStatus === "NOT_ONBOARDED") &&
           <p className="sdlc-muted">ASSIGNEE_NOT_ONBOARDED — this fictitious assignee has not bound a workbench identity yet.</p>}
+      </section>
+      <section className="sdlc-card sdlc-stack readiness" aria-labelledby="m2-title">
+        <div className="section-heading"><div><p className="eyebrow">M2 · Three-level workflow</p><h2 id="m2-title">Epic, tickets, and repo tasks</h2></div></div>
+        <div className="sdlc-actions">
+          <button type="button" disabled={Boolean(m2Busy)} onClick={() => void createEpic()}>Create EPIC-M2-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "CREATED"} onClick={() => void activateEpic()}>Activate epic</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "ACTIVE"} onClick={() => void attachTickets()}>Attach four channel tickets</button>
+          <button type="button" disabled={Boolean(m2Busy) || tickets.length === 0} onClick={() => void addRepoTask()}>Add repo task to M2-API-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || tickets.length < 2} onClick={() => void addDependency()}>Add dependency M2-API-1 → M2-WEB-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-WEB-1" && item.status === "PLANNED")} onClick={() => void advanceWebTicket()}>Advance M2-WEB-1 to CI_PASSED</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-WEB-1" && item.status === "CI_PASSED")} onClick={() => void mergeWebTicket()}>Try merge M2-WEB-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || dependencyError !== "MERGE_BLOCKED_BY_DEPENDENCY"} onClick={() => void resolveDependency()}>Resolve dependency</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "ACTIVE"} onClick={() => void createChangeRequest()}>Create emergency change request</button>
+          <button type="button" disabled={Boolean(m2Busy) || !changeRequest || changeRequest.status !== "DRAFT"} onClick={() => void approveChange("BUSINESS_OWNER")}>Approve change as Business Owner</button>
+          <button type="button" disabled={Boolean(m2Busy) || !changeRequest || changeRequest.status !== "DRAFT"} onClick={() => void approveChange("TECHNICAL_OWNER")}>Approve change as Technical Owner</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-API-1" && item.pendingChangeConfirmation)} onClick={() => void ackChangeOnApi()}>Acknowledge change on M2-API-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || tasks.length === 0} onClick={() => void skipFirstTask()}>Skip first DEMO-123 task with attestation</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic} onClick={() => void showResume()}>Show resume context</button>
+        </div>
+        {dependencyError && <ErrorState title="M2 action unavailable" correlationId={dependencyError} onRetry={() => undefined} />}
+        {epic && <p role="status">Epic {epic.epicId} · {epic.title} · {epic.status} · v{epic.version}</p>}
+        {tickets.length > 0 && <div className="table-scroll"><table><caption>EPIC-M2-1 tickets</caption>
+          <thead><tr><th scope="col">Ticket</th><th scope="col">Channel</th><th scope="col">Status</th><th scope="col">Change confirmation</th></tr></thead>
+          <tbody>{tickets.map((ticket) => <tr key={ticket.ticketId}>
+            <th scope="row">{ticket.ticketId}</th><td>{ticket.channel}</td><td>{ticket.status}</td>
+            <td>{ticket.pendingChangeConfirmation ? "PENDING_CHANGE_CONFIRMATION" : "—"}</td></tr>)}</tbody></table></div>}
+        {repoTaskLine && <p>{repoTaskLine}</p>}
+        {dependencyLine && <p>{dependencyLine}</p>}
+        {changeRequest && <p role="status">Change request {changeRequest.changeRequestId} · {changeRequest.status} · approvals {changeRequest.approvedRoles.length}/{changeRequest.requiredApprovals}</p>}
+        {skipLine && <p role="status">{skipLine}</p>}
+        {resume && <section aria-labelledby="resume-title"><h3 id="resume-title">Resume context · {resume.epic.status}</h3>
+          <ul>{resume.tickets.map((item) => <li key={item.ticket.ticketId}>{item.ticket.ticketId} · {item.ticket.status} → {item.nextAction}</li>)}</ul>
+          <p className="sdlc-muted">Audit trail: {resume.auditTrail.map((event) => event.action).join(" · ")}</p></section>}
       </section>
     </main>
   </>;
