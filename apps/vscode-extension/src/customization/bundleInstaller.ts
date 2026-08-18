@@ -12,7 +12,7 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
     title: "Select an extracted, reviewed SDLC customization bundle" });
   if (!selected?.[0]) return;
   const sourceRoot = selected[0].fsPath;
-  const manifestPath = "manifests/customization-bundle-v1.json";
+  const manifestPath = "central/manifests/bundle-manifest.json";
   const manifest = loadAndValidateBundle(sourceRoot, manifestPath);
   const destination = join(context.globalStorageUri.fsPath, "customizations", manifest.bundleVersion);
   const agentsRoot = join(destination, "agents");
