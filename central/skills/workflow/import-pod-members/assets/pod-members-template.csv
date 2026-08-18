@@ -1,3 +1,3 @@
-employeeId,displayName,email,podId,role,capabilities,githubLogin,status
-E000001,Example API Developer,api.developer@example.invalid,example-pod,DEVELOPER,api-development,example-api-dev,ACTIVE
-E000002,Example QA Analyst,qa.analyst@example.invalid,example-pod,QA,qa;manual-e2e;accessibility,,ACTIVE
+employeeId,displayLabel,principalId,role,journeyId,active,effectiveFrom
+EMP-100,Fictional Scrum Master,PRINCIPAL-EMP-100,SCRUM_MASTER,ACCOUNT_OPENING,true,2026-01-01
+EMP-201,Fictional API Developer,PRINCIPAL-EMP-201,DEVELOPER,ACCOUNT_OPENING,true,2026-01-01
