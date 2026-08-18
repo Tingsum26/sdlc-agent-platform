@@ -6,7 +6,7 @@
 
 ## 1. Goals
 
-1. Replace the current partial bundle (3 agents, 4 skills, 2 policies) with the complete catalog from the seven-repository spec: 13 agents, 27 skills, 19 instructions, 15 policies, 19 templates, evals, mcp catalog, and bundle manifest.
+1. Replace the current partial bundle (3 agents, 4 skills, 2 policies) with the complete catalog from the seven-repository spec: 13 agents, 33 skills, 19 instructions, 15 policies, 19 templates, evals, mcp catalog, and bundle manifest.
 2. Every file's structure and content is traceable to named public open-source references.
 3. Format stays within the VS Code GitHub Copilot-supported intersection (no Claude-Code-only fields/commands).
 4. License compliance: only MIT / Apache-2.0 sources are copied or closely adapted; no-license repositories are concept-only references and are never copied.
@@ -17,15 +17,15 @@
 |---|---|---|---|
 | Skill format + frontmatter | [agentskills/agentskills](https://github.com/agentskills/agentskills) | Apache-2.0 | SKILL.md layout, description-matching principles, resources layout |
 | Skill format baseline | [obra/superpowers](https://github.com/obra/superpowers) | MIT | SKILL.md structure and RED/GREEN contract-eval pattern already used in this repo |
-| SDD stage boundaries | [github/spec-kit](https://github.com/github/spec-kit) | MIT | requirement → spec → plan → task → archive phase boundaries |
+| SDD stage boundaries | [github/spec-kit](https://github.com/github/spec-kit) | MIT | requirement 鈫?spec 鈫?plan 鈫?task 鈫?archive phase boundaries |
 | Spec lifecycle | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) | MIT | spec directory lifecycle concept (proposal/apply/archive) |
 | Copilot agent file fields | [github/awesome-copilot](https://github.com/github/awesome-copilot) | MIT | VS Code `.agent.md` fields (name/description/model/tools/handoffs) |
 | SDLC agent roster | [arozumenko/sdlc-skills](https://github.com/arozumenko/sdlc-skills) | MIT | Role division across the SDLC, Copilot-compatible wording |
 | Engineering skill content | [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) | MIT | Review/test/TDD skill step breakdown and checklists |
 | Full-stack skill steps | [Jeffallan/claude-skills](https://github.com/Jeffallan/claude-skills) | MIT | Skill step decomposition per topic |
 | Copilot-compatible SDD harness | [gotalab/cc-sdd](https://github.com/gotalab/cc-sdd) | MIT | Skills usable by Copilot (concept + structure) |
-| Frontend engineering checklists | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | no license file | CONCEPT ONLY — no text copied |
-| Agent Skills examples | [anthropics/skills](https://github.com/anthropics/skills) | no license file | CONCEPT ONLY — no text copied |
+| Frontend engineering checklists | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | no license file | CONCEPT ONLY 鈥?no text copied |
+| Agent Skills examples | [anthropics/skills](https://github.com/anthropics/skills) | no license file | CONCEPT ONLY 鈥?no text copied |
 | Skill catalogs | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills), [VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills) | no license / MIT | Catalog organization ideas; VoltAgent MIT only for structure |
 
 Compliance rules:
@@ -37,42 +37,42 @@ Compliance rules:
 
 ```text
 central/
-├─ agents/                       # 13 .agent.md files
-├─ skills/
-│  ├─ workflow/                  # start-epic, join-epic, change-epic, start-ticket*, resume-workflow*, import-pod-members*
-│  ├─ analysis/                  # analyze-code-context, grill-requirement, assess-api-compatibility
-│  ├─ design/                    # design-solution, plan-change, adr
-│  ├─ implement/                 # implement-task, java-development, web-development, ios-development, android-development
-│  ├─ test/                      # generate-tests, plan-manual-e2e, record-manual-e2e, review-accessibility, review-analytics-tagging
-│  ├─ review/                    # prepare-pr*, review-pr
-│  ├─ onboard/                   # onboard-repository, onboard-journey, sync-onboarding, analyze-http-call-graph
-│  └─ sm/                        # analyze-epic-risk, prepare-standup, find-blockers, check-release-readiness, draft-jira-update
-├─ instructions/                 # 19 .instructions.md files
-├─ policies/                     # 15 policies (2 existing reworked)
-├─ templates/                    # 19 templates
-├─ evals/                        # at least 1 behavioral scenario per agent and per core skill
-├─ mcp/catalog.json              # reworked from current
-├─ manifests/bundle-manifest.json
-└─ REFERENCES.md
+鈹溾攢 agents/                       # 13 .agent.md files
+鈹溾攢 skills/
+鈹? 鈹溾攢 workflow/                  # start-epic, join-epic, change-epic, start-ticket*, resume-workflow*, import-pod-members*
+鈹? 鈹溾攢 analysis/                  # analyze-code-context, grill-requirement, assess-api-compatibility
+鈹? 鈹溾攢 design/                    # design-solution, plan-change, adr
+鈹? 鈹溾攢 implement/                 # implement-task, java-development, web-development, ios-development, android-development
+鈹? 鈹溾攢 test/                      # generate-tests, plan-manual-e2e, record-manual-e2e, review-accessibility, review-analytics-tagging
+鈹? 鈹溾攢 review/                    # prepare-pr*, review-pr
+鈹? 鈹溾攢 onboard/                   # onboard-repository, onboard-journey, sync-onboarding, analyze-http-call-graph
+鈹? 鈹斺攢 sm/                        # analyze-epic-risk, prepare-standup, find-blockers, check-release-readiness, draft-jira-update
+鈹溾攢 instructions/                 # 19 .instructions.md files
+鈹溾攢 policies/                     # 15 policies (2 existing reworked)
+鈹溾攢 templates/                    # 19 templates
+鈹溾攢 evals/                        # at least 1 behavioral scenario per agent and per core skill
+鈹溾攢 mcp/catalog.json              # reworked from current
+鈹溾攢 manifests/bundle-manifest.json
+鈹斺攢 REFERENCES.md
 ```
 
 `*` = existing file migrated and reworked into the new location and format.
 
 ## 4. Agents (13)
 
-1. `epic-delivery-analyst` — epic intake, ticket matrix, journey gap analysis (read-only tools + workflow MCP)
-2. `delivery-coordinator` — Scrum Master view: stand-up, blockers, release readiness (read-only + workflow MCP)
-3. `requirement-analyst` — grills requirements with code evidence (reworked existing)
-4. `code-context-analyst` — AS-IS evidence pack from code/Onboarding (read-only)
-5. `solution-architect` — cross-repo design, API compatibility, ADRs (reworked existing)
-6. `planner` — implementation plan and repo task breakdown
-7. `java-implementer` — Java/Spring implementation under repo instructions
-8. `web-implementer` — web implementation with accessibility baseline
-9. `ios-implementer` — iOS implementation
-10. `android-implementer` — Android implementation
-11. `test-designer` — automated + manual E2E test generation
-12. `accessibility-qa` — WCAG 2.2 AA + VoiceOver/TalkBack checks
-13. `pr-reviewer` — read-only structured review findings; `model` uses a review-preference fallback chain (reworked existing)
+1. `epic-delivery-analyst` 鈥?epic intake, ticket matrix, journey gap analysis (read-only tools + workflow MCP)
+2. `delivery-coordinator` 鈥?Scrum Master view: stand-up, blockers, release readiness (read-only + workflow MCP)
+3. `requirement-analyst` 鈥?grills requirements with code evidence (reworked existing)
+4. `code-context-analyst` 鈥?AS-IS evidence pack from code/Onboarding (read-only)
+5. `solution-architect` 鈥?cross-repo design, API compatibility, ADRs (reworked existing)
+6. `planner` 鈥?implementation plan and repo task breakdown
+7. `java-implementer` 鈥?Java/Spring implementation under repo instructions
+8. `web-implementer` 鈥?web implementation with accessibility baseline
+9. `ios-implementer` 鈥?iOS implementation
+10. `android-implementer` 鈥?Android implementation
+11. `test-designer` 鈥?automated + manual E2E test generation
+12. `accessibility-qa` 鈥?WCAG 2.2 AA + VoiceOver/TalkBack checks
+13. `pr-reviewer` 鈥?read-only structured review findings; `model` uses a review-preference fallback chain (reworked existing)
 
 Agent file conventions (Copilot-supported intersection):
 - frontmatter: `name`, `description`, `model` (only for pr-reviewer as a fallback chain), `tools` (only local MCP tools + read/search tools), `handoffs` (workflow gate order).
@@ -82,7 +82,7 @@ Agent file conventions (Copilot-supported intersection):
 
 Each `SKILL.md` frontmatter: `name`, `description` (written for model matching), `version` (repo-custom; ignored by Copilot, used by bundle validation). Body: **When to use / Procedure (steps + hard gates) / Output contract (schema + acceptance)**. Skills may carry `references/` and `assets/`.
 
-Skill ↔ agent ownership and the workflow gate chain follow the run-first spec (M1–M7). `grill-requirement` keeps the Socratic single-question pattern; `import-pod-members` keeps DRY_RUN→confirm→APPLY.
+Skill 鈫?agent ownership and the workflow gate chain follow the run-first spec (M1鈥揗7). `grill-requirement` keeps the Socratic single-question pattern; `import-pod-members` keeps DRY_RUN鈫抍onfirm鈫扐PPLY.
 
 ## 6. Instructions (19)
 
@@ -106,7 +106,9 @@ epic-intake, requirement-contract, solution-design, api-contract, cross-platform
 ## 10. Bundle integration
 
 - `manifests/bundle-manifest.json` lists every file; existing VSIX `bundleInstaller` path logic must install the new `central/` layout. If `bundleInstaller` hardcodes old paths, adapt minimally and record it in the commit.
-- `packages/contracts/test/central-bundle.test.ts` and `customizations.test.ts` extended to assert: 13 agents present, 27 skills present with valid frontmatter, agent↔skill references resolvable, `REFERENCES.md` exists with license column, no Claude-only fields anywhere.
+- `packages/contracts/test/central-bundle.test.ts` and `customizations.test.ts` extended to assert: 13 agents present, 33 skills present with valid frontmatter, agent→skill references resolvable, `REFERENCES.md` exists with license column, no Claude-only fields anywhere.
+
+**Count correction (2026-08-18):** the headline count "27 skills" was a typo — the §5 list contains 33 skills and all downstream artifacts use 33.
 
 ## 11. Verification gates
 
@@ -128,3 +130,4 @@ epic-intake, requirement-contract, solution-design, api-contract, cross-platform
 - Reference map has license column; compliance rule is explicit.
 - Copilot-format intersection is explicit (fields listed).
 - Scope is bounded to the central bundle plus contract tests.
+

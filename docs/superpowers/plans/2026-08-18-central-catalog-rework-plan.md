@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rework the central Copilot customization bundle into the complete catalog from spec `docs/superpowers/specs/2026-08-18-central-catalog-rework-design.md`: 13 agents, 27 skills, 19 instructions, 15 policies, 19 templates, evals, mcp catalog, manifest, and a license-traceable `REFERENCES.md`, all formatted within the VS Code GitHub Copilot-supported intersection and verified by contract tests.
+**Goal:** Rework the central Copilot customization bundle into the complete catalog from spec `docs/superpowers/specs/2026-08-18-central-catalog-rework-design.md`: 13 agents, 33 skills, 19 instructions, 15 policies, 19 templates, evals, mcp catalog, manifest, and a license-traceable `REFERENCES.md`, all formatted within the VS Code GitHub Copilot-supported intersection and verified by contract tests.
+
+**Correction note (2026-08-18):** the design doc's headline said "27 skills" but its own list contains 33; the plan and manifest now use 33, and the four skills omitted from the original task split (`start-epic`, `join-epic`, `change-epic`, `review-pr`) are created in Task 4.
 
 **Architecture:** Content-only rework. The new `central/` directory becomes the single source of truth; existing `.github/agents|skills|instructions`, `skills/`, `policies/`, `evals/`, `mcp/catalog.json`, `manifests/customization-bundle-v1.json` are migrated into it (old locations removed after migration in the same commit group). `packages/contracts` tests are extended to assert the full catalog. VSIX `bundleInstaller` adapts only if it hardcodes old paths (verify in Task 11).
 
@@ -67,7 +69,7 @@ sources only. This file is validated by `packages/contracts` tests.
   "name": "SDLC Central Customization Bundle",
   "description": "Central agents, skills, instructions, policies, templates, and evals for the public Local-Copilot SDLC platform. Fictitious data only.",
   "agents": 13,
-  "skills": 27,
+  "skills": 33,
   "instructions": 19,
   "policies": 15,
   "templates": 19,
@@ -124,7 +126,7 @@ describe("central catalog", () => {
   it("contains all 27 skills with valid frontmatter", () => {
     const files = readdirSync(`${root}/central/skills`, { recursive: true } as never)
       .filter((name) => String(name).endsWith("SKILL.md"));
-    expect(files).toHaveLength(27);
+    expect(files).toHaveLength(33);
     for (const skill of expectedSkills) {
       const content = readFileSync(`${root}/central/skills/${skillGroup(skill)}/${skill}/SKILL.md`, "utf8");
       expect(content).toContain(`name: ${skill}`);
@@ -497,6 +499,10 @@ git commit -m "feat(catalog): add the ten remaining agents"
 - Create: `central/skills/workflow/resume-workflow/SKILL.md` (rework of `.github/skills/resume-workflow/SKILL.md`)
 - Create: `central/skills/review/prepare-pr/SKILL.md` (rework of `.github/skills/prepare-pr/SKILL.md`)
 - Create: `central/skills/workflow/import-pod-members/SKILL.md` (rework of `skills/importing-pod-members/SKILL.md`; keep `references/import-contract.md` and `assets/pod-members-template.csv` copies)
+- Create: `central/skills/workflow/start-epic/SKILL.md` (new — correction item)
+- Create: `central/skills/workflow/join-epic/SKILL.md` (new — correction item)
+- Create: `central/skills/workflow/change-epic/SKILL.md` (new — correction item)
+- Create: `central/skills/review/review-pr/SKILL.md` (new — correction item)
 
 - [ ] **Step 1: Write the four reworked skills**
 
@@ -606,16 +612,115 @@ The saved roster revision plus an import report (added/updated/unchanged counts,
 
 Also copy the existing supporting files: `skills/importing-pod-members/references/import-contract.md` → `central/skills/workflow/import-pod-members/references/import-contract.md` and `skills/importing-pod-members/assets/pod-members-template.csv` → `central/skills/workflow/import-pod-members/assets/pod-members-template.csv` (byte-for-byte copies).
 
-- [ ] **Step 2: Run contract tests**
+- [ ] **Step 2: Write the four correction skills**
+
+`central/skills/workflow/start-epic/SKILL.md`:
+
+```markdown
+---
+name: start-epic
+description: Use to create or activate an Epic workflow and attach its channel tickets before per-ticket analysis.
+version: "1.0"
+---
+
+# Start Epic
+
+## When to use
+An epic (Jira epic or manual emergency change) must enter the workflow.
+
+## Procedure
+1. Call `workflow_epic_create` with the epic id, title, and journey.
+2. Call `workflow_epic_activate` with the returned version.
+3. Attach API/WEB/IOS/ANDROID tickets with `workflow_epic_attach_ticket`.
+4. For a manual emergency change, record reason, urgency, affected tickets, and actor before creating anything.
+5. Stop and hand off to the epic delivery analyst for intake.
+
+## Output contract
+An ACTIVE epic with its ticket matrix persisted and audit trail entries. Never create a duplicate epic; never invent ticket contents.
+```
+
+`central/skills/workflow/join-epic/SKILL.md`:
+
+```markdown
+---
+name: join-epic
+description: Use to resume or join an existing epic and read its persisted state instead of recreating it.
+version: "1.0"
+---
+
+# Join Epic
+
+## When to use
+An epic already exists and work must continue on it.
+
+## Procedure
+1. Call `workflow_epic_resume` to read epic, tickets, open tasks, next actions, and audit trail.
+2. State the current status and the single next action.
+3. Proceed only after the human confirms.
+
+## Output contract
+A resume summary plus the confirmed next action. Never re-create artifacts that already exist at a newer version.
+```
+
+`central/skills/workflow/change-epic/SKILL.md`:
+
+```markdown
+---
+name: change-epic
+description: Use to record an emergency change against an active epic with dual-role approval.
+version: "1.0"
+---
+
+# Change Epic
+
+## When to use
+A significant change arrives after epic analysis and must be versioned, not silently overwritten.
+
+## Procedure
+1. Call `workflow_epic_create_change_request` with reason, urgency, description, and affected tickets.
+2. Present the DRAFT change request; do not approve it yourself.
+3. Approval requires both BUSINESS_OWNER and TECHNICAL_OWNER roles; after approval the affected tickets are flagged for confirmation.
+4. Record the change in the audit trail; never overwrite the approved requirement contract in place.
+
+## Output contract
+A change request at DRAFT or APPROVED with affected tickets flagged. Never self-approve.
+```
+
+`central/skills/review/review-pr/SKILL.md`:
+
+```markdown
+---
+name: review-pr
+description: Use to review a pull request read-only: structured findings with severity, evidence, and remediation.
+version: "1.0"
+---
+
+# Review PR
+
+## When to use
+A PR is open and needs the reviewer agent's structured findings before human review.
+
+## Procedure
+1. Read the persisted requirement/design/skip decisions, the full diff, and the test evidence.
+2. Report findings ordered by severity (`BLOCKER` → `LOW`), each with file/location, evidence, impact, violated policy, and remediation.
+3. Check cross-repo/API compatibility, native-later rollout, flags/rollback, security, accessibility, tagging, tests, and manual E2E.
+4. If nothing is actionable, say so explicitly with residual risks and unverified evidence.
+5. Submit the review artifact and stop for human confirmation.
+
+## Output contract
+Review findings matching the pr-review template. Read-only: never edit, approve, or merge.
+```
+
+- [ ] **Step 3: Run contract tests**
 
 Run: `pnpm --filter @sdlc/contracts test`
 Expected: skills test still fails (23 skills missing) — no new failures.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```powershell
 git add central/skills/workflow central/skills/review
-git commit -m "feat(catalog): rework existing skills into central layout"
+git commit -m "feat(catalog): rework existing skills and add workflow and review skills"
 ```
 
 ---
@@ -783,7 +888,7 @@ ADR markdown matching the adr template. No decision may be recorded as accepted 
 - [ ] **Step 2: Run contract tests**
 
 Run: `pnpm --filter @sdlc/contracts test`
-Expected: skills test still fails (17 skills missing) — no new failures.
+Expected: skills test still fails (19 skills missing) — no new failures.
 
 - [ ] **Step 3: Commit**
 
@@ -1047,7 +1152,7 @@ Tagging findings artifact with severity per finding.
 - [ ] **Step 3: Run contract tests**
 
 Run: `pnpm --filter @sdlc/contracts test`
-Expected: skills test still fails (7 skills missing) — no new failures.
+Expected: skills test still fails (9 skills missing) — no new failures.
 
 - [ ] **Step 4: Commit**
 
@@ -1280,7 +1385,7 @@ Jira update draft. The agent never publishes or impersonates the actor.
 - [ ] **Step 3: Run contract tests**
 
 Run: `pnpm --filter @sdlc/contracts test`
-Expected: skills test PASSES now (27 skills); agents test PASSES; REFERENCES test PASSES. The Claude-field test must also pass.
+Expected: skills test PASSES now (33 skills); agents test PASSES; REFERENCES test PASSES. The Claude-field test must also pass.
 
 - [ ] **Step 4: Commit**
 
