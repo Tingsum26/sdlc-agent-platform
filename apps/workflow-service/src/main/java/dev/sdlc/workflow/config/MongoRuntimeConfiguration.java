@@ -16,6 +16,8 @@ import dev.sdlc.workflow.change.InMemoryChangeRequestRepository;
 import dev.sdlc.workflow.dependency.DependencyRepository;
 import dev.sdlc.workflow.dependency.DependencyService;
 import dev.sdlc.workflow.dependency.InMemoryDependencyRepository;
+import dev.sdlc.workflow.enterprise.DeterministicFakeTransport;
+import dev.sdlc.workflow.enterprise.EnterpriseTransport;
 import dev.sdlc.workflow.epic.EpicWorkflowRepository;
 import dev.sdlc.workflow.epic.EpicWorkflowService;
 import dev.sdlc.workflow.epic.InMemoryEpicWorkflowRepository;
@@ -25,6 +27,7 @@ import dev.sdlc.workflow.identity.IdentityBindingService;
 import dev.sdlc.workflow.integration.CiStatusAdapter;
 import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.integration.MockCiStatusAdapter;
+import dev.sdlc.workflow.integration.SplunkDiagnosticAdapter;
 import dev.sdlc.workflow.jiraprojection.FakeJiraProjectionClient;
 import dev.sdlc.workflow.jiraprojection.InMemoryJiraProjectionRepository;
 import dev.sdlc.workflow.jiraprojection.JiraProjectionRepository;
@@ -42,6 +45,7 @@ import dev.sdlc.workflow.repotask.RepoTaskService;
 import dev.sdlc.workflow.skip.InMemorySkipAttestationRepository;
 import dev.sdlc.workflow.skip.SkipAttestationRepository;
 import dev.sdlc.workflow.skip.SkipService;
+import dev.sdlc.workflow.splunk.SplunkAuditPublisher;
 import dev.sdlc.workflow.task.AuditEventRepository;
 import dev.sdlc.workflow.task.TaskTransitionPolicy;
 import dev.sdlc.workflow.task.WorkflowTaskRepository;
@@ -236,5 +240,22 @@ public class MongoRuntimeConfiguration {
     CiStatusAdapter ciStatusAdapter() {
         // TODO(INTERNAL): INTERNAL-CI-001 Replace the mock CI adapter with the real Jenkins adapter.
         return new MockCiStatusAdapter();
+    }
+
+    @Bean
+    EnterpriseTransport enterpriseTransport() {
+        // TODO(INTERNAL): INTERNAL-SPLUNK-001 Point the Splunk audit publisher at the real HEC endpoint.
+        return new DeterministicFakeTransport();
+    }
+
+    @Bean
+    SplunkDiagnosticAdapter splunkDiagnosticAdapter(EnterpriseTransport transport, ObjectMapper objectMapper,
+            Clock clock) {
+        return new SplunkDiagnosticAdapter(transport, objectMapper, clock);
+    }
+
+    @Bean
+    SplunkAuditPublisher splunkAuditPublisher(SplunkDiagnosticAdapter splunk) {
+        return new SplunkAuditPublisher(splunk);
     }
 }

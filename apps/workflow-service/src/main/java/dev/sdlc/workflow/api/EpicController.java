@@ -21,6 +21,7 @@ import dev.sdlc.workflow.security.CurrentUser;
 import dev.sdlc.workflow.skip.SkipAttestation;
 import dev.sdlc.workflow.skip.SkipResult;
 import dev.sdlc.workflow.skip.SkipService;
+import dev.sdlc.workflow.splunk.SplunkAuditPublisher;
 import dev.sdlc.workflow.task.TaskStatus;
 import dev.sdlc.workflow.task.WorkflowTask;
 import dev.sdlc.workflow.task.WorkflowTaskService;
@@ -58,11 +59,13 @@ public class EpicController {
     private final DomainAuditEventRepository audits;
     private final JiraProjectionService jiraProjections;
     private final CiStatusAdapter ciStatusAdapter;
+    private final SplunkAuditPublisher splunkAudit;
 
     public EpicController(EpicWorkflowService epics, TicketWorkflowService tickets, RepoTaskService repoTasks,
             DependencyService dependencies, ChangeRequestService changeRequests, SkipService skips,
             WorkflowTaskService workflowTasks, DomainAuditEventRepository audits,
-            JiraProjectionService jiraProjections, CiStatusAdapter ciStatusAdapter) {
+            JiraProjectionService jiraProjections, CiStatusAdapter ciStatusAdapter,
+            SplunkAuditPublisher splunkAudit) {
         this.epics = epics;
         this.tickets = tickets;
         this.repoTasks = repoTasks;
@@ -73,6 +76,7 @@ public class EpicController {
         this.audits = audits;
         this.jiraProjections = jiraProjections;
         this.ciStatusAdapter = ciStatusAdapter;
+        this.splunkAudit = splunkAudit;
     }
 
     @PostMapping("/epics")
@@ -140,13 +144,23 @@ public class EpicController {
     @PostMapping("/jira-drafts/{projectionId}/publish")
     JiraProjection publishJiraDraft(@PathVariable String projectionId, HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
-        return jiraProjections.flush(projectionId, user.actorId(), CorrelationIdFilter.from(request));
+        String correlationId = CorrelationIdFilter.from(request);
+        JiraProjection updated = jiraProjections.flush(projectionId, user.actorId(), correlationId);
+        splunkAudit.jiraProjection(updated.ticketId(), updated.milestoneId(), updated.status().name(),
+                correlationId, "");
+        return updated;
     }
 
     @PostMapping("/jira-drafts/retry")
     List<JiraProjection> retryJiraDrafts(HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
-        return jiraProjections.flushPending(user.actorId(), CorrelationIdFilter.from(request));
+        String correlationId = CorrelationIdFilter.from(request);
+        List<JiraProjection> updated = jiraProjections.flushPending(user.actorId(), correlationId);
+        for (JiraProjection projection : updated) {
+            splunkAudit.jiraProjection(projection.ticketId(), projection.milestoneId(),
+                    projection.status().name(), correlationId, "");
+        }
+        return updated;
     }
 
     @GetMapping("/jira-drafts/{projectionId}")
@@ -163,9 +177,11 @@ public class EpicController {
         // mock PASSED adapter.
         CiStatus status = ciStatusAdapter.getStatus(body.repositoryAlias(), body.revision());
         TicketWorkflow ticket = tickets.ticket(ticketId);
+        String correlationId = CorrelationIdFilter.from(request);
         TicketWorkflow advanced = tickets.transition(ticketId, ticket.version(),
                 status.state() == CiState.PASSED ? TicketDeliveryStatus.CI_PASSED : TicketDeliveryStatus.BLOCKED,
-                user.actorId(), CorrelationIdFilter.from(request));
+                user.actorId(), correlationId);
+        splunkAudit.ciStatus(ticketId, body.repositoryAlias(), advanced.status().name(), correlationId);
         return Map.of("ticket", advanced, "status", advanced.status().name(), "state", status.state().name(),
                 "detailsUrl", status.detailsUrl());
     }
