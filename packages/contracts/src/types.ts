@@ -92,3 +92,99 @@ export interface JourneyManifest {
   featureFlag: { required: boolean; provider: string; ownerRole: string };
   e2eOwners: Array<{ scenario: string; ownerRole: string }>;
 }
+
+export const SDLC_CHANNELS = ["API", "WEB", "IOS", "ANDROID"] as const;
+
+export type EpicStatus = "CREATED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+export type Channel = (typeof SDLC_CHANNELS)[number];
+export type TicketDeliveryStatus =
+  | "PLANNED" | "IN_ANALYSIS" | "WAITING_FOR_APPROVAL" | "IN_DEVELOPMENT"
+  | "PR_OPEN" | "CI_PASSED" | "MERGED" | "RELEASED" | "FLAG_ENABLED"
+  | "E2E_VERIFIED" | "BLOCKED" | "CANCELLED";
+export type RepoTaskStatus = "PLANNED" | "IN_PROGRESS" | "PR_OPEN" | "MERGED" | "BLOCKED" | "CANCELLED";
+export type ChangeRequestStatus = "DRAFT" | "APPROVED" | "REJECTED";
+export type ChangeUrgency = "STANDARD" | "URGENT";
+export type DependencyKind = "REQUIRES_BEFORE";
+export type DependencyStatus = "BLOCKING" | "RESOLVED";
+export type ChangeApproverRole = "BUSINESS_OWNER" | "TECHNICAL_OWNER";
+
+export interface EpicWorkflow {
+  epicId: string;
+  title: string;
+  journeyId: string;
+  status: EpicStatus;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketWorkflow {
+  ticketId: string;
+  epicId: string;
+  channel: Channel;
+  status: TicketDeliveryStatus;
+  pendingChangeConfirmation: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RepoTask {
+  repoTaskId: string;
+  ticketId: string;
+  repositoryAlias: string;
+  baseCommit: string;
+  status: RepoTaskStatus;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Dependency {
+  dependencyId: string;
+  epicId: string;
+  fromTicketId: string;
+  toTicketId: string;
+  kind: DependencyKind;
+  status: DependencyStatus;
+  version: number;
+  updatedAt: string;
+}
+
+export interface EpicChangeRequest {
+  changeRequestId: string;
+  epicId: string;
+  reason: string;
+  urgency: ChangeUrgency;
+  description: string;
+  affectedTicketIds: string[];
+  approvedRoles: ChangeApproverRole[];
+  requiredApprovals: number;
+  status: ChangeRequestStatus;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SkipAttestation {
+  attestationId: string;
+  taskId: string;
+  stageType: string;
+  reason: string;
+  discussedWith: string;
+  actorId: string;
+  actorRole: string;
+  occurredAt: string;
+  correlationId: string;
+}
+
+export interface DomainAuditEvent {
+  eventId: string;
+  aggregateId: string;
+  aggregateType: string;
+  action: string;
+  detail: string;
+  actorId: string;
+  occurredAt: string;
+  correlationId: string;
+}
