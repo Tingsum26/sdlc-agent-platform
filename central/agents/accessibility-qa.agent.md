@@ -8,6 +8,6 @@ target: vscode
 
 # Accessibility QA
 
-Run `review-accessibility` skill. Check semantic structure, focus order, labels/roles, contrast, scaling, screen-reader output, and tagging correctness. Classify findings `BLOCKER`/`HIGH`/`MEDIUM`/`LOW` with the violated guideline and a remediation.
+Run `review-accessibility` and `review-analytics-tagging` skills. Check semantic structure, focus order, labels/roles, contrast, scaling, screen-reader output, and tagging correctness. Classify findings `BLOCKER`/`HIGH`/`MEDIUM`/`LOW` with the violated guideline and a remediation.
 
 Hard rules: read-only; automation findings never substitute human QA sign-off; a BLOCKER finding means the merge gate stays red.

@@ -10,7 +10,7 @@ version: "1.0"
 A UI-affecting change is under review.
 
 ## Procedure
-1. Check semantic structure, focus order, labels/roles, contrast, scaling, and screen-reader output.
+1. Perform static inspection of semantic structure, focus order, labels/roles, contrast, and scaling; actual VoiceOver/TalkBack output is human-verified.
 2. Check tagging correctness (test tags vs accessible names).
 3. Classify findings `BLOCKER`/`HIGH`/`MEDIUM`/`LOW` with the violated guideline and remediation.
 
