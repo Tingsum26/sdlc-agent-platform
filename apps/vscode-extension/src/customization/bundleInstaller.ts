@@ -75,8 +75,13 @@ async function addLocation(key: string, path: string, previous: string | undefin
 // root (e.g. `central/skills/workflow/start-ticket/SKILL.md`), so take the
 // substring after the first `skills/` segment; legacy 1.0 paths fall back to
 // the basename exactly as before.
-function skillInstallPath(path: string): string {
+export function skillInstallPath(path: string): string {
   const marker = "/skills/";
   const index = path.indexOf(marker);
-  return index === -1 ? basename(path) : path.slice(index + marker.length);
+  if (index === -1) return basename(path);
+  const relative = path.slice(index + marker.length);
+  if (relative.length === 0 || /^[\\/]/.test(relative) || relative.split(/[\\/]/).some((segment) => segment === "..")) {
+    throw new Error("Unsafe skill install path");
+  }
+  return relative;
 }

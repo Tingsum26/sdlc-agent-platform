@@ -18,7 +18,7 @@ vi.mock("vscode", () => ({
 }));
 
 import * as vscode from "vscode";
-import { installCustomizationBundle } from "../src/customization/bundleInstaller.js";
+import { installCustomizationBundle, skillInstallPath } from "../src/customization/bundleInstaller.js";
 
 describe("customization bundle installer", () => {
   it("keeps each 2.0 skill in its own group/skill directory instead of flattening SKILL.md names", async () => {
@@ -55,5 +55,9 @@ describe("customization bundle installer", () => {
     const instructionsRoot = join(storageRoot, "customizations", "test-bundle", "instructions");
     expect(existsSync(join(agentsRoot, "analyst.agent.md"))).toBe(true);
     expect(existsSync(join(instructionsRoot, "web.instructions.md"))).toBe(true);
+  });
+
+  it("rejects a skill install path that traverses outside the skills root", () => {
+    expect(() => skillInstallPath("central/skills/../../evil/SKILL.md")).toThrow(/unsafe/i);
   });
 });

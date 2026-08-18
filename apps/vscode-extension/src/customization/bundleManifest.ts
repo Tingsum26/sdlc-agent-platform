@@ -22,6 +22,9 @@ export function loadAndValidateBundle(root: string, manifestPath: string): Bundl
   }
   const parsed = JSON.parse(raw) as BundleManifest & { bundleId?: string };
   if (parsed.schemaVersion === "2.0") {
+    if (typeof parsed.bundleId !== "string" || !/^[a-z0-9][a-z0-9._-]*$/i.test(parsed.bundleId)) {
+      throw new Error("Unsupported bundle manifest version");
+    }
     return summarizeBundle(safeRoot, manifestFile, parsed.bundleId);
   }
   if (parsed.schemaVersion !== "1.0" || !/^\d+\.\d+\.\d+$/.test(parsed.bundleVersion)) {
@@ -45,7 +48,7 @@ export function safeResolve(root: string, relativePath: string): string {
   return target;
 }
 
-function summarizeBundle(safeRoot: string, manifestFile: string, bundleId: string | undefined): BundleManifest {
+function summarizeBundle(safeRoot: string, manifestFile: string, bundleId: string): BundleManifest {
   // The 2.0 manifest is a counts summary: file lists are derived by walking the
   // sibling `central/*` directories relative to `central/manifests`.
   const manifestDir = dirname(manifestFile);
@@ -53,7 +56,7 @@ function summarizeBundle(safeRoot: string, manifestFile: string, bundleId: strin
   const relativeToRoot = (file: string): string => relative(safeRoot, file).split(sep).join("/");
   return {
     schemaVersion: "2.0",
-    bundleVersion: bundleId ?? "2.0.0",
+    bundleVersion: bundleId,
     agents: walkFiles(join(centralDir, "agents"), (name) => name.endsWith(".agent.md"), false).map(relativeToRoot),
     skills: walkFiles(join(centralDir, "skills"), (name) => name === "SKILL.md", true).map(relativeToRoot),
     instructions: walkFiles(join(centralDir, "instructions"), (name) => name.endsWith(".instructions.md"), true).map(relativeToRoot),

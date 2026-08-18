@@ -51,4 +51,13 @@ describe("customization bundle manifest", () => {
     expect(manifest.policies ?? []).toContain("central/policies/stage-gates.json");
     expect(manifest.evals ?? []).toContain("central/evals/agents-behavior.md");
   });
+
+  it("rejects a 2.0 manifest whose bundleId is missing or malformed", () => {
+    const root = mkdtempSync(join(tmpdir(), "sdlc-bundle-2-bad-"));
+    mkdirSync(join(root, "central", "manifests"), { recursive: true });
+    writeFileSync(join(root, "central", "manifests", "bundle-manifest.json"), JSON.stringify({
+      bundleId: "../evil", schemaVersion: "2.0", agents: 0, skills: 0, instructions: 0,
+    }));
+    expect(() => loadAndValidateBundle(root, "central/manifests/bundle-manifest.json")).toThrow(/unsupported/i);
+  });
 });
