@@ -60,6 +60,23 @@ public final class WorkflowTaskService {
         return claimed;
     }
 
+    public synchronized WorkflowTask skipTask(
+            String taskId,
+            long expectedVersion,
+            String actorId,
+            String correlationId) {
+        WorkflowTask task = requireVersion(taskId, expectedVersion);
+        if (task.status() != TaskStatus.WAITING_FOR_LOCAL_COPILOT
+                && task.status() != TaskStatus.LOCAL_COPILOT_RUNNING
+                && task.status() != TaskStatus.WAITING_FOR_USER_CONFIRMATION) {
+            throw new IllegalTaskTransitionException("Stage cannot be skipped from " + task.status());
+        }
+        WorkflowTask skipped = task.transitionedTo(TaskStatus.COMPLETED, clock.instant());
+        tasks.save(skipped);
+        audit(skipped, actorId, "TASK_SKIPPED", task.status(), skipped.status(), correlationId);
+        return skipped;
+    }
+
     public synchronized WorkflowTask transition(
             String taskId,
             TaskStatus expectedStatus,
