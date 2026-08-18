@@ -35,7 +35,7 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler({StaleTaskVersionException.class, StaleRosterRevisionException.class,
-            IllegalTaskTransitionException.class, ArtifactImmutableException.class})
+            IllegalTaskTransitionException.class, ArtifactImmutableException.class, IllegalStateException.class})
     ResponseEntity<Map<String, Object>> conflict(RuntimeException exception, HttpServletRequest request) {
         return problem(HttpStatus.CONFLICT, "Workflow conflict", "The workflow state changed; refresh and retry", request);
     }

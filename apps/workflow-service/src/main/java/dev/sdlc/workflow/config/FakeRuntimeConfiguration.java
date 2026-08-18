@@ -8,6 +8,17 @@ import dev.sdlc.workflow.assignment.TaskAssignmentRepository;
 import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactStore;
 import dev.sdlc.workflow.artifact.FakeArtifactStore;
+import dev.sdlc.workflow.audit.DomainAuditEventRepository;
+import dev.sdlc.workflow.audit.InMemoryDomainAuditEventRepository;
+import dev.sdlc.workflow.change.ChangeRequestRepository;
+import dev.sdlc.workflow.change.ChangeRequestService;
+import dev.sdlc.workflow.change.InMemoryChangeRequestRepository;
+import dev.sdlc.workflow.dependency.DependencyRepository;
+import dev.sdlc.workflow.dependency.DependencyService;
+import dev.sdlc.workflow.dependency.InMemoryDependencyRepository;
+import dev.sdlc.workflow.epic.EpicWorkflowRepository;
+import dev.sdlc.workflow.epic.EpicWorkflowService;
+import dev.sdlc.workflow.epic.InMemoryEpicWorkflowRepository;
 import dev.sdlc.workflow.identity.DirectoryPersonService;
 import dev.sdlc.workflow.identity.EnrollmentCodeService;
 import dev.sdlc.workflow.identity.IdentityBindingService;
@@ -16,12 +27,21 @@ import dev.sdlc.workflow.integration.IntegrationDiagnosticService;
 import dev.sdlc.workflow.pod.InMemoryPodRosterRepository;
 import dev.sdlc.workflow.pod.PodRosterRepository;
 import dev.sdlc.workflow.pod.PodRosterService;
+import dev.sdlc.workflow.repotask.InMemoryRepoTaskRepository;
+import dev.sdlc.workflow.repotask.RepoTaskRepository;
+import dev.sdlc.workflow.repotask.RepoTaskService;
+import dev.sdlc.workflow.skip.InMemorySkipAttestationRepository;
+import dev.sdlc.workflow.skip.SkipAttestationRepository;
+import dev.sdlc.workflow.skip.SkipService;
 import dev.sdlc.workflow.task.AuditEventRepository;
 import dev.sdlc.workflow.task.InMemoryAuditEventRepository;
 import dev.sdlc.workflow.task.InMemoryWorkflowTaskRepository;
 import dev.sdlc.workflow.task.TaskTransitionPolicy;
 import dev.sdlc.workflow.task.WorkflowTaskRepository;
 import dev.sdlc.workflow.task.WorkflowTaskService;
+import dev.sdlc.workflow.ticket.InMemoryTicketWorkflowRepository;
+import dev.sdlc.workflow.ticket.TicketWorkflowRepository;
+import dev.sdlc.workflow.ticket.TicketWorkflowService;
 import dev.sdlc.workflow.webhook.InMemoryWebhookDeliveryRepository;
 import dev.sdlc.workflow.webhook.WebhookDeliveryRepository;
 import dev.sdlc.workflow.webhook.WebhookSignatureVerifier;
@@ -134,5 +154,76 @@ public class FakeRuntimeConfiguration {
     @Bean
     IntegrationDiagnosticService integrationDiagnosticService(Clock clock) {
         return new IntegrationDiagnosticService(clock, true);
+    }
+
+    @Bean
+    DomainAuditEventRepository domainAuditEventRepository() {
+        // TODO(INTERNAL): INTERNAL-AUD-001 Persist M2 domain aggregates and audit events to MongoDB.
+        return new InMemoryDomainAuditEventRepository();
+    }
+
+    @Bean
+    EpicWorkflowRepository epicWorkflowRepository() {
+        return new InMemoryEpicWorkflowRepository();
+    }
+
+    @Bean
+    TicketWorkflowRepository ticketWorkflowRepository() {
+        return new InMemoryTicketWorkflowRepository();
+    }
+
+    @Bean
+    RepoTaskRepository repoTaskRepository() {
+        return new InMemoryRepoTaskRepository();
+    }
+
+    @Bean
+    DependencyRepository dependencyRepository() {
+        return new InMemoryDependencyRepository();
+    }
+
+    @Bean
+    ChangeRequestRepository changeRequestRepository() {
+        return new InMemoryChangeRequestRepository();
+    }
+
+    @Bean
+    SkipAttestationRepository skipAttestationRepository() {
+        return new InMemorySkipAttestationRepository();
+    }
+
+    @Bean
+    EpicWorkflowService epicWorkflowService(EpicWorkflowRepository epics, DomainAuditEventRepository audits,
+            Clock clock) {
+        return new EpicWorkflowService(epics, audits, clock);
+    }
+
+    @Bean
+    TicketWorkflowService ticketWorkflowService(EpicWorkflowRepository epics, TicketWorkflowRepository tickets,
+            DependencyRepository dependencies, DomainAuditEventRepository audits, Clock clock) {
+        return new TicketWorkflowService(epics, tickets, dependencies, audits, clock);
+    }
+
+    @Bean
+    RepoTaskService repoTaskService(TicketWorkflowService tickets, RepoTaskRepository repoTasks,
+            DomainAuditEventRepository audits, Clock clock) {
+        return new RepoTaskService(tickets, repoTasks, audits, clock);
+    }
+
+    @Bean
+    DependencyService dependencyService(EpicWorkflowRepository epics, TicketWorkflowService tickets,
+            DependencyRepository dependencies, DomainAuditEventRepository audits, Clock clock) {
+        return new DependencyService(epics, tickets, dependencies, audits, clock);
+    }
+
+    @Bean
+    ChangeRequestService changeRequestService(EpicWorkflowRepository epics, TicketWorkflowService tickets,
+            ChangeRequestRepository requests, DomainAuditEventRepository audits, Clock clock) {
+        return new ChangeRequestService(epics, tickets, requests, audits, clock);
+    }
+
+    @Bean
+    SkipService skipService(WorkflowTaskService workflowTasks, SkipAttestationRepository attestations, Clock clock) {
+        return new SkipService(workflowTasks, attestations, clock);
     }
 }
