@@ -59,10 +59,10 @@ describe("central catalog", () => {
     }
   });
 
-  it("contains all 27 skills with valid frontmatter", () => {
+  it("contains all 33 skills with valid frontmatter", () => {
     const files = readdirSync(resolve(root, "central/skills"), { recursive: true } as never)
       .filter((name) => String(name).endsWith("SKILL.md"));
-    expect(files).toHaveLength(27);
+    expect(files).toHaveLength(33);
     for (const skill of expectedSkills) {
       const content = readFileSync(resolve(root, `central/skills/${skillGroup(skill)}/${skill}/SKILL.md`), "utf8");
       expect(content).toContain(`name: ${skill}`);
