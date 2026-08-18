@@ -1,4 +1,4 @@
-﻿# INTERNAL TODO Registry
+# INTERNAL TODO Registry
 
 Every internal-network configuration point in public code carries a
 `TODO(INTERNAL): INTERNAL-XXX` marker and MUST be listed here. M8 adds CI
@@ -14,5 +14,6 @@ enforcement so an unregistered marker fails the build.
 | INTERNAL-JIRA-001 | workflow-service | `config/*RuntimeConfiguration.java`, `api/EpicController.java` | Route the Jira projection outbox to the real Jira comment API with credentials | Sanitized Jira comment publish log | Revert to the fake projection client |
 | INTERNAL-CI-001 | workflow-service | `config/*RuntimeConfiguration.java`, `api/EpicController.java` | Route CI status to the real Jenkins adapter | Sanitized CI status log | Revert to the mock CI adapter |
 | INTERNAL-SPLUNK-001 | workflow-service | `config/*RuntimeConfiguration.java` | Point the Splunk audit publisher at the real HEC endpoint | Sanitized HEC event log | Revert to the fake transport |
+| INTERNAL-JOURNEY-001 | workflow-service | `api/JourneyController.java`, `config/*RuntimeConfiguration.java` | Feed real repository observation events (merge hooks) into the freshness engine and persist observations in MongoDB | Sanitized observation log | Revert to in-memory observations |
 
 

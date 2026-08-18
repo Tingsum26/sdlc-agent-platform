@@ -32,6 +32,9 @@ import dev.sdlc.workflow.jiraprojection.FakeJiraProjectionClient;
 import dev.sdlc.workflow.jiraprojection.InMemoryJiraProjectionRepository;
 import dev.sdlc.workflow.jiraprojection.JiraProjectionRepository;
 import dev.sdlc.workflow.jiraprojection.JiraProjectionService;
+import dev.sdlc.workflow.journeyfreshness.InMemoryJourneyObservationRepository;
+import dev.sdlc.workflow.journeyfreshness.JourneyFreshnessService;
+import dev.sdlc.workflow.journeyfreshness.JourneyObservationRepository;
 import dev.sdlc.workflow.persistence.MongoAuditEventRepository;
 import dev.sdlc.workflow.persistence.MongoPodRosterRepository;
 import dev.sdlc.workflow.persistence.MongoTaskAssignmentRepository;
@@ -257,5 +260,16 @@ public class MongoRuntimeConfiguration {
     @Bean
     SplunkAuditPublisher splunkAuditPublisher(SplunkDiagnosticAdapter splunk) {
         return new SplunkAuditPublisher(splunk);
+    }
+
+    @Bean
+    JourneyObservationRepository journeyObservationRepository() {
+        // TODO(INTERNAL): INTERNAL-JOURNEY-001 Persist journey observations in MongoDB and feed merge hooks.
+        return new InMemoryJourneyObservationRepository();
+    }
+
+    @Bean
+    JourneyFreshnessService journeyFreshnessService(JourneyObservationRepository observations, Clock clock) {
+        return new JourneyFreshnessService(observations, clock);
     }
 }
