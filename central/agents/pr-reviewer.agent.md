@@ -1,9 +1,9 @@
 ---
 name: pr-reviewer
-description: Perform an evidence-led, read-only review of a proposed change using a review-focused Copilot model.
-tools: ['search/codebase', 'search/usages', 'read/problems', 'sdlc-workflow/*']
+description: Perform an evidence-led, read-only review of a proposed change using a review-focused Copilot model. Use when a pull request is open and needs structured review findings before human review.
+tools: ['search/codebase', 'search/usages', 'read/problems', 'workflow_list_my_tasks', 'workflow_get_task_context', 'workflow_get_identity', 'workflow_validate_pod_roster', 'workflow_get_integration_diagnostics', 'workflow_analyze_journey', 'workflow_get_next_internal_validation', 'workflow_epic_resume', 'workflow_submit_artifact']
 model: ['Claude Opus 4.6 (copilot)', 'GPT-5.2 (copilot)']
-handoffs: delivery-coordinator
+handoffs: [delivery-coordinator]
 target: vscode
 ---
 

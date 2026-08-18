@@ -46,9 +46,11 @@ describe("copilot format intersection", () => {
   });
 
   it("every agent declares the sdlc-workflow MCP tools and a non-empty tool list", () => {
-    const content = readdirSync(resolve(root, "central/agents")).filter((name) => name.endsWith(".agent.md"))
-      .map((name) => readFileSync(resolve(root, "central/agents", name), "utf8")).join("\n");
-    expect(content).toContain("sdlc-workflow");
-    expect(content).not.toMatch(/tools:\s*\[\s*\]/);
+    const files = readdirSync(resolve(root, "central/agents")).filter((name) => name.endsWith(".agent.md"));
+    for (const name of files) {
+      const content = readFileSync(resolve(root, "central/agents", name), "utf8");
+      expect(content).toMatch(/workflow_[a-z_]+/);
+      expect(content).not.toMatch(/tools:\s*\[\s*\]/);
+    }
   });
 });
