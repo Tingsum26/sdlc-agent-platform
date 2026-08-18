@@ -6,6 +6,15 @@
 
 **Correction note (2026-08-18):** the design doc's headline said "27 skills" but its own list contains 33; the plan and manifest now use 33, and the four skills omitted from the original task split (`start-epic`, `join-epic`, `change-epic`, `review-pr`) are created in Task 4.
 
+**Tool allowlist convention (2026-08-18, applies to ALL agent files in Tasks 2–3):** the wildcard `sdlc-workflow/*` is replaced by explicit per-role tool lists, and `handoffs` is always an array. Role templates:
+
+- `READONLY`: `workflow_list_my_tasks`, `workflow_get_task_context`, `workflow_get_identity`, `workflow_validate_pod_roster`, `workflow_get_integration_diagnostics`, `workflow_analyze_journey`, `workflow_get_next_internal_validation`, `workflow_epic_resume`
+- `PRODUCER`: READONLY + `workflow_claim_task`, `workflow_submit_artifact`, `workflow_complete_task`
+- `REVIEWER`: READONLY + `workflow_submit_artifact`
+- `EPIC-OPS`: READONLY + `workflow_epic_create`, `workflow_epic_activate`, `workflow_epic_attach_ticket`, `workflow_epic_add_dependency`, `workflow_epic_create_change_request`
+
+Role → template mapping: epic-delivery-analyst = EPIC-OPS; delivery-coordinator, code-context-analyst = READONLY; requirement-analyst, solution-architect, planner, java/web/ios/android-implementer, test-designer = PRODUCER; accessibility-qa, pr-reviewer = REVIEWER. No agent may list `edit`/`terminal`/`execute`/MongoDB tools unless that agent's body explicitly grants implementation rights (only the four implementers may add `edit`/`terminal`).
+
 **Architecture:** Content-only rework. The new `central/` directory becomes the single source of truth; existing `.github/agents|skills|instructions`, `skills/`, `policies/`, `evals/`, `mcp/catalog.json`, `manifests/customization-bundle-v1.json` are migrated into it (old locations removed after migration in the same commit group). `packages/contracts` tests are extended to assert the full catalog. VSIX `bundleInstaller` adapts only if it hardcodes old paths (verify in Task 11).
 
 **Tech Stack:** Markdown/YAML/JSON content, vitest contract tests (existing), pnpm workspace.
