@@ -1,7 +1,0 @@
-{
-  "schemaVersion": "1.0",
-  "strategy": "EXPAND_MIGRATE_CONTRACT",
-  "breakingRiskChecks": ["removedOrRenamedField", "newRequiredField", "typeOrNullability", "semanticChange", "strictClientEnum", "statusOrError", "auth", "pagination", "idempotency", "oldValidPayloadRejected"],
-  "requiredEvidence": ["consumerVersionMatrix", "contractTests", "safeLegacyDefault", "featureFlagLifecycle", "rollback", "deprecation", "removalCondition"],
-  "nativeLater": { "missingOrOldClientHeader": "SAFE_LEGACY_BEHAVIOR", "releaseOrder": ["WEB_API", "NATIVE_RELEASE_TRAIN"] }
-}

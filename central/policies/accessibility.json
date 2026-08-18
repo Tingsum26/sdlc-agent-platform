@@ -1,0 +1,8 @@
+{
+  "id": "accessibility",
+  "version": 2,
+  "rule": "A BLOCKER accessibility finding keeps the merge gate red; automation findings never substitute for human QA sign-off.",
+  "when": { "event": "merge-gate" },
+  "effect": "BLOCK",
+  "evidence": "accessibility findings artifact with severity and violated guideline"
+}

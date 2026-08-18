@@ -1,0 +1,8 @@
+{
+  "id": "feature-flag",
+  "version": 2,
+  "rule": "Every feature flag declares an owner, a default value, its target platforms, and an expiry date; a flag missing any of these cannot merge.",
+  "when": { "event": "flag-introduction" },
+  "effect": "BLOCK",
+  "evidence": "flag metadata in the implementation plan or PR description"
+}

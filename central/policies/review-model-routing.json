@@ -1,0 +1,8 @@
+{
+  "id": "review-model-routing",
+  "version": 2,
+  "rule": "PR review runs on the review model chain, and the review artifact records which model produced the findings.",
+  "when": { "event": "pr-review" },
+  "effect": "REQUIRE_EVIDENCE",
+  "evidence": "reviewer model identifier in the review artifact"
+}

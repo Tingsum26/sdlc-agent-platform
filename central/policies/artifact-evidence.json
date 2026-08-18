@@ -1,0 +1,8 @@
+{
+  "id": "artifact-evidence",
+  "version": 2,
+  "rule": "Every claim in an artifact carries a source and an evidence level (TEST_VERIFIED, CODE_VERIFIED, DOC_STATED, AI_INFERRED, or UNRESOLVED); unproven inference is labeled, never presented as fact.",
+  "when": { "event": "artifact-submit" },
+  "effect": "REQUIRE_EVIDENCE",
+  "evidence": "evidence-level labels and source references in the artifact"
+}

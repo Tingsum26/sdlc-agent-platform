@@ -1,0 +1,8 @@
+{
+  "id": "privacy-redaction",
+  "version": 2,
+  "rule": "No token, credential, cookie, customer data, or unmasked personal data may enter a committed file, artifact, or log.",
+  "when": { "event": "artifact-submit" },
+  "effect": "BLOCK",
+  "evidence": "redaction scan and secret-scan output"
+}

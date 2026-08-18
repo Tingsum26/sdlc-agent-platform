@@ -1,0 +1,8 @@
+{
+  "id": "pod-assignment",
+  "version": 2,
+  "rule": "Pod member assignment uses a deterministic role match; an unassigned queue is allowed, and any assignment with no matching role routes to it rather than failing.",
+  "when": { "event": "pod-assignment" },
+  "effect": "WARN",
+  "evidence": "assignment routing log and unassigned queue state"
+}

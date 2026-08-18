@@ -1,0 +1,8 @@
+{
+  "id": "manual-e2e",
+  "version": 2,
+  "rule": "Only a human QA actor may record a manual E2E case as PASS; an agent never fabricates or self-records a passing manual result.",
+  "when": { "event": "manual-e2e-result" },
+  "effect": "BLOCK",
+  "evidence": "executor role and human QA sign-off in the result artifact"
+}
