@@ -1,13 +1,13 @@
-﻿# M3 Milestone Verification (2026-08-18)
+# M3 Milestone Verification (2026-08-18)
 
 Branch: `agent/mvp-vertical-slice`
-Milestone: M3 鈥?Enterprise adapters: Jira projection outbox (draft 鈫?human-confirmed publish 鈫?retry with `JIRA_ARTIFACT_SYNC_PENDING`/`FAILED`), Jenkins CI status flow into the Ticket View, and Splunk structured audit emission with allowlist redaction
+Milestone: M3 — Enterprise adapters: Jira projection outbox (draft → human-confirmed publish → retry with `JIRA_ARTIFACT_SYNC_PENDING`/`FAILED`), Jenkins CI status flow into the Ticket View, and Splunk structured audit emission with allowlist redaction
 
 ## Gates
 
 | Gate | Command | Result |
 |---|---|---|
-| Java full suite | `.\mvnw.cmd -q verify` | PASS (105 tests 鈥?85 unit + 20 IT, 0 failures, exit 0) |
+| Java full suite | `.\mvnw.cmd -q verify` | PASS (105 tests — 85 unit + 20 IT, 0 failures, exit 0) |
 | Frozen install | `pnpm install --frozen-lockfile` | PASS |
 | Node tests | `pnpm test` | PASS (vscode-extension 13, contracts 30, workflow-mcp 11, ui 8, web-ui 5) |
 | Node builds | `pnpm build` | PASS (all workspaces incl. vscode-extension) |
@@ -15,8 +15,8 @@ Milestone: M3 鈥?Enterprise adapters: Jira projection outbox (draft 鈫?human-c
 | M2 browser E2E | `pnpm e2e:m2` | PASS (1 spec) |
 | M3 browser E2E | `pnpm e2e:m3` | PASS (1 spec) |
 | Regression E2E | `pnpm e2e:public-mvp` | PASS (1 spec) |
-| Lifecycle start | `powershell -File scripts/start-demo.ps1` | PASS 鈥?"Public demo ready" |
-| Lifecycle stop | `powershell -File scripts/stop-demo.ps1` | PASS 鈥?ports 8080/4173 released |
+| Lifecycle start | `powershell -File scripts/start-demo.ps1` | PASS — "Public demo ready" |
+| Lifecycle stop | `powershell -File scripts/stop-demo.ps1` | PASS — ports 8080/4173 released |
 | TODO/TBD scan | apps,packages,e2e excluding `TODO(INTERNAL)` | NONE |
 | Credential scan | apps,packages,e2e,docs,central | NONE |
 
@@ -43,4 +43,3 @@ Milestone: M3 鈥?Enterprise adapters: Jira projection outbox (draft 鈫?human-c
 
 - New internal configuration points are registered in `docs/handoff/INTERNAL_TODO.md`: `INTERNAL-JIRA-001` (route the Jira projection outbox to the real Jira comment API, in `api/EpicController.java` and `config/*RuntimeConfiguration.java`), `INTERNAL-CI-001` (route CI status to the real Jenkins adapter, in `api/EpicController.java` and `config/*RuntimeConfiguration.java`), and `INTERNAL-SPLUNK-001` (point the Splunk audit publisher at the real HEC endpoint, in `config/*RuntimeConfiguration.java`).
 - All M3 behavior is verified against the `fake` profile with fictitious data. Jira comment publish, Jenkins CI, and Splunk HEC remain internal-agent work behind the registered markers.
-
