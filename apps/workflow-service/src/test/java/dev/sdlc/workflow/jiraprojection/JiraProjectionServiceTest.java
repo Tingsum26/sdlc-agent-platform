@@ -84,4 +84,22 @@ class JiraProjectionServiceTest {
         assertEquals(JiraProjectionStatus.JIRA_ARTIFACT_SYNC_FAILED, failed.status());
         assertEquals(0, fixture.service().flushPending("EMP-100", "corr-5").size());
     }
+
+    @Test
+    void flushPublishesOnlyTheTargetProjection() {
+        Fixture fixture = fixture();
+        fixture.service().enqueue("DEMO-123", "REQ-APPROVED", "Requirement approved", "EMP-100", "corr-1");
+        fixture.service().enqueue("DEMO-456", "DESIGN-APPROVED", "Design approved", "EMP-100", "corr-2");
+
+        JiraProjection published = fixture.service().flush(
+                fixture.service().listAll().stream()
+                        .filter(item -> item.ticketId().equals("DEMO-456")).findFirst().orElseThrow().projectionId(),
+                "EMP-100", "corr-3");
+
+        assertEquals(JiraProjectionStatus.PUBLISHED, published.status());
+        assertEquals(1, fixture.client().published().size());
+        assertEquals(JiraProjectionStatus.JIRA_ARTIFACT_SYNC_PENDING,
+                fixture.service().listAll().stream()
+                        .filter(item -> item.ticketId().equals("DEMO-123")).findFirst().orElseThrow().status());
+    }
 }

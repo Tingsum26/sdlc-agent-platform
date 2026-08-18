@@ -1,12 +1,10 @@
 package dev.sdlc.workflow.api;
 
-import dev.sdlc.workflow.artifact.JiraProjectionStatus;
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
 import dev.sdlc.workflow.change.ChangeRequestService;
 import dev.sdlc.workflow.change.ChangeUrgency;
 import dev.sdlc.workflow.change.EpicChangeRequest;
-import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.dependency.Dependency;
 import dev.sdlc.workflow.dependency.DependencyService;
 import dev.sdlc.workflow.epic.Channel;
@@ -140,17 +138,9 @@ public class EpicController {
     }
 
     @PostMapping("/jira-drafts/{projectionId}/publish")
-    JiraProjection publishJiraDraft(@PathVariable String projectionId, @Valid @RequestBody VersionRequest body,
-            HttpServletRequest request) {
+    JiraProjection publishJiraDraft(@PathVariable String projectionId, HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
-        JiraProjection draft = jiraProjections.get(projectionId);
-        if (draft.status() != JiraProjectionStatus.JIRA_ARTIFACT_SYNC_PENDING) {
-            throw new WorkflowConflictException("Projection is not pending");
-        }
-        return jiraProjections.flushPending(user.actorId(), CorrelationIdFilter.from(request)).stream()
-                .filter(item -> item.projectionId().equals(projectionId))
-                .findFirst()
-                .orElseThrow(() -> new WorkflowConflictException("Projection is not pending"));
+        return jiraProjections.flush(projectionId, user.actorId(), CorrelationIdFilter.from(request));
     }
 
     @PostMapping("/jira-drafts/retry")

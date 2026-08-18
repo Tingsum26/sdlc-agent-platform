@@ -36,9 +36,7 @@ class JiraProjectionIT {
         String projectionId = json.readTree(created).path("projectionId").asText();
 
         mvc.perform(post("/api/v1/jira-drafts/{id}/publish", projectionId)
-                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"expectedVersion\":0}"))
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PUBLISHED"))
                 .andExpect(jsonPath("$.attempts").value(1));
@@ -47,6 +45,33 @@ class JiraProjectionIT {
                         .header("X-Demo-User", "PRINCIPAL-EMP-100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.milestoneId").value("REQ-APPROVED"));
+    }
+
+    @Test
+    void rejectsRepublishingAPublishedDraft() throws Exception {
+        String created = mvc.perform(post("/api/v1/jira-drafts")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"DEMO-789\",\"milestoneId\":\"DESIGN-APPROVED\",\"summary\":\"Design approved\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String projectionId = json.readTree(created).path("projectionId").asText();
+
+        mvc.perform(post("/api/v1/jira-drafts/{id}/publish", projectionId)
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"));
+
+        mvc.perform(post("/api/v1/jira-drafts/{id}/publish", projectionId)
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void rejectsPublishingAnUnknownDraft() throws Exception {
+        mvc.perform(post("/api/v1/jira-drafts/{id}/publish", "JIRA-PROJ-NOPE")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

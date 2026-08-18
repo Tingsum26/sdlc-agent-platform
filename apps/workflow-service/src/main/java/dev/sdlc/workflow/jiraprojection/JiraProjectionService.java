@@ -2,6 +2,7 @@ package dev.sdlc.workflow.jiraprojection;
 
 import dev.sdlc.workflow.artifact.JiraProjectionClient;
 import dev.sdlc.workflow.artifact.JiraProjectionStatus;
+import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,6 +49,16 @@ public final class JiraProjectionService {
             changed.add(updated);
         }
         return changed;
+    }
+
+    public synchronized JiraProjection flush(String projectionId, String actorId, String correlationId) {
+        JiraProjection projection = get(projectionId);
+        if (projection.status() != JiraProjectionStatus.JIRA_ARTIFACT_SYNC_PENDING) {
+            throw new WorkflowConflictException("Projection is not pending");
+        }
+        JiraProjection updated = attempt(projection);
+        projections.save(updated);
+        return updated;
     }
 
     public JiraProjection get(String projectionId) {
