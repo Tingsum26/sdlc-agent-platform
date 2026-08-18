@@ -31,6 +31,28 @@ describe("epic MCP tools", () => {
     await server.close();
   });
 
+  it("resumes an epic through the tool surface", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      epic: { epicId: "EPIC-M2-1" },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const server = createWorkflowMcpServer(new WorkflowApiClient("http://127.0.0.1:8080", fetcher));
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const result = await client.callTool({
+      name: "workflow_epic_resume",
+      arguments: { epicId: "EPIC-M2-1" },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:8080/api/v1/epics/EPIC-M2-1/resume",
+      expect.objectContaining({ method: "GET" }));
+    await client.close();
+    await server.close();
+  });
+
   it("rejects an invalid channel", async () => {
     const fetcher = vi.fn<typeof fetch>();
     const server = createWorkflowMcpServer(new WorkflowApiClient("http://127.0.0.1:8080", fetcher));

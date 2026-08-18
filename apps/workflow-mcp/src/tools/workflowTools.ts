@@ -128,7 +128,7 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
   server.registerTool("workflow_epic_create", {
     description: "Create a fictional Epic workflow aggregate.",
     inputSchema: z.object({
-      epicId: z.string().min(3).max(80), title: z.string().min(1), journeyId: z.string().min(3).max(80),
+      epicId: z.string().min(1), title: z.string().min(1), journeyId: z.string().min(3).max(80),
     }),
   }, (args, extra) => safe("workflow_epic_create", (correlationId) => api.createEpic(args, correlationId, extra.signal)));
 
