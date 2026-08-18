@@ -21,7 +21,11 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
   await Promise.all([mkdir(agentsRoot, { recursive: true }), mkdir(skillsRoot, { recursive: true }), mkdir(instructionsRoot, { recursive: true })]);
 
   for (const path of manifest.agents) await cp(safeResolve(sourceRoot, path), join(agentsRoot, basename(path)), { force: true });
-  for (const path of manifest.skills) await cp(safeResolve(sourceRoot, path), join(skillsRoot, basename(path)), { recursive: true, force: true });
+  for (const path of manifest.skills) {
+    const target = join(skillsRoot, skillInstallPath(path));
+    await mkdir(dirname(target), { recursive: true });
+    await cp(safeResolve(sourceRoot, path), target, { recursive: true, force: true });
+  }
   for (const path of manifest.instructions.filter((value) => value.endsWith(".instructions.md"))) {
     await cp(safeResolve(sourceRoot, path), join(instructionsRoot, basename(path)), { force: true });
   }
@@ -64,4 +68,15 @@ async function addLocation(key: string, path: string, previous: string | undefin
   if (previous) delete next[previous];
   next[path] = true;
   await chat.update(key, next, vscode.ConfigurationTarget.Global);
+}
+
+// Skills install relative to the skills root, keeping each skill's unique
+// group/skill directory. Derived 2.0 paths are relative to the bundle source
+// root (e.g. `central/skills/workflow/start-ticket/SKILL.md`), so take the
+// substring after the first `skills/` segment; legacy 1.0 paths fall back to
+// the basename exactly as before.
+function skillInstallPath(path: string): string {
+  const marker = "/skills/";
+  const index = path.indexOf(marker);
+  return index === -1 ? basename(path) : path.slice(index + marker.length);
 }
