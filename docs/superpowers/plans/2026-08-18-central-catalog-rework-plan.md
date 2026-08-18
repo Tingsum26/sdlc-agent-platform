@@ -13,7 +13,7 @@
 - `REVIEWER`: READONLY + `workflow_submit_artifact`
 - `EPIC-OPS`: READONLY + `workflow_epic_create`, `workflow_epic_activate`, `workflow_epic_attach_ticket`, `workflow_epic_add_dependency`, `workflow_epic_create_change_request`
 
-Role → template mapping: epic-delivery-analyst = EPIC-OPS; delivery-coordinator, code-context-analyst = READONLY; requirement-analyst, solution-architect, planner, java/web/ios/android-implementer, test-designer = PRODUCER; accessibility-qa, pr-reviewer = REVIEWER. No agent may list `edit`/`terminal`/`execute`/MongoDB tools unless that agent's body explicitly grants implementation rights (only the four implementers may add `edit`/`terminal`).
+Role → template mapping: epic-delivery-analyst = EPIC-OPS; delivery-coordinator, code-context-analyst = READONLY; requirement-analyst, solution-architect, planner, java/web/ios/android-implementer, test-designer = PRODUCER; accessibility-qa, pr-reviewer = REVIEWER. No agent may list `edit`/`terminal`/`execute`/MongoDB tools unless that agent's body explicitly grants implementation rights (only the four implementers and the test-designer may add `edit`/`terminal`).
 
 **Architecture:** Content-only rework. The new `central/` directory becomes the single source of truth; existing `.github/agents|skills|instructions`, `skills/`, `policies/`, `evals/`, `mcp/catalog.json`, `manifests/customization-bundle-v1.json` are migrated into it (old locations removed after migration in the same commit group). `packages/contracts` tests are extended to assert the full catalog. VSIX `bundleInstaller` adapts only if it hardcodes old paths (verify in Task 11).
 
