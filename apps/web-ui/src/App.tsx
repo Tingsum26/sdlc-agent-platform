@@ -64,6 +64,7 @@ export function App() {
   const [repoTaskLine, setRepoTaskLine] = useState<string>();
   const [dependencyLine, setDependencyLine] = useState<string>();
   const [dependencyError, setDependencyError] = useState<string>();
+  const [mergeBlocked, setMergeBlocked] = useState(false);
   const [changeRequest, setChangeRequest] = useState<ChangeRequestState>();
   const [resume, setResume] = useState<ResumeState>();
   const [skipLine, setSkipLine] = useState<string>();
@@ -243,14 +244,15 @@ export function App() {
   const mergeWebTicket = async () => {
     const ticket = tickets.find((item) => item.ticketId === "M2-WEB-1");
     if (!ticket) return;
-    setM2Busy("merge"); setDependencyError(undefined);
+    setM2Busy("merge");
     try {
       await m2Api(`/api/v1/tickets/${ticket.ticketId}/advance`, {
         method: "POST", body: JSON.stringify({ expectedVersion: ticket.version, target: "MERGED" }),
       });
       await refreshTickets(epic!.epicId);
+      setMergeBlocked(false);
     } catch {
-      setDependencyError("MERGE_BLOCKED_BY_DEPENDENCY");
+      setMergeBlocked(true); setDependencyError(undefined);
       await refreshTickets(epic!.epicId);
     } finally { setM2Busy(undefined); }
   };
@@ -260,11 +262,16 @@ export function App() {
     setM2Busy("resolve"); setDependencyError(undefined);
     try {
       const deps = await m2Api<Array<{ dependencyId: string; version: number }>>(`/api/v1/epics/${epic.epicId}/dependencies`);
+      if (deps.length === 0) {
+        setDependencyError("no-dependency-to-resolve");
+        return;
+      }
       const blocking = deps[0];
       await m2Api(`/api/v1/dependencies/${blocking.dependencyId}/resolve`, {
         method: "POST", body: JSON.stringify({ expectedVersion: blocking.version }),
       });
       setDependencyLine(`RESOLVED ${blocking.dependencyId}`);
+      setMergeBlocked(false);
     } catch { setDependencyError("dependency-resolve-failed"); } finally { setM2Busy(undefined); }
   };
 
@@ -336,6 +343,18 @@ export function App() {
     return response.json() as Promise<T>;
   }
 
+  const m2NextAction = !epic ? "Create EPIC-M2-1"
+    : epic.status === "CREATED" ? "Activate epic"
+    : tickets.length === 0 ? "Attach four channel tickets"
+    : !repoTaskLine ? "Add repo task to M2-API-1"
+    : !dependencyLine ? "Add dependency M2-API-1 → M2-WEB-1"
+    : tickets.find((item) => item.ticketId === "M2-WEB-1")?.status === "PLANNED" ? "Advance M2-WEB-1 to CI_PASSED"
+    : mergeBlocked ? "Resolve dependency"
+    : !changeRequest ? "Create emergency change request"
+    : changeRequest.status === "DRAFT" ? "Approve change as Business Owner then Technical Owner"
+    : tickets.some((item) => item.pendingChangeConfirmation) ? "Acknowledge change on M2-API-1"
+    : "Show resume context";
+
   return <>
     <a className="skip-link" href="#main">Skip to main content</a>
     <header className="app-header"><div><p className="eyebrow">Local Copilot · human-controlled</p><h1>SDLC Workbench</h1></div>
@@ -390,23 +409,24 @@ export function App() {
       </section>
       <section className="sdlc-card sdlc-stack readiness" aria-labelledby="m2-title">
         <div className="section-heading"><div><p className="eyebrow">M2 · Three-level workflow</p><h2 id="m2-title">Epic, tickets, and repo tasks</h2></div></div>
+        <p className="sdlc-muted" role="status" aria-atomic="true">Next action: {m2NextAction}</p>
         <div className="sdlc-actions">
-          <button type="button" disabled={Boolean(m2Busy)} onClick={() => void createEpic()}>Create EPIC-M2-1</button>
-          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "CREATED"} onClick={() => void activateEpic()}>Activate epic</button>
-          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "ACTIVE"} onClick={() => void attachTickets()}>Attach four channel tickets</button>
-          <button type="button" disabled={Boolean(m2Busy) || tickets.length === 0} onClick={() => void addRepoTask()}>Add repo task to M2-API-1</button>
-          <button type="button" disabled={Boolean(m2Busy) || tickets.length < 2} onClick={() => void addDependency()}>Add dependency M2-API-1 → M2-WEB-1</button>
-          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-WEB-1" && item.status === "PLANNED")} onClick={() => void advanceWebTicket()}>Advance M2-WEB-1 to CI_PASSED</button>
-          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-WEB-1" && item.status === "CI_PASSED")} onClick={() => void mergeWebTicket()}>Try merge M2-WEB-1</button>
-          <button type="button" disabled={Boolean(m2Busy) || dependencyError !== "MERGE_BLOCKED_BY_DEPENDENCY"} onClick={() => void resolveDependency()}>Resolve dependency</button>
-          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "ACTIVE"} onClick={() => void createChangeRequest()}>Create emergency change request</button>
-          <button type="button" disabled={Boolean(m2Busy) || !changeRequest || changeRequest.status !== "DRAFT"} onClick={() => void approveChange("BUSINESS_OWNER")}>Approve change as Business Owner</button>
-          <button type="button" disabled={Boolean(m2Busy) || !changeRequest || changeRequest.status !== "DRAFT"} onClick={() => void approveChange("TECHNICAL_OWNER")}>Approve change as Technical Owner</button>
-          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-API-1" && item.pendingChangeConfirmation)} onClick={() => void ackChangeOnApi()}>Acknowledge change on M2-API-1</button>
-          <button type="button" disabled={Boolean(m2Busy) || tasks.length === 0} onClick={() => void skipFirstTask()}>Skip first DEMO-123 task with attestation</button>
-          <button type="button" disabled={Boolean(m2Busy) || !epic} onClick={() => void showResume()}>Show resume context</button>
+          <button type="button" disabled={Boolean(m2Busy) || Boolean(epic)} aria-busy={Boolean(m2Busy)} onClick={() => void createEpic()}>Create EPIC-M2-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "CREATED"} aria-busy={Boolean(m2Busy)} onClick={() => void activateEpic()}>Activate epic</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "ACTIVE"} aria-busy={Boolean(m2Busy)} onClick={() => void attachTickets()}>{m2Busy === "attach" ? "Attaching tickets…" : "Attach four channel tickets"}</button>
+          <button type="button" disabled={Boolean(m2Busy) || tickets.length === 0} aria-busy={Boolean(m2Busy)} onClick={() => void addRepoTask()}>Add repo task to M2-API-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || tickets.length < 2} aria-busy={Boolean(m2Busy)} onClick={() => void addDependency()}>Add dependency M2-API-1 → M2-WEB-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-WEB-1" && item.status === "PLANNED")} aria-busy={Boolean(m2Busy)} onClick={() => void advanceWebTicket()}>{m2Busy === "advance" ? "Advancing…" : "Advance M2-WEB-1 to CI_PASSED"}</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-WEB-1" && item.status === "CI_PASSED")} aria-busy={Boolean(m2Busy)} onClick={() => void mergeWebTicket()}>Try merge M2-WEB-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || !mergeBlocked} aria-busy={Boolean(m2Busy)} onClick={() => void resolveDependency()}>Resolve dependency</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic || epic.status !== "ACTIVE"} aria-busy={Boolean(m2Busy)} onClick={() => void createChangeRequest()}>Create emergency change request</button>
+          <button type="button" disabled={Boolean(m2Busy) || !changeRequest || changeRequest.status !== "DRAFT"} aria-busy={Boolean(m2Busy)} onClick={() => void approveChange("BUSINESS_OWNER")}>Approve change as Business Owner</button>
+          <button type="button" disabled={Boolean(m2Busy) || !changeRequest || changeRequest.status !== "DRAFT"} aria-busy={Boolean(m2Busy)} onClick={() => void approveChange("TECHNICAL_OWNER")}>Approve change as Technical Owner</button>
+          <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-API-1" && item.pendingChangeConfirmation)} aria-busy={Boolean(m2Busy)} onClick={() => void ackChangeOnApi()}>Acknowledge change on M2-API-1</button>
+          <button type="button" disabled={Boolean(m2Busy) || tasks.length === 0} aria-busy={Boolean(m2Busy)} onClick={() => void skipFirstTask()}>Skip first DEMO-123 task with attestation</button>
+          <button type="button" disabled={Boolean(m2Busy) || !epic} aria-busy={Boolean(m2Busy)} onClick={() => void showResume()}>Show resume context</button>
         </div>
-        {dependencyError && <ErrorState title="M2 action unavailable" correlationId={dependencyError} onRetry={() => undefined} />}
+        {dependencyError && <ErrorState title="M2 action unavailable" correlationId={dependencyError} onRetry={() => setDependencyError(undefined)} />}
         {epic && <p role="status">Epic {epic.epicId} · {epic.title} · {epic.status} · v{epic.version}</p>}
         {tickets.length > 0 && <div className="table-scroll"><table><caption>EPIC-M2-1 tickets</caption>
           <thead><tr><th scope="col">Ticket</th><th scope="col">Channel</th><th scope="col">Status</th><th scope="col">Change confirmation</th></tr></thead>
@@ -415,6 +435,7 @@ export function App() {
             <td>{ticket.pendingChangeConfirmation ? "PENDING_CHANGE_CONFIRMATION" : "—"}</td></tr>)}</tbody></table></div>}
         {repoTaskLine && <p>{repoTaskLine}</p>}
         {dependencyLine && <p>{dependencyLine}</p>}
+        {mergeBlocked && <p role="status">MERGE_BLOCKED_BY_DEPENDENCY — resolve the dependency before merging.</p>}
         {changeRequest && <p role="status">Change request {changeRequest.changeRequestId} · {changeRequest.status} · approvals {changeRequest.approvedRoles.length}/{changeRequest.requiredApprovals}</p>}
         {skipLine && <p role="status">{skipLine}</p>}
         {resume && <section aria-labelledby="resume-title"><h3 id="resume-title">Resume context · {resume.epic.status}</h3>
