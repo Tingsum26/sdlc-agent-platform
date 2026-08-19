@@ -56,6 +56,8 @@ Expected: FAIL — `viewState` module missing.
 
 - [ ] **Step 3: Implement `views/viewState.ts`**
 
+> Implementation note (2026-08-18): Task 1's test 2 used a pinned date `Date.parse("2026-08-18T12:00:00Z")` against `toViewState`'s default `now = Date.now()`, which is date-brittle (LIVE only within 5 minutes of that instant). The committed test uses `at: Date.now() - 60_000` instead; the module itself is unchanged.
+
 ```ts
 export type Freshness = "LIVE" | "DELAYED" | "STALE" | "OFFLINE";
 export type ViewState<T> =
