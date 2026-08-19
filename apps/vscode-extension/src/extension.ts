@@ -6,16 +6,38 @@ import { checkMcpHealth } from "./diagnostics/mcpHealth.js";
 import { installCustomizationBundle, rollbackCustomizationBundle } from "./customization/bundleInstaller.js";
 import { ExtensionLogger } from "./logging/logger.js";
 import { TaskPoller } from "./polling/taskPoller.js";
-import { TaskTreeProvider } from "./views/taskTreeProvider.js";
+import { CustomizationProvider } from "./views/customizationProvider.js";
+import { EpicProvider } from "./views/epicProvider.js";
+import { IdentityPodProvider } from "./views/identityPodProvider.js";
+import { McpCenterProvider } from "./views/mcpCenterProvider.js";
+import { MyWorkProvider } from "./views/myWorkProvider.js";
 import { ReadinessTreeProvider } from "./views/readinessTreeProvider.js";
+import { ScrumMasterProvider } from "./views/scrumMasterProvider.js";
 import { WorkflowStatusBar } from "./views/statusBar.js";
+import { TicketProvider } from "./views/ticketProvider.js";
+import type { McpCatalogEntry } from "./views/types.js";
 import { openApprovalPanel } from "./webview/approvalPanel.js";
 import { escapeHtml, shell } from "./webview/html.js";
 import { openReportPanel } from "./webview/reportPanel.js";
 import { openJourneyReportPanel } from "./webview/journeyReportPanel.js";
 
-const viewIds = ["sdlc.developer", "sdlc.scrumMaster", "sdlc.myWork", "sdlc.epic", "sdlc.ticket",
-  "sdlc.repoTask", "sdlc.customization", "sdlc.mcpCenter", "sdlc.diagnostics"];
+const viewIds = ["sdlc.myWork", "sdlc.scrumMaster", "sdlc.epic", "sdlc.ticket",
+  "sdlc.identityPod", "sdlc.customization", "sdlc.mcpCenter", "sdlc.diagnostics"];
+
+/**
+ * Static MCP catalog mirroring central/mcp/catalog.json. The packaged VSIX
+ * ships only dist/ (see package.json "files"), so the catalog file is not read
+ * at runtime; keep the server list, required flags, and workflow skills in
+ * sync with the central catalog by hand.
+ */
+const mcpCatalog: McpCatalogEntry[] = [
+  { id: "workflow", name: "Workflow MCP", required: true, skills: ["start-epic", "join-epic", "change-epic", "start-ticket", "resume-workflow", "import-pod-members"] },
+  { id: "jira", name: "Jira MCP", required: false, skills: [] },
+  { id: "confluence", name: "Confluence MCP", required: false, skills: [] },
+  { id: "github-enterprise", name: "GitHub MCP", required: false, skills: [] },
+  { id: "figma-desktop", name: "Figma Desktop", required: false, skills: [] },
+  { id: "code-graph", name: "Code graph", required: false, skills: [] },
+];
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("Local Copilot SDLC");
@@ -23,23 +45,60 @@ export function activate(context: vscode.ExtensionContext): void {
   const config = () => vscode.workspace.getConfiguration("sdlc");
   const client = () => new WorkflowClient(config().get<string>("workflowServiceUrl", "http://127.0.0.1:8080"),
     fetch, config().get<string>("demoActorId") || undefined);
-  const taskViewIds = viewIds.filter((id) => id !== "sdlc.diagnostics");
-  const providers = taskViewIds.map((id) => new TaskTreeProvider(id));
+  // Every view provider implements the tree contract and its own refresh();
+  // the intersection makes the refresh fan-out below type-safe.
+  const viewProviders: Array<vscode.TreeDataProvider<vscode.TreeItem> & { refresh(): Promise<void> }> = [
+    new MyWorkProvider(client()),
+    new ScrumMasterProvider(client()),
+    new EpicProvider(client()),
+    new TicketProvider(client()),
+    new IdentityPodProvider(client()),
+    new CustomizationProvider(context.globalState),
+    new McpCenterProvider(mcpCatalog),
+  ];
   const readinessProvider = new ReadinessTreeProvider();
   const status = new WorkflowStatusBar();
   let tasks: WorkflowTask[] = [];
 
+  const taskViewIds = viewIds.filter((id) => id !== "sdlc.diagnostics");
   for (let index = 0; index < taskViewIds.length; index += 1) {
-    context.subscriptions.push(vscode.window.registerTreeDataProvider(taskViewIds[index]!, providers[index]!));
+    context.subscriptions.push(vscode.window.registerTreeDataProvider(taskViewIds[index]!, viewProviders[index]!));
   }
   context.subscriptions.push(vscode.window.registerTreeDataProvider("sdlc.diagnostics", readinessProvider));
 
+  // Per-view refresh fan-out: every provider refreshes independently and a
+  // failure in one view never blocks the others. Each provider's refresh()
+  // already swallows its own errors into the view's error state; the try/catch
+  // here is the last line of defense and keeps a rejection visible to
+  // allSettled instead of escaping into the aggregate.
+  const refreshView = async (provider: { refresh(): Promise<void> }): Promise<void> => {
+    try {
+      await provider.refresh();
+    } catch (error) {
+      logger.error("view_refresh_failed", { message: safeMessage(error) });
+      throw error;
+    }
+  };
+
   const refresh = async () => {
-    tasks = await client().listTasks();
-    providers.forEach((provider) => provider.setTasks(tasks));
-    const actionable = tasks.filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status)).length;
-    status.update(tasks.length, actionable);
-    logger.info("tasks_refreshed", { total: tasks.length, actionable });
+    const settled = await Promise.allSettled(viewProviders.map((provider) => refreshView(provider)));
+
+    // Aggregate summary for the status bar and logger, unchanged from the
+    // single-provider wiring.
+    let total = 0;
+    let actionable = 0;
+    try {
+      tasks = await client().listTasks();
+      total = tasks.length;
+      actionable = tasks.filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status)).length;
+    } catch (error) {
+      logger.error("aggregate_tasks_failed", { message: safeMessage(error) });
+    }
+    status.update(total, actionable);
+    logger.info("tasks_refreshed", {
+      total, actionable,
+      viewFailures: settled.filter((result) => result.status === "rejected").length,
+    });
     try {
       const readinessClient = client();
       const [identity, diagnostics, next] = await Promise.all([

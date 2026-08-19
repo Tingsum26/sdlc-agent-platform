@@ -32,12 +32,11 @@
     },
     "views": {
       "sdlcWorkbench": [
-        { "id": "sdlc.developer", "name": "Developer View" },
-        { "id": "sdlc.scrumMaster", "name": "Scrum Master View" },
         { "id": "sdlc.myWork", "name": "My Work" },
+        { "id": "sdlc.scrumMaster", "name": "Scrum Master View" },
         { "id": "sdlc.epic", "name": "Epic View" },
         { "id": "sdlc.ticket", "name": "Ticket View" },
-        { "id": "sdlc.repoTask", "name": "Repo Task View" },
+        { "id": "sdlc.identityPod", "name": "Identity / Pod Configuration" },
         { "id": "sdlc.customization", "name": "Customization Center" },
         { "id": "sdlc.mcpCenter", "name": "MCP Center" },
         { "id": "sdlc.diagnostics", "name": "Diagnostics" }
