@@ -30,11 +30,12 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $bundleName = "sdlc-central-bundle-$Version"
 $staging = Join-Path $OutDir $bundleName
 if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
-Copy-Item -Recurse $central $staging
+Copy-Item -Recurse $central (Join-Path $staging 'central')
 
 $zip = Join-Path $OutDir "$bundleName.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
-Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zip -CompressionLevel Optimal
+# Zip the central directory itself so the archive root is central/ (installer input contract).
+Compress-Archive -Path (Join-Path $staging 'central') -DestinationPath $zip -CompressionLevel Optimal
 Remove-Item -Recurse -Force $staging
 
 $hash = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash.ToLowerInvariant()

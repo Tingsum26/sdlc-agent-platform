@@ -16,17 +16,16 @@ try {
     New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
     Expand-Archive -Path $zip -DestinationPath $extractDir
 
-    $expectedDirs = @('agents', 'skills', 'instructions', 'hooks', 'mcp', 'policies', 'templates', 'evals', 'manifests')
-    foreach ($dir in $expectedDirs) {
-        if (-not (Test-Path (Join-Path $extractDir $dir))) { throw "missing dir: $dir" }
-    }
-    $agentCount = (Get-ChildItem (Join-Path $extractDir 'agents') -Filter '*.agent.md' -File).Count
-    $skillCount = (Get-ChildItem (Join-Path $extractDir 'skills') -Filter 'SKILL.md' -Recurse -File).Count
+    # Installer input contract: loadAndValidateBundle requires central/manifests/bundle-manifest.json
+    # directly under the selected folder, so the zip root must be central/.
+    if (-not (Test-Path (Join-Path $extractDir 'central'))) { throw 'central dir missing' }
+    if (-not (Test-Path (Join-Path $extractDir 'central\manifests\bundle-manifest.json'))) { throw 'bundle manifest missing' }
+    $agentCount = (Get-ChildItem (Join-Path $extractDir 'central\agents') -Filter '*.agent.md' -File).Count
+    $skillCount = (Get-ChildItem (Join-Path $extractDir 'central\skills') -Filter 'SKILL.md' -Recurse -File).Count
     if ($agentCount -ne 13) { throw "expected 13 agents, got $agentCount" }
     if ($skillCount -ne 33) { throw "expected 33 skills, got $skillCount" }
-    if (-not (Test-Path (Join-Path $extractDir 'hooks\hooks-manifest.json'))) { throw 'hooks manifest missing' }
-    if (-not (Test-Path (Join-Path $extractDir 'mcp\profiles.json'))) { throw 'profiles missing' }
-    if (-not (Test-Path (Join-Path $extractDir 'manifests\bundle-manifest.json'))) { throw 'bundle manifest missing' }
+    if (-not (Test-Path (Join-Path $extractDir 'central\hooks\hooks-manifest.json'))) { throw 'hooks manifest missing' }
+    if (-not (Test-Path (Join-Path $extractDir 'central\mcp\profiles.json'))) { throw 'profiles missing' }
 
     Write-Output 'PASS'
 } finally {

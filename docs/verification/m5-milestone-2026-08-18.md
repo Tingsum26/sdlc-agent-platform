@@ -42,7 +42,7 @@ Milestone: M5 — Central bundle integration: hooks manifest + settings activati
 2. `scripts/build-bundle.ps1` relaxes `$ErrorActionPreference` to `Continue` around the pnpm contracts-validation call: pnpm 10 prints a `pnpm.overrides` deprecation WARN on stderr, which PowerShell 5.1 otherwise wraps as a terminating `NativeCommandError` even with `*> $null`. The `$LASTEXITCODE` gate still decides pass/fail.
 3. Hook settings are activated as local deterministic echo no-ops (`echo <action> >/dev/null && exit 0`); real hook commands require company Copilot policy confirmation and platform-safe invocation — tracked as `INTERNAL-HOOKS-001`.
 4. `pnpm` intermittently leaves empty `_tmp_<pid>_<hex>` files at the repo root during validation runs; `.gitignore` now covers `_tmp_*`.
-5. The bundle ZIP is flat at the root (no wrapping folder); `Expand-Archive` yields `agents/`, `skills/`, … directly.
+5. The bundle ZIP root is `central/` (installer-compatible): `Expand-Archive` yields `central/agents/`, `central/skills/`, … directly, matching `loadAndValidateBundle`'s `central/manifests/bundle-manifest.json` input contract.
 
 ## Internal handoff status
 
