@@ -32,11 +32,11 @@ const STAGES: Array<{ type: string; artifactType: string; label: string }> = [
  *
  *   from-ticket (WAITING_FOR_LOCAL_COPILOT, v0)
  *     → claim (LOCAL_COPILOT_RUNNING, v1)
- *     → results (WAITING_FOR_USER_CONFIRMATION, artifact v1)
- *     → confirm (WAITING_FOR_APPROVAL, v2)
- *     → approvals (WAITING_FOR_CI, v3)
- *     → ci (WAITING_FOR_MANUAL_E2E, v4)
- *     → manual-e2e (COMPLETED, v5)
+ *     → results (WAITING_FOR_USER_CONFIRMATION, v2)
+ *     → confirm (WAITING_FOR_APPROVAL, v3)
+ *     → approvals (WAITING_FOR_CI, v4)
+ *     → ci (WAITING_FOR_MANUAL_E2E, v5)
+ *     → manual-e2e (COMPLETED, v6)
  *
  * All data is fictitious; every REST call carries the demo identity header.
  */
@@ -86,6 +86,10 @@ export async function runFictionalSdlc(
     });
     artifactIds.push(artifact.artifactId);
     steps.push({ label: `${stage.label} artifact submitted`, detail: artifact.artifactId });
+    // `results` transitions the task internally (LOCAL_COPILOT_RUNNING →
+    // WAITING_FOR_USER_CONFIRMATION) and returns only the artifact, so bump the
+    // tracked version by one to stay in lockstep with the task's real version.
+    taskVersion += 1;
 
     const confirmed = await json<{ taskId: string; version: number }>(`/tasks/${created.taskId}/confirm`, {
       method: "POST", body: JSON.stringify({ expectedVersion: taskVersion }),
