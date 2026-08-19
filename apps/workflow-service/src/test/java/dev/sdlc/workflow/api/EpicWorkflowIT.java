@@ -168,9 +168,38 @@ class EpicWorkflowIT {
     }
 
     @Test
+    void listsCreatedEpics() throws Exception {
+        mvc.perform(post("/api/v1/epics")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"epicId":"EPIC-LIST-1","title":"Listed epic","journeyId":"ACCOUNT_OPENING"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("CREATED"));
+
+        String epics = mvc.perform(get("/api/v1/epics")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode created = findEpicById(json.readTree(epics), "EPIC-LIST-1");
+        assertTrue(created != null, "created epic should appear in the list");
+        assertTrue("CREATED".equals(created.path("status").asText()), "listed epic should be CREATED");
+    }
+
+    @Test
     void requiresAnAuthenticatedDemoUser() throws Exception {
         mvc.perform(get("/api/v1/epics/EPIC-M2-1"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private static JsonNode findEpicById(JsonNode array, String epicId) {
+        for (JsonNode node : array) {
+            if (epicId.equals(node.path("epicId").asText())) {
+                return node;
+            }
+        }
+        return null;
     }
 
     private static JsonNode findById(JsonNode array, String ticketId) {

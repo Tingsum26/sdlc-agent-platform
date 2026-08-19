@@ -16,7 +16,7 @@ export interface NextInternalValidation { complete: boolean; provider?: string; 
 export interface EpicSummary { epicId: string; title: string; journeyId: string; status: string; version: number }
 export interface TicketSummary { ticketId: string; epicId: string; channel: string; status: string; pendingChangeConfirmation: boolean; version: number }
 export interface RepoTaskSummary { repoTaskId: string; ticketId: string; repositoryAlias: string; status: string; version: number }
-export interface EpicResume { epic: EpicSummary; tickets: Array<{ ticket: TicketSummary; openTasks: unknown[]; nextAction: string }>; auditTrail: Array<{ action: string; actorId: string; occurredAt: string }> }
+export interface EpicResume { epic: EpicSummary; tickets: Array<{ ticket: TicketSummary; openTasks: WorkflowTask[]; nextAction: string }>; auditTrail: Array<{ action: string; actorId: string; occurredAt: string }> }
 export interface PodMember { principalId: string; employeeId: string; displayLabel: string; role: string; onboardingStatus: string }
 export interface JourneyFreshnessMap { [alias: string]: string }
 

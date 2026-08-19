@@ -57,6 +57,6 @@ describe("M6 workflow client", () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response("[]", { status: 200, headers: { "content-type": "application/json" } }));
     const client = new WorkflowClient("http://127.0.0.1:8080", fetcher);
     await client.getPodMembers("ACCOUNT_OPENING");
-    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:8080/api/v1/internal-readiness/pods/ACCOUNT_OPENING/members", expect.anything());
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:8080/api/v1/internal-readiness/pods/ACCOUNT_OPENING/members", expect.objectContaining({ method: "GET" }));
   });
 });

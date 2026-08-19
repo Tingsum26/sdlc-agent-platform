@@ -95,6 +95,12 @@ public class EpicController {
         return epics.activate(epicId, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request));
     }
 
+    @GetMapping("/epics")
+    List<EpicWorkflow> epics(HttpServletRequest request) {
+        CurrentUser.require(request);
+        return epics.list();
+    }
+
     @GetMapping("/epics/{epicId}")
     EpicWorkflow epic(@PathVariable String epicId, HttpServletRequest request) {
         CurrentUser.require(request);
