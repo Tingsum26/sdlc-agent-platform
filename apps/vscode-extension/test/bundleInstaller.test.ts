@@ -1,11 +1,18 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { configUpdates } = vi.hoisted(() => ({
-  configUpdates: [] as Array<{ section: string | undefined; key: string; value: unknown }>,
-}));
+// configUpdates records every config write (for last-write assertions);
+// configState mirrors the live configuration so `get` returns what was last
+// written, exactly like the real VS Code settings host.
+const { configUpdates, configState } = vi.hoisted(() => {
+  const configState = new Map<string, unknown>();
+  return {
+    configUpdates: [] as Array<{ section: string | undefined; key: string; value: unknown }>,
+    configState,
+  };
+});
 
 vi.mock("vscode", () => ({
   window: {
@@ -15,9 +22,13 @@ vi.mock("vscode", () => ({
   },
   workspace: {
     getConfiguration: vi.fn((section?: string) => ({
-      get: vi.fn((_key: string, fallback: unknown) => fallback),
+      get: vi.fn((key: string, fallback: unknown) => {
+        const stateKey = `${section ?? ""}|${key}`;
+        return configState.has(stateKey) ? configState.get(stateKey) : fallback;
+      }),
       update: vi.fn((key: string, value: unknown) => {
         configUpdates.push({ section, key, value });
+        configState.set(`${section ?? ""}|${key}`, value);
         return Promise.resolve();
       }),
     })),
@@ -26,7 +37,12 @@ vi.mock("vscode", () => ({
 }));
 
 import * as vscode from "vscode";
-import { installCustomizationBundle, rollbackCustomizationBundle, skillInstallPath } from "../src/customization/bundleInstaller.js";
+import { hookCommand, installCustomizationBundle, rollbackCustomizationBundle, skillInstallPath } from "../src/customization/bundleInstaller.js";
+
+beforeEach(() => {
+  configUpdates.length = 0;
+  configState.clear();
+});
 
 // The extension context's globalState must actually retain written values so a
 // multi-step install → install → rollback scenario behaves like the real host.
@@ -122,11 +138,11 @@ describe("customization bundle installer", () => {
     expect(existsSync(join(bundleRoot, "hooks", "hooks-manifest.json"))).toBe(true);
     expect(existsSync(join(bundleRoot, "mcp", "profiles.json"))).toBe(true);
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: "echo guard-dangerous-operations >/dev/null && exit 0",
+      PreToolUse: hookCommand("guard-dangerous-operations"),
     });
   });
 
-  it("rolls back to a previous bundle and restores its hook settings", async () => {
+  it("rolls back to a previous bundle and restores its hook and location settings", async () => {
     const v1Root = createSourceBundle("hooks-bundle-v1", [
       { event: "PreToolUse", action: "guard-dangerous-operations" },
       { event: "Stop", action: "verify-stage-output" },
@@ -142,21 +158,96 @@ describe("customization bundle installer", () => {
     await installCustomizationBundle(context);
     await installCustomizationBundle(context);
 
-    // v2 install overwrote the PreToolUse command and carried the Stop entry
-    // over from the previously recorded hook settings.
+    // v2 recomputes the installer-managed hooks from the live config: the Stop
+    // entry recorded by v1 is dropped (v2 does not declare it) and PreToolUse
+    // points at v2's action.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: "echo guard-v2 >/dev/null && exit 0",
-      Stop: "echo verify-stage-output >/dev/null && exit 0",
+      PreToolUse: hookCommand("guard-v2"),
     });
 
     vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items) => items[0]);
     await rollbackCustomizationBundle(context);
 
-    // Rolling back to v1 re-applies v1's hook settings (including the Stop
-    // entry that v2's manifest does not declare).
+    // Rolling back to v1 re-applies v1's hook settings, including the Stop
+    // entry that v2's manifest does not declare.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: "echo guard-dangerous-operations >/dev/null && exit 0",
-      Stop: "echo verify-stage-output >/dev/null && exit 0",
+      PreToolUse: hookCommand("guard-dangerous-operations"),
+      Stop: hookCommand("verify-stage-output"),
     });
+
+    // The location settings are re-applied for the rolled-back root as well.
+    const v1RootPath = join(storageRoot, "customizations", "hooks-bundle-v1");
+    expect(writtenSetting("chat", "agentFilesLocations")).toEqual({ [join(v1RootPath, "agents")]: true });
+    expect(writtenSetting("chat", "agentSkillsLocations")).toEqual({ [join(v1RootPath, "skills")]: true });
+    expect(writtenSetting("chat", "instructionsFilesLocations")).toEqual({ [join(v1RootPath, "instructions")]: true });
+  });
+
+  it("removes previously recorded installer hooks when the new bundle declares no hooks and preserves user-managed entries", async () => {
+    const v1Root = createSourceBundle("hooks-bundle-empty-v1", [
+      { event: "PreToolUse", action: "guard-dangerous-operations" },
+    ]);
+    const noHooksRoot = createSourceBundle("hooks-bundle-empty", []);
+    // The bundle ships no hooks manifest at all.
+    rmSync(join(noHooksRoot, "central", "hooks", "hooks-manifest.json"));
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-empty-hooks-dest-"));
+    const context = createStatefulContext(storageRoot);
+
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValueOnce([{ fsPath: v1Root } as vscode.Uri]);
+    await installCustomizationBundle(context);
+    expect(writtenSetting("chat.agent", "hooks")).toEqual({ PreToolUse: hookCommand("guard-dangerous-operations") });
+
+    // The user then adds their own entry directly to chat.agent.hooks.
+    configState.set("chat.agent|hooks", {
+      PreToolUse: hookCommand("guard-dangerous-operations"),
+      UserPromptSubmit: "echo user-managed-prompt >/dev/null && exit 0",
+    });
+
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValueOnce([{ fsPath: noHooksRoot } as vscode.Uri]);
+    await installCustomizationBundle(context);
+
+    // The installer's previously recorded PreToolUse entry is removed; the
+    // user-managed UserPromptSubmit entry is untouched.
+    expect(writtenSetting("chat.agent", "hooks")).toEqual({
+      UserPromptSubmit: "echo user-managed-prompt >/dev/null && exit 0",
+    });
+  });
+
+  it("skips invalid hook events and actions instead of aborting activation", async () => {
+    const sourceRoot = createSourceBundle("hooks-bundle-validated", [
+      { event: "PreToolUse", action: "guard-dangerous-operations" },
+    ]);
+    writeFileSync(join(sourceRoot, "central", "hooks", "hooks-manifest.json"), JSON.stringify({
+      schemaVersion: "1.0",
+      events: [
+        { event: "PreToolUse", action: "guard-dangerous-operations" },
+        { event: "NotARealEvent", action: "bogus" },
+        { event: "PreToolUse", action: "bad action!" },
+        { event: 42, action: "not-a-string" },
+        "not-an-object",
+      ],
+    }));
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-validated-dest-"));
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+
+    await installCustomizationBundle(createStatefulContext(storageRoot));
+
+    // Only the valid entry is activated; unknown event names, invalid action
+    // characters, and malformed entries are skipped without aborting.
+    expect(writtenSetting("chat.agent", "hooks")).toEqual({
+      PreToolUse: hookCommand("guard-dangerous-operations"),
+    });
+  });
+
+  it("tolerates a non-array hooks events field without throwing", async () => {
+    const sourceRoot = createSourceBundle("hooks-bundle-nonarray", []);
+    writeFileSync(join(sourceRoot, "central", "hooks", "hooks-manifest.json"), JSON.stringify({ schemaVersion: "1.0", events: {} }));
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-nonarray-dest-"));
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+
+    await installCustomizationBundle(createStatefulContext(storageRoot));
+
+    // The {"events": {}} shape previously threw a TypeError while iterating;
+    // it now yields no entries and writes an empty installer-managed hook set.
+    expect(writtenSetting("chat.agent", "hooks")).toEqual({});
   });
 });

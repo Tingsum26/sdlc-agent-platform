@@ -34,7 +34,7 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
   for (const path of manifest.skills) {
     const target = join(skillsRoot, skillInstallPath(path));
     await mkdir(dirname(target), { recursive: true });
-    await cp(safeResolve(sourceRoot, path), target, { recursive: true, force: true });
+    await cp(safeResolve(sourceRoot, path), target, { recursive: true, force: true, dereference: true });
   }
   for (const path of manifest.instructions.filter((value) => value.endsWith(".instructions.md"))) {
     await cp(safeResolve(sourceRoot, path), join(instructionsRoot, basename(path)), { force: true });
@@ -46,7 +46,9 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
     if (!existsSync(sourceDir)) continue;
     const targetDir = join(destination, dir);
     await mkdir(dirname(targetDir), { recursive: true });
-    await cp(sourceDir, targetDir, { recursive: true, force: true });
+    // dereference: true copies symlink targets instead of the links themselves,
+    // so symlinks inside shipped dirs cannot escape the bundle.
+    await cp(sourceDir, targetDir, { recursive: true, force: true, dereference: true });
   }
   await activateBundleLocations(context, destination);
 
@@ -82,28 +84,66 @@ async function activateBundleLocations(context: vscode.ExtensionContext, root: s
   await activateHooks(context, root);
 }
 
+// The exact command recorded for a validated hook entry. Byte-for-byte stable:
+// tests and the activation surface treat this shape as a deliberate contract.
+export function hookCommand(action: string): string {
+  return `echo ${action} >/dev/null && exit 0`;
+}
+
+const hookEventNames = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"] as const;
+const hookActionPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
+function isValidHookEntry(entry: unknown): entry is HookEvent {
+  if (typeof entry !== "object" || entry === null) return false;
+  const { event, action } = entry as Record<string, unknown>;
+  return typeof event === "string" && (hookEventNames as readonly string[]).includes(event)
+    && typeof action === "string" && hookActionPattern.test(action);
+}
+
+// Reads and validates the target bundle's hooks manifest. A missing manifest,
+// unparseable JSON, or a non-array `events` field yields no entries rather than
+// aborting activation; invalid entries are skipped individually.
+async function readHookEntries(root: string): Promise<HookEvent[]> {
+  try {
+    const manifest = JSON.parse(await readFile(join(root, "hooks", "hooks-manifest.json"), "utf8")) as { events?: unknown };
+    if (!Array.isArray(manifest.events)) return [];
+    return manifest.events.filter(isValidHookEntry);
+  } catch {
+    return [];
+  }
+}
+
 // TODO(INTERNAL): INTERNAL-HOOKS-001 — Confirm the company Copilot policy
 // allows VS Code agent hooks; replace the local echo no-op commands with the
 // approved deterministic hook commands, and only then enable real hook
 // execution. The declared events are still recorded in chat.agent.hooks so the
 // activation surface is visible, but every command is a local no-op today.
+// NOTE: `echo … >/dev/null && exit 0` is POSIX-shell syntax; real hook commands
+// must be invoked platform-safely (e.g. a Node shim shipped in the bundle or a
+// per-OS command builder), never as a bare POSIX pipeline on Windows.
 async function activateHooks(context: vscode.ExtensionContext, root: string): Promise<void> {
+  // Merge/stale semantics: chat.agent.hooks is the user's live config and may
+  // hold user-managed keys that must never be touched. The installer manages
+  // only the keys it recorded in globalState (activeHookSettingsKey) for the
+  // previously active bundle; every activation recomputes them for the target
+  // bundle: start from the LIVE config, delete the previously recorded keys,
+  // add this bundle's validated entries, and write back. Stale installer
+  // entries are therefore removed on rollback or when a bundle declares no
+  // events, while user-managed keys are preserved.
   const chat = vscode.workspace.getConfiguration("chat.agent");
-  let events: HookEvent[] = [];
-  try {
-    const manifest = JSON.parse(await readFile(join(root, "hooks", "hooks-manifest.json"), "utf8")) as { events?: HookEvent[] };
-    events = manifest.events ?? [];
-  } catch {
-    events = [];
+  const live = chat.get<Record<string, unknown>>("hooks", {});
+  const hookSettings: Record<string, unknown> = live && typeof live === "object" && !Array.isArray(live) ? { ...live } : {};
+  const recorded = context.globalState.get<Record<string, unknown>>(activeHookSettingsKey, {});
+  for (const key of Object.keys(recorded)) delete hookSettings[key];
+
+  const nextRecorded: Record<string, unknown> = {};
+  for (const { event, action } of await readHookEntries(root)) {
+    hookSettings[event] = hookCommand(action);
+    nextRecorded[event] = hookCommand(action);
   }
-  if (events.length === 0) return;
-  const previous = context.globalState.get<Record<string, unknown>>(activeHookSettingsKey);
-  const hookSettings: Record<string, unknown> = previous ? { ...previous } : {};
-  for (const { event, action } of events) {
-    hookSettings[event] = `echo ${action} >/dev/null && exit 0`;
-  }
+
   await chat.update("hooks", hookSettings, vscode.ConfigurationTarget.Global);
-  await context.globalState.update(activeHookSettingsKey, hookSettings);
+  await context.globalState.update(activeHookSettingsKey, nextRecorded);
 }
 
 async function addLocation(key: string, path: string, previous: string | undefined): Promise<void> {
