@@ -620,7 +620,7 @@ export function App() {
       </section>
       <section className="sdlc-card sdlc-stack readiness" aria-labelledby="m7-title">
         <div className="section-heading"><div><p className="eyebrow">M7 · End-to-end SDLC</p><h2 id="m7-title">Fictional end-to-end SDLC run</h2></div>
-          <button type="button" disabled={m7Busy} aria-busy={m7Busy} onClick={() => void runM7()}>
+          <button type="button" disabled={m7Busy || m7Steps.length > 0} aria-busy={m7Busy} onClick={() => void runM7()}>
             {m7Busy ? "Running fictional SDLC…" : "Run fictional end-to-end SDLC"}
           </button></div>
         {m7Error && <ErrorState title="Fictional SDLC demo unavailable" correlationId={m7Error} onRetry={() => void runM7()} />}
