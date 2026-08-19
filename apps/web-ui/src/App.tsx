@@ -3,6 +3,7 @@ import { EmptyState, ErrorState, TaskList, type TaskListItem, type TaskStatus } 
 import "@sdlc/ui/tokens.css";
 import "./app.css";
 import { parsePodCsv } from "./podCsv";
+import { runFictionalSdlc, type SdlcStepEvent } from "./fictionalSdlcDriver";
 
 interface ApiTask {
   taskId: string; type: string; status: string;
@@ -79,6 +80,11 @@ export function App() {
   const [observeLine, setObserveLine] = useState<string>();
   const [journeyReportHtml, setJourneyReportHtml] = useState<string>();
   const [journeyError, setJourneyError] = useState<string>();
+  const [m7Steps, setM7Steps] = useState<SdlcStepEvent[]>([]);
+  const [m7Artifacts, setM7Artifacts] = useState<string[]>([]);
+  const [m7ReportHtml, setM7ReportHtml] = useState<string>();
+  const [m7Busy, setM7Busy] = useState(false);
+  const [m7Error, setM7Error] = useState<string>();
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -458,6 +464,24 @@ export function App() {
     } catch { setJourneyError("journey-refresh-failed"); }
   };
 
+  const runM7 = async () => {
+    setM7Busy(true); setM7Error(undefined);
+    try {
+      const result = await runFictionalSdlc(fetch, {
+        ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567",
+      });
+      setM7Steps(result.steps);
+      setM7Artifacts(result.artifactIds);
+      const lastArtifactId = result.artifactIds[result.artifactIds.length - 1];
+      if (lastArtifactId) {
+        const reportResponse = await fetch(`/api/v1/reports/${lastArtifactId}/versions/1`, { headers: readinessHeaders });
+        if (!reportResponse.ok) throw new Error(`status ${reportResponse.status}`);
+        setM7ReportHtml(await reportResponse.text());
+      }
+    } catch { setM7Error("fictional-sdlc-failed"); }
+    finally { setM7Busy(false); }
+  };
+
   async function json<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(path, { ...init, headers: readinessHeaders });
     if (!response.ok) throw new Error(`status ${response.status}`);
@@ -593,6 +617,17 @@ export function App() {
           </ul>
         )}
         {journeyReportHtml && <iframe className="journey-report" title="Journey readiness HTML report" sandbox="" srcDoc={journeyReportHtml} />}
+      </section>
+      <section className="sdlc-card sdlc-stack readiness" aria-labelledby="m7-title">
+        <div className="section-heading"><div><p className="eyebrow">M7 · End-to-end SDLC</p><h2 id="m7-title">Fictional end-to-end SDLC run</h2></div>
+          <button type="button" disabled={m7Busy} aria-busy={m7Busy} onClick={() => void runM7()}>
+            {m7Busy ? "Running fictional SDLC…" : "Run fictional end-to-end SDLC"}
+          </button></div>
+        {m7Error && <ErrorState title="Fictional SDLC demo unavailable" correlationId={m7Error} onRetry={() => void runM7()} />}
+        {m7Steps.length > 0 && <ol aria-label="M7 audit trail">
+          {m7Steps.map((step, index) => <li key={index}>{step.label} — {step.detail}</li>)}
+        </ol>}
+        {m7ReportHtml && <iframe className="journey-report" title="SDLC stage report" sandbox="" srcDoc={m7ReportHtml} />}
       </section>
     </main>
   </>;
