@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.0",
   "profiles": {
-    "api": { "label": "API developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "assess-api-compatibility", "plan-change", "implement-task", "java-development", "generate-tests", "prepare-pr", "review-pr"], "servers": ["sdlc-workflow", "jira", "confluence", "github-enterprise", "code-intelligence"] },
-    "web": { "label": "Web developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "plan-change", "implement-task", "web-development", "generate-tests", "review-accessibility", "review-analytics-tagging", "prepare-pr", "review-pr"], "servers": ["sdlc-workflow", "jira", "confluence", "github-enterprise", "figma"] },
-    "ios": { "label": "iOS developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "plan-change", "implement-task", "ios-development", "generate-tests", "review-accessibility", "prepare-pr", "review-pr"], "servers": ["sdlc-workflow", "jira", "confluence", "github-enterprise", "figma"] },
-    "android": { "label": "Android developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "plan-change", "implement-task", "android-development", "generate-tests", "review-accessibility", "prepare-pr", "review-pr"], "servers": ["sdlc-workflow", "jira", "confluence", "github-enterprise", "figma"] },
-    "scrum-master": { "label": "Scrum Master", "skills": ["join-epic", "resume-workflow", "analyze-epic-risk", "prepare-standup", "find-blockers", "check-release-readiness", "draft-jira-update", "import-pod-members"], "servers": ["sdlc-workflow"] }
+    "api": { "label": "API developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "assess-api-compatibility", "plan-change", "implement-task", "java-development", "generate-tests", "prepare-pr", "review-pr"], "servers": ["workflow", "jira", "confluence", "github-enterprise", "code-graph"] },
+    "web": { "label": "Web developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "plan-change", "implement-task", "web-development", "generate-tests", "review-accessibility", "review-analytics-tagging", "prepare-pr", "review-pr"], "servers": ["workflow", "jira", "confluence", "github-enterprise", "figma-desktop"] },
+    "ios": { "label": "iOS developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "plan-change", "implement-task", "ios-development", "generate-tests", "review-accessibility", "prepare-pr", "review-pr"], "servers": ["workflow", "jira", "confluence", "github-enterprise", "figma-desktop"] },
+    "android": { "label": "Android developer", "skills": ["start-ticket", "grill-requirement", "design-solution", "plan-change", "implement-task", "android-development", "generate-tests", "review-accessibility", "prepare-pr", "review-pr"], "servers": ["workflow", "jira", "confluence", "github-enterprise", "figma-desktop"] },
+    "scrum-master": { "label": "Scrum Master", "skills": ["join-epic", "resume-workflow", "analyze-epic-risk", "prepare-standup", "find-blockers", "check-release-readiness", "draft-jira-update", "import-pod-members"], "servers": ["workflow"] }
   }
 }

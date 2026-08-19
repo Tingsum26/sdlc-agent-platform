@@ -116,7 +116,7 @@ describe("central catalog", () => {
   it("declares hooks for deterministic lifecycle events only", () => {
     const hooks = JSON.parse(readFileSync(`${root}/central/hooks/hooks-manifest.json`, "utf8"));
     expect(hooks.schemaVersion).toBe("1.0");
-    expect(hooks.events.length).toBeGreaterThanOrEqual(5);
+    expect(hooks.events.map((hook: { event: string }) => hook.event).sort()).toEqual(["PostToolUse", "PreCompact", "PreToolUse", "SessionStart", "Stop", "UserPromptSubmit"]);
     for (const hook of hooks.events) {
       expect(["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"]).toContain(hook.event);
       expect(hook.action).toBeTruthy();
@@ -124,14 +124,17 @@ describe("central catalog", () => {
     }
   });
 
-  it("defines role profiles referencing real skills and servers", () => {
-    const profiles = JSON.parse(readFileSync(`${root}/central/mcp/profiles.json`, "utf8"));
+  it("defines role profiles referencing real skills and catalog servers", () => {
+    const profiles = JSON.parse(readFileSync(`${root}/central/mcp/profiles.json`, "utf8")).profiles;
+    const catalog = JSON.parse(readFileSync(`${root}/central/mcp/catalog.json`, "utf8"));
+    const serverIds = catalog.servers.map((server: { id: string }) => server.id);
     const skills = readdirSync(`${root}/central/skills`, { recursive: true } as never)
       .filter((name) => String(name).endsWith("SKILL.md"))
       .map((name) => String(name).split(/[\\/]/).slice(-2, -1)[0]);
-    for (const profile of Object.values(profiles.profiles) as Array<{ skills: string[]; servers: string[] }>) {
+    expect(Object.keys(profiles)).toHaveLength(5);
+    for (const profile of Object.values(profiles) as Array<{ skills: string[]; servers: string[] }>) {
       for (const skill of profile.skills) expect(skills).toContain(skill);
-      for (const server of profile.servers) expect(typeof server).toBe("string");
+      for (const server of profile.servers) expect(serverIds).toContain(server);
     }
   });
 });
