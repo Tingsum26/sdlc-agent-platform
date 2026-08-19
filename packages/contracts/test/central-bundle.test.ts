@@ -106,4 +106,32 @@ describe("central catalog", () => {
       expect(catalogContent).not.toContain(conceptOnly);
     }
   });
+
+  it("manifest counts include hooks and profiles", () => {
+    const manifest = JSON.parse(readFileSync(`${root}/central/manifests/bundle-manifest.json`, "utf8"));
+    expect(manifest.hooks).toBe(1);
+    expect(manifest.profiles).toBe(1);
+  });
+
+  it("declares hooks for deterministic lifecycle events only", () => {
+    const hooks = JSON.parse(readFileSync(`${root}/central/hooks/hooks-manifest.json`, "utf8"));
+    expect(hooks.schemaVersion).toBe("1.0");
+    expect(hooks.events.length).toBeGreaterThanOrEqual(5);
+    for (const hook of hooks.events) {
+      expect(["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"]).toContain(hook.event);
+      expect(hook.action).toBeTruthy();
+      expect(hook.deterministic).toBe(true);
+    }
+  });
+
+  it("defines role profiles referencing real skills and servers", () => {
+    const profiles = JSON.parse(readFileSync(`${root}/central/mcp/profiles.json`, "utf8"));
+    const skills = readdirSync(`${root}/central/skills`, { recursive: true } as never)
+      .filter((name) => String(name).endsWith("SKILL.md"))
+      .map((name) => String(name).split(/[\\/]/).slice(-2, -1)[0]);
+    for (const profile of Object.values(profiles.profiles) as Array<{ skills: string[]; servers: string[] }>) {
+      for (const skill of profile.skills) expect(skills).toContain(skill);
+      for (const server of profile.servers) expect(typeof server).toBe("string");
+    }
+  });
 });

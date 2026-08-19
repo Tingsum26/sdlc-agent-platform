@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Deterministic VS Code agent hooks for the SDLC platform. Every hook runs a local script or no-op; none invoke a model.",
+  "events": [
+    { "event": "SessionStart", "action": "verify-workflow-context", "deterministic": true, "detail": "Check repository, workflow id, and MCP health; refuse to proceed without a bound workflow when one is expected." },
+    { "event": "UserPromptSubmit", "action": "record-redacted-metadata", "deterministic": true, "detail": "Log correlation id and bound ticket id metadata; never log prompt text." },
+    { "event": "PreToolUse", "action": "guard-dangerous-operations", "deterministic": true, "detail": "Block pushes to protected branches, secret reads, and out-of-scope repository writes per policies/security." },
+    { "event": "PostToolUse", "action": "format-and-record", "deterministic": true, "detail": "Run lightweight formatting on edited files and append a redacted tool record." },
+    { "event": "PreCompact", "action": "persist-checkpoint", "deterministic": true, "detail": "Persist task state and approved artifact references before context compaction." },
+    { "event": "Stop", "action": "verify-stage-output", "deterministic": true, "detail": "Check the stage's required artifact exists and note the next action." }
+  ]
+}

@@ -8,6 +8,8 @@
   "instructions": 19,
   "policies": 15,
   "templates": 20,
+  "hooks": 1,
+  "profiles": 1,
   "referencesFile": "central/REFERENCES.md",
   "compatibility": {
     "vscode": ">=1.100",
