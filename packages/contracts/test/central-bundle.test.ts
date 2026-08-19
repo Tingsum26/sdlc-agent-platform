@@ -137,4 +137,9 @@ describe("central catalog", () => {
       for (const server of profile.servers) expect(serverIds).toContain(server);
     }
   });
+
+  it("review-pr mandates residual risks in its output contract", () => {
+    const content = readFileSync(`${root}/central/skills/review/review-pr/SKILL.md`, "utf8");
+    expect(content).toMatch(/residual risks/i);
+  });
 });
