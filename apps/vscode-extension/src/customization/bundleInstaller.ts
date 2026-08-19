@@ -1,4 +1,5 @@
-import { cp, mkdir } from "node:fs/promises";
+import { cp, mkdir, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import * as vscode from "vscode";
 import { loadAndValidateBundle, safeResolve } from "./bundleManifest.js";
@@ -6,6 +7,15 @@ import { loadAndValidateBundle, safeResolve } from "./bundleManifest.js";
 interface InstalledBundle { version: string; root: string; installedAt: string }
 const stateKey = "sdlc.installedCustomizationBundles";
 const activeLocationsKey = "sdlc.activeCustomizationLocations";
+const activeHookSettingsKey = "sdlc.activeCustomizationHookSettings";
+
+// Content directories shipped wholesale with the bundle. The 2.0 manifest
+// walker derives agents/skills/instructions/policies/evals lists as the
+// manifest surface, but the installed bundle carries the full platform
+// configuration, so every content directory is copied as-is.
+const shippedContentDirs = ["hooks", "mcp", "policies", "templates", "evals"] as const;
+
+interface HookEvent { event: string; action: string }
 
 export async function installCustomizationBundle(context: vscode.ExtensionContext): Promise<void> {
   const selected = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false,
@@ -31,7 +41,14 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
   }
   await mkdir(dirname(join(destination, manifestPath)), { recursive: true });
   await cp(safeResolve(sourceRoot, manifestPath), join(destination, manifestPath), { force: true });
-  await activateBundleLocations(context, agentsRoot, skillsRoot, instructionsRoot);
+  for (const dir of shippedContentDirs) {
+    const sourceDir = safeResolve(sourceRoot, `central/${dir}`);
+    if (!existsSync(sourceDir)) continue;
+    const targetDir = join(destination, dir);
+    await mkdir(dirname(targetDir), { recursive: true });
+    await cp(sourceDir, targetDir, { recursive: true, force: true });
+  }
+  await activateBundleLocations(context, destination);
 
   const installed = context.globalState.get<InstalledBundle[]>(stateKey, []).filter((entry) => entry.version !== manifest.bundleVersion);
   installed.unshift({ version: manifest.bundleVersion, root: destination, installedAt: new Date().toISOString() });
@@ -45,13 +62,16 @@ export async function rollbackCustomizationBundle(context: vscode.ExtensionConte
   const choice = await vscode.window.showQuickPick(installed.slice(1).map((entry) => ({ label: entry.version, description: entry.installedAt, entry })),
     { title: "Select last-known-good customization bundle" });
   if (!choice) return;
-  await activateBundleLocations(context, join(choice.entry.root, "agents"), join(choice.entry.root, "skills"), join(choice.entry.root, "instructions"));
+  await activateBundleLocations(context, choice.entry.root);
   const reordered = [choice.entry, ...installed.filter((entry) => entry.version !== choice.entry.version)];
   await context.globalState.update(stateKey, reordered);
   void vscode.window.showInformationMessage(`Rolled back SDLC customizations to ${choice.entry.version}.`);
 }
 
-async function activateBundleLocations(context: vscode.ExtensionContext, agents: string, skills: string, instructions: string): Promise<void> {
+async function activateBundleLocations(context: vscode.ExtensionContext, root: string): Promise<void> {
+  const agents = join(root, "agents");
+  const skills = join(root, "skills");
+  const instructions = join(root, "instructions");
   const previous = context.globalState.get<Record<string, string>>(activeLocationsKey, {});
   await addLocation("agentFilesLocations", agents, previous["agentFilesLocations"]);
   await addLocation("agentSkillsLocations", skills, previous["agentSkillsLocations"]);
@@ -59,6 +79,31 @@ async function activateBundleLocations(context: vscode.ExtensionContext, agents:
   await context.globalState.update(activeLocationsKey, {
     agentFilesLocations: agents, agentSkillsLocations: skills, instructionsFilesLocations: instructions,
   });
+  await activateHooks(context, root);
+}
+
+// TODO(INTERNAL): INTERNAL-HOOKS-001 — Confirm the company Copilot policy
+// allows VS Code agent hooks; replace the local echo no-op commands with the
+// approved deterministic hook commands, and only then enable real hook
+// execution. The declared events are still recorded in chat.agent.hooks so the
+// activation surface is visible, but every command is a local no-op today.
+async function activateHooks(context: vscode.ExtensionContext, root: string): Promise<void> {
+  const chat = vscode.workspace.getConfiguration("chat.agent");
+  let events: HookEvent[] = [];
+  try {
+    const manifest = JSON.parse(await readFile(join(root, "hooks", "hooks-manifest.json"), "utf8")) as { events?: HookEvent[] };
+    events = manifest.events ?? [];
+  } catch {
+    events = [];
+  }
+  if (events.length === 0) return;
+  const previous = context.globalState.get<Record<string, unknown>>(activeHookSettingsKey);
+  const hookSettings: Record<string, unknown> = previous ? { ...previous } : {};
+  for (const { event, action } of events) {
+    hookSettings[event] = `echo ${action} >/dev/null && exit 0`;
+  }
+  await chat.update("hooks", hookSettings, vscode.ConfigurationTarget.Global);
+  await context.globalState.update(activeHookSettingsKey, hookSettings);
 }
 
 async function addLocation(key: string, path: string, previous: string | undefined): Promise<void> {
