@@ -32,3 +32,31 @@ describe("WorkflowClient", () => {
     ]);
   });
 });
+
+describe("M6 workflow client", () => {
+  it("lists epics", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response("[]", { status: 200, headers: { "content-type": "application/json" } }));
+    const client = new WorkflowClient("http://127.0.0.1:8080", fetcher);
+    await client.listEpics();
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:8080/api/v1/epics", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("loads an epic resume with tickets and repo tasks", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.endsWith("/resume")) return new Response(JSON.stringify({ epic: {}, tickets: [], auditTrail: [] }), { status: 200, headers: { "content-type": "application/json" } });
+      if (path.includes("/repo-tasks")) return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    });
+    const client = new WorkflowClient("http://127.0.0.1:8080", fetcher);
+    const resume = await client.getEpicResume("EPIC-M2-1");
+    expect(resume.tickets).toEqual([]);
+  });
+
+  it("loads pod members", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response("[]", { status: 200, headers: { "content-type": "application/json" } }));
+    const client = new WorkflowClient("http://127.0.0.1:8080", fetcher);
+    await client.getPodMembers("ACCOUNT_OPENING");
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:8080/api/v1/internal-readiness/pods/ACCOUNT_OPENING/members", expect.anything());
+  });
+});

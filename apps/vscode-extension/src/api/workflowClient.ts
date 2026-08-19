@@ -13,6 +13,13 @@ export interface EnterpriseIdentity { employeeId: string; displayLabel: string; 
 export interface IntegrationDiagnostic { provider: string; status: string; observedAt: string; source: string; safeDetail: string }
 export interface NextInternalValidation { complete: boolean; provider?: string; status?: string; instruction?: string }
 
+export interface EpicSummary { epicId: string; title: string; journeyId: string; status: string; version: number }
+export interface TicketSummary { ticketId: string; epicId: string; channel: string; status: string; pendingChangeConfirmation: boolean; version: number }
+export interface RepoTaskSummary { repoTaskId: string; ticketId: string; repositoryAlias: string; status: string; version: number }
+export interface EpicResume { epic: EpicSummary; tickets: Array<{ ticket: TicketSummary; openTasks: unknown[]; nextAction: string }>; auditTrail: Array<{ action: string; actorId: string; occurredAt: string }> }
+export interface PodMember { principalId: string; employeeId: string; displayLabel: string; role: string; onboardingStatus: string }
+export interface JourneyFreshnessMap { [alias: string]: string }
+
 export class WorkflowClient {
   private etag: string | undefined;
   private cachedTasks: WorkflowTask[] = [];
@@ -83,8 +90,36 @@ export class WorkflowClient {
     return response.text();
   }
 
-  private async json(path: string, init: RequestInit = {}): Promise<unknown> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`, { ...init, headers: this.headers() });
+  async listEpics(signal?: AbortSignal): Promise<EpicSummary[]> {
+    return (await this.json("/api/v1/epics", { method: "GET" }, signal)) as EpicSummary[];
+  }
+
+  async getEpicResume(epicId: string, signal?: AbortSignal): Promise<EpicResume> {
+    return (await this.json(`/api/v1/epics/${encodeURIComponent(epicId)}/resume`, { method: "GET" }, signal)) as EpicResume;
+  }
+
+  async listTickets(epicId: string, signal?: AbortSignal): Promise<TicketSummary[]> {
+    return (await this.json(`/api/v1/epics/${encodeURIComponent(epicId)}/tickets`, { method: "GET" }, signal)) as TicketSummary[];
+  }
+
+  async listRepoTasks(ticketId: string, signal?: AbortSignal): Promise<RepoTaskSummary[]> {
+    return (await this.json(`/api/v1/tickets/${encodeURIComponent(ticketId)}/repo-tasks`, { method: "GET" }, signal)) as RepoTaskSummary[];
+  }
+
+  async getPodMembers(journeyId: string, signal?: AbortSignal): Promise<PodMember[]> {
+    return (await this.json(`/api/v1/internal-readiness/pods/${encodeURIComponent(journeyId)}/members`, { method: "GET" }, signal)) as PodMember[];
+  }
+
+  async getJourneyFreshness(manifest: unknown, signal?: AbortSignal): Promise<JourneyFreshnessMap> {
+    return (await this.json("/api/v1/journeys/freshness", { method: "POST", body: JSON.stringify(manifest) }, signal)) as JourneyFreshnessMap;
+  }
+
+  private async json(path: string, init: RequestInit = {}, signal?: AbortSignal): Promise<unknown> {
+    const response = await this.fetcher(`${this.baseUrl}${path}`, {
+      ...init,
+      headers: this.headers(),
+      ...(signal === undefined ? {} : { signal }),
+    });
     await this.requireOk(response);
     return response.json();
   }
