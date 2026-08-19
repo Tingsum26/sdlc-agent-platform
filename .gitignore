@@ -19,3 +19,5 @@ test-results/
 *.vsix
 .DS_Store
 Thumbs.db
+
+_tmp_*
