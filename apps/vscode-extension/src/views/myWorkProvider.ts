@@ -38,12 +38,12 @@ export class MyWorkProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
   private taskItem(task: WorkflowTask, freshness: Freshness): vscode.TreeItem {
     const label = `${task.scope.ticketId} · ${task.status}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = task.scope.repositoryAlias;
+    item.description = `${task.scope.repositoryAlias} · ${freshness}`;
     item.tooltip = `${task.taskId}\nVersion ${task.version}\nUpdated ${task.updatedAt}\nFreshness: ${freshness}`;
     item.iconPath = statusIcon(task.status);
     item.command = { command: "sdlc.openTask", title: "Open task", arguments: [task.taskId] };
     item.contextValue = "sdlcTask";
-    item.accessibilityInformation = { label: `${label}. ${task.scope.repositoryAlias}. Status ${task.status}. Version ${task.version}.` };
+    item.accessibilityInformation = { label: `${label}. ${task.scope.repositoryAlias}. Status ${task.status}. Freshness ${freshness}.` };
     return item;
   }
 }

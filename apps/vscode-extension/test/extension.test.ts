@@ -55,6 +55,29 @@ describe("VSIX static boundaries", () => {
     expect(source).toMatch(/Promise\.allSettled/);
   });
 
+  it("mirrors the central MCP catalog server ids and required flags", () => {
+    // The VSIX ships only dist/, so the static mirror in extension.ts cannot
+    // read central/mcp/catalog.json at runtime; this guard turns the
+    // "keep in sync by hand" note into a checked invariant.
+    const central = JSON.parse(readFileSync(resolve(root, "..", "..", "central", "mcp", "catalog.json"), "utf8")) as {
+      servers: Array<{ id: string; required: boolean }>;
+    };
+    const source = readFileSync(resolve(root, "src", "extension.ts"), "utf8");
+    const mirror = source.match(/const mcpCatalog: McpCatalogEntry\[\] = (\[[\s\S]*?\]);/);
+    expect(mirror, "static mcpCatalog literal in extension.ts").not.toBeNull();
+    // The literal's object keys are unquoted and the array ends with a
+    // trailing comma (valid TS, invalid JSON); normalize before parsing.
+    const keyQuoted = mirror![1]!
+      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g, '$1"$2"$3')
+      .replace(/,\s*\]$/, "]");
+    const catalog = JSON.parse(keyQuoted) as Array<{ id: string; required: boolean }>;
+
+    const byId = (entries: Array<{ id: string; required: boolean }>) =>
+      Object.fromEntries(entries.map((entry) => [entry.id, entry.required]));
+    expect(Object.keys(byId(catalog)).sort()).toEqual(Object.keys(byId(central.servers)).sort());
+    expect(byId(catalog)).toEqual(byId(central.servers));
+  });
+
   it("contains no model invocation or direct persistence integration", () => {
     const source = readdirSync(resolve(root, "src"), { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))

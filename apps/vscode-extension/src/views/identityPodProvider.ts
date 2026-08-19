@@ -48,20 +48,20 @@ export class IdentityPodProvider implements vscode.TreeDataProvider<vscode.TreeI
   private identityItem(identity: EnterpriseIdentity, freshness: Freshness): vscode.TreeItem {
     const label = `${identity.employeeId} · ${identity.displayLabel}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = "Identity";
+    item.description = `Identity · ${freshness}`;
     item.tooltip = `Source ${identity.source}\nFreshness: ${freshness}`;
     item.iconPath = new vscode.ThemeIcon("account");
-    item.accessibilityInformation = { label: `${label}. Identity. Source ${identity.source}.` };
+    item.accessibilityInformation = { label: `${label}. Identity. Source ${identity.source}. Freshness ${freshness}.` };
     return item;
   }
 
   private memberItem(member: PodMember, freshness: Freshness): vscode.TreeItem {
     const label = `${member.employeeId} · ${member.displayLabel}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = `${member.role} · ${member.onboardingStatus}`;
+    item.description = `${member.role} · ${member.onboardingStatus} · ${freshness}`;
     item.tooltip = `Pod of ${ACCOUNT_OPENING_JOURNEY}\nFreshness: ${freshness}`;
     item.iconPath = new vscode.ThemeIcon("person");
-    item.accessibilityInformation = { label: `${label}. ${member.role}. ${member.onboardingStatus}.` };
+    item.accessibilityInformation = { label: `${label}. ${member.role}. ${member.onboardingStatus}. Freshness ${freshness}.` };
     return item;
   }
 }

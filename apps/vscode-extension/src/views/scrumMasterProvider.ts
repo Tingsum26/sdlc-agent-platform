@@ -38,10 +38,10 @@ export class ScrumMasterProvider implements vscode.TreeDataProvider<vscode.TreeI
   private ticketItem(entry: EpicResume["tickets"][number], freshness: Freshness): vscode.TreeItem {
     const label = `${entry.ticket.ticketId} · ${entry.ticket.status}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = entry.nextAction;
+    item.description = `${entry.nextAction} · ${freshness}`;
     item.tooltip = `Next action: ${entry.nextAction}\nVersion ${entry.ticket.version}\nFreshness: ${freshness}`;
     item.iconPath = statusIcon(entry.ticket.status);
-    item.accessibilityInformation = { label: `${label}. ${entry.nextAction}. Status ${entry.ticket.status}.` };
+    item.accessibilityInformation = { label: `${label}. ${entry.nextAction}. Status ${entry.ticket.status}. Freshness ${freshness}.` };
     return item;
   }
 }

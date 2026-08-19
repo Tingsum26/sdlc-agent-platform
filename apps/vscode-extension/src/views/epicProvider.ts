@@ -34,10 +34,10 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private epicItem(epic: EpicSummary, freshness: Freshness): vscode.TreeItem {
     const label = `${epic.epicId} · ${epic.title}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = epic.status;
+    item.description = `${epic.status} · ${freshness}`;
     item.tooltip = `Journey ${epic.journeyId}\nVersion ${epic.version}\nFreshness: ${freshness}`;
     item.iconPath = statusIcon(epic.status);
-    item.accessibilityInformation = { label: `${label}. Status ${epic.status}. Journey ${epic.journeyId}.` };
+    item.accessibilityInformation = { label: `${label}. Status ${epic.status}. Journey ${epic.journeyId}. Freshness ${freshness}.` };
     return item;
   }
 }

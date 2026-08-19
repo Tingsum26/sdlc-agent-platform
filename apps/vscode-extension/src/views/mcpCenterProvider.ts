@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { toViewState } from "./viewState.js";
+import { toViewState, type Freshness } from "./viewState.js";
 import { commandItem, emptyItem, errorItem, loadingItem, safeMessage } from "./treeItems.js";
 import type { McpCatalogEntry, ViewStateWithFreshness } from "./types.js";
 
@@ -28,19 +28,19 @@ export class McpCenterProvider implements vscode.TreeDataProvider<vscode.TreeIte
   getChildren(): vscode.TreeItem[] {
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
-    const rows = this.state.data.map((entry) => this.serverItem(entry));
+    const rows = this.state.data.map((entry) => this.serverItem(entry, this.state.freshness));
     if (rows.length === 0) rows.push(emptyItem("No catalog servers"));
     rows.push(commandItem("Open MCP onboarding", "sdlc.openMcpCenter"));
     return rows;
   }
 
-  private serverItem(entry: McpCatalogEntry): vscode.TreeItem {
+  private serverItem(entry: McpCatalogEntry, freshness: Freshness): vscode.TreeItem {
     const item = new vscode.TreeItem(entry.id, vscode.TreeItemCollapsibleState.None);
-    item.description = entry.required ? "required" : "optional";
+    item.description = `${entry.required ? "required" : "optional"} · ${freshness}`;
     item.tooltip = `${entry.name} · ${entry.skills.length} skills: ${entry.skills.join(", ")}`;
     item.iconPath = new vscode.ThemeIcon("server");
     item.accessibilityInformation = {
-      label: `${entry.id}. ${entry.required ? "Required" : "Optional"}. ${entry.skills.length} skills.`,
+      label: `${entry.id}. ${entry.required ? "Required" : "Optional"}. ${entry.skills.length} skills. Freshness ${freshness}.`,
     };
     return item;
   }

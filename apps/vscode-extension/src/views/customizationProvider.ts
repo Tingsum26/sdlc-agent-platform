@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { toViewState } from "./viewState.js";
+import { toViewState, type Freshness } from "./viewState.js";
 import { commandItem, emptyItem, errorItem, loadingItem, safeMessage } from "./treeItems.js";
 import { INSTALLED_BUNDLES_KEY, type InstalledBundle, type KeyValueStore, type ViewStateWithFreshness } from "./types.js";
 
@@ -31,7 +31,7 @@ export class CustomizationProvider implements vscode.TreeDataProvider<vscode.Tre
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     const rows: vscode.TreeItem[] = [];
     if (this.state.data.length === 0) rows.push(emptyItem("No installed bundles"));
-    else rows.push(...this.state.data.map((bundle) => this.bundleItem(bundle)));
+    else rows.push(...this.state.data.map((bundle) => this.bundleItem(bundle, this.state.freshness)));
     rows.push(
       commandItem("Install reviewed bundle", "sdlc.installCustomizationBundle"),
       commandItem("Roll back bundle", "sdlc.rollbackCustomizationBundle"),
@@ -40,12 +40,12 @@ export class CustomizationProvider implements vscode.TreeDataProvider<vscode.Tre
     return rows;
   }
 
-  private bundleItem(bundle: InstalledBundle): vscode.TreeItem {
+  private bundleItem(bundle: InstalledBundle, freshness: Freshness): vscode.TreeItem {
     const item = new vscode.TreeItem(bundle.version, vscode.TreeItemCollapsibleState.None);
-    item.description = bundle.installedAt;
+    item.description = `${bundle.installedAt} · ${freshness}`;
     item.tooltip = `Root ${bundle.root}\nInstalled ${bundle.installedAt}`;
     item.iconPath = new vscode.ThemeIcon("package");
-    item.accessibilityInformation = { label: `${bundle.version}. ${bundle.installedAt}. Installed bundle.` };
+    item.accessibilityInformation = { label: `${bundle.version}. ${bundle.installedAt}. Installed bundle. Freshness ${freshness}.` };
     return item;
   }
 }

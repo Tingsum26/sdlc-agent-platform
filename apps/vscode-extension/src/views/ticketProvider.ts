@@ -49,10 +49,10 @@ export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
   private ticketItem(ticket: TicketSummary, freshness: Freshness): TicketItem {
     const label = `${ticket.ticketId} · ${ticket.status}`;
     const item = new TicketItem(label, ticket.ticketId);
-    item.description = ticket.channel;
+    item.description = `${ticket.channel} · ${freshness}`;
     item.tooltip = `Channel ${ticket.channel}\nVersion ${ticket.version}\nFreshness: ${freshness}`;
     item.iconPath = statusIcon(ticket.status);
-    item.accessibilityInformation = { label: `${label}. Channel ${ticket.channel}. Status ${ticket.status}.` };
+    item.accessibilityInformation = { label: `${label}. Channel ${ticket.channel}. Status ${ticket.status}. Freshness ${freshness}.` };
     return item;
   }
 

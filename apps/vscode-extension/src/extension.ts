@@ -27,8 +27,8 @@ const viewIds = ["sdlc.myWork", "sdlc.scrumMaster", "sdlc.epic", "sdlc.ticket",
 /**
  * Static MCP catalog mirroring central/mcp/catalog.json. The packaged VSIX
  * ships only dist/ (see package.json "files"), so the catalog file is not read
- * at runtime; keep the server list, required flags, and workflow skills in
- * sync with the central catalog by hand.
+ * at runtime; test/extension.test.ts asserts this mirror keeps the same server
+ * ids and required flags as the central catalog.
  */
 const mcpCatalog: McpCatalogEntry[] = [
   { id: "workflow", name: "Workflow MCP", required: true, skills: ["start-epic", "join-epic", "change-epic", "start-ticket", "resume-workflow", "import-pod-members"] },
