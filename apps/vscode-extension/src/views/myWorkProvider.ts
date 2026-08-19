@@ -1,0 +1,49 @@
+import * as vscode from "vscode";
+import type { WorkflowTask } from "../api/workflowClient.js";
+import { toViewState, type Freshness } from "./viewState.js";
+import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
+import type { ViewStateWithFreshness, WorkflowViewsClient } from "./types.js";
+
+/**
+ * My Work view: the actionable task backlog (COMPLETED/CANCELLED excluded),
+ * each row carrying the ticket, repository alias, and poll freshness.
+ */
+export class MyWorkProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+  private readonly changed = new vscode.EventEmitter<void>();
+  readonly onDidChangeTreeData = this.changed.event;
+  private state: ViewStateWithFreshness<WorkflowTask[]> = toViewState({ kind: "loading" });
+
+  constructor(private readonly client: WorkflowViewsClient) {}
+
+  getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
+
+  async refresh(): Promise<void> {
+    try {
+      const tasks = (await this.client.listTasks())
+        .filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status));
+      this.state = toViewState({ kind: "data", data: tasks, at: Date.now() });
+    } catch (error) {
+      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+    }
+    this.changed.fire();
+  }
+
+  getChildren(): vscode.TreeItem[] {
+    if (this.state.kind === "loading") return [loadingItem()];
+    if (this.state.kind === "error") return [errorItem(this.state.message)];
+    if (this.state.data.length === 0) return [emptyItem("No actionable tasks")];
+    return this.state.data.map((task) => this.taskItem(task, this.state.freshness));
+  }
+
+  private taskItem(task: WorkflowTask, freshness: Freshness): vscode.TreeItem {
+    const label = `${task.scope.ticketId} · ${task.status}`;
+    const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+    item.description = task.scope.repositoryAlias;
+    item.tooltip = `${task.taskId}\nVersion ${task.version}\nUpdated ${task.updatedAt}\nFreshness: ${freshness}`;
+    item.iconPath = statusIcon(task.status);
+    item.command = { command: "sdlc.openTask", title: "Open task", arguments: [task.taskId] };
+    item.contextValue = "sdlcTask";
+    item.accessibilityInformation = { label: `${label}. ${task.scope.repositoryAlias}. Status ${task.status}. Version ${task.version}.` };
+    return item;
+  }
+}
