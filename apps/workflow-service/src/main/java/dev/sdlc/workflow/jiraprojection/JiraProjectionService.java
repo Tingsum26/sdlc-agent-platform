@@ -23,18 +23,23 @@ public final class JiraProjectionService {
         this.clock = clock;
     }
 
-    public synchronized JiraProjection enqueue(String ticketId, String milestoneId, String summary,
+    public synchronized JiraProjection enqueue(String ticketId, String milestoneId, String serverGeneratedSummary,
             String actorId, String correlationId) {
         if (ticketId == null || ticketId.isBlank()) throw new IllegalArgumentException("ticketId is required");
         if (milestoneId == null || milestoneId.isBlank()) throw new IllegalArgumentException("milestoneId is required");
-        if (summary == null || summary.isBlank()) throw new IllegalArgumentException("summary is required");
+        if (serverGeneratedSummary == null || serverGeneratedSummary.isBlank()) {
+            throw new IllegalArgumentException("server-generated summary is required");
+        }
+        if (serverGeneratedSummary.length() > JiraSummaryFactory.MAX_LENGTH) {
+            throw new IllegalArgumentException("server-generated summary exceeds 500 characters");
+        }
         JiraProjection existing = projections.findAll().stream()
                 .filter(item -> item.ticketId().equals(ticketId) && item.milestoneId().equals(milestoneId))
                 .findFirst().orElse(null);
         if (existing != null) return existing;
         Instant now = clock.instant();
         String projectionId = "JIRA-PROJ-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
-        JiraProjection draft = new JiraProjection(projectionId, ticketId, milestoneId, summary,
+        JiraProjection draft = new JiraProjection(projectionId, ticketId, milestoneId, serverGeneratedSummary,
                 JiraProjectionStatus.JIRA_ARTIFACT_SYNC_PENDING, 0, now, now);
         projections.save(draft);
         return draft;

@@ -2,6 +2,8 @@ package dev.sdlc.workflow.api;
 
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
+import dev.sdlc.workflow.artifact.ArtifactMetadata;
+import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.change.ChangeRequestService;
 import dev.sdlc.workflow.change.ChangeUrgency;
 import dev.sdlc.workflow.change.EpicChangeRequest;
@@ -15,6 +17,7 @@ import dev.sdlc.workflow.integration.CiStatus;
 import dev.sdlc.workflow.integration.CiStatusAdapter;
 import dev.sdlc.workflow.jiraprojection.JiraProjection;
 import dev.sdlc.workflow.jiraprojection.JiraProjectionService;
+import dev.sdlc.workflow.jiraprojection.JiraSummaryFactory;
 import dev.sdlc.workflow.repotask.RepoTask;
 import dev.sdlc.workflow.repotask.RepoTaskService;
 import dev.sdlc.workflow.security.CurrentUser;
@@ -58,13 +61,15 @@ public class EpicController {
     private final WorkflowTaskService workflowTasks;
     private final DomainAuditEventRepository audits;
     private final JiraProjectionService jiraProjections;
+    private final ArtifactService artifacts;
+    private final JiraSummaryFactory jiraSummaries = new JiraSummaryFactory();
     private final CiStatusAdapter ciStatusAdapter;
     private final SplunkAuditPublisher splunkAudit;
 
     public EpicController(EpicWorkflowService epics, TicketWorkflowService tickets, RepoTaskService repoTasks,
             DependencyService dependencies, ChangeRequestService changeRequests, SkipService skips,
             WorkflowTaskService workflowTasks, DomainAuditEventRepository audits,
-            JiraProjectionService jiraProjections, CiStatusAdapter ciStatusAdapter,
+            JiraProjectionService jiraProjections, ArtifactService artifacts, CiStatusAdapter ciStatusAdapter,
             SplunkAuditPublisher splunkAudit) {
         this.epics = epics;
         this.tickets = tickets;
@@ -75,6 +80,7 @@ public class EpicController {
         this.workflowTasks = workflowTasks;
         this.audits = audits;
         this.jiraProjections = jiraProjections;
+        this.artifacts = artifacts;
         this.ciStatusAdapter = ciStatusAdapter;
         this.splunkAudit = splunkAudit;
     }
@@ -138,12 +144,21 @@ public class EpicController {
     }
 
     @PostMapping("/jira-drafts")
-    ResponseEntity<JiraProjection> createJiraDraft(@Valid @RequestBody JiraDraftRequest body,
+    ResponseEntity<JiraProjection> createJiraDraft(@Valid @RequestBody JiraProjectionRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
+        TicketWorkflow ticket = tickets.ticket(body.ticketId());
+        ArtifactMetadata artifact = artifacts.requireArtifact(body.artifactId(), body.artifactVersion());
+        if (!artifact.approved()) {
+            throw new IllegalArgumentException("Artifact must be approved before Jira projection");
+        }
+        WorkflowTask task = workflowTasks.getTask(artifact.taskId());
+        if (!ticket.ticketId().equals(task.scope().ticketId())) {
+            throw new IllegalArgumentException("Artifact task does not belong to ticket");
+        }
         // TODO(INTERNAL): INTERNAL-JIRA-001 Route the projection outbox to the real Jira comment API.
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(jiraProjections.enqueue(body.ticketId(), body.milestoneId(), body.summary(),
+        return ResponseEntity.status(HttpStatus.CREATED).body(jiraProjections.enqueue(ticket.ticketId(), body.milestoneId(),
+                        jiraSummaries.create(ticket, artifact),
                         user.actorId(), CorrelationIdFilter.from(request)));
     }
 
@@ -329,8 +344,8 @@ public class EpicController {
     public record AdvanceRequest(@Min(0) long expectedVersion, @NotNull TicketDeliveryStatus target) {
     }
 
-    public record JiraDraftRequest(@NotBlank String ticketId, @NotBlank String milestoneId,
-            @NotBlank String summary) {
+    public record JiraProjectionRequest(@NotBlank String ticketId, @NotBlank String milestoneId,
+            @NotBlank String artifactId, @Min(1) int artifactVersion) {
     }
 
     public record CiRequest(@NotBlank String repositoryAlias, @NotBlank String revision) {
