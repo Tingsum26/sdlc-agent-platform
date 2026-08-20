@@ -245,4 +245,19 @@ describe("extension activation E2E", () => {
     const rows = (registry.treeProviders.get("sdlc.diagnostics") as { getChildren(): ReadinessRow[] }).getChildren();
     expect(rows.some((row) => row.label === "WORKFLOW · PASS")).toBe(true);
   });
+
+  it("attempts refresh with an empty demo actor and renders authentication state", async () => {
+    configValues.demoActorId = "";
+    const fetcher = vi.fn(async () => new Response("{}", { status: 401 }));
+    vi.stubGlobal("fetch", fetcher);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    activate(mockContext());
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fetcher).toHaveBeenCalled();
+    expect(labelsOf("sdlc.myWork")[0]).toContain("Error: Workflow request failed (401)");
+    configValues.demoActorId = "DEMO-ACTOR";
+  });
 });

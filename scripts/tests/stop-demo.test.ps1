@@ -3,6 +3,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $sourceScript = (Resolve-Path (Join-Path $PSScriptRoot '..\stop-demo.ps1')).Path
+$lineageModule = (Resolve-Path (Join-Path $PSScriptRoot '..\process-lineage.psm1')).Path
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("sdlc-stop-demo-test-" + [Guid]::NewGuid().ToString('N'))
 $testScripts = Join-Path $testRoot 'scripts'
 $testState = Join-Path $testRoot '.demo'
@@ -28,6 +29,15 @@ function Assert-ProcessHasExited([int]$ProcessId, [string]$Description) {
 try {
     New-Item -ItemType Directory -Path $testScripts, $testState | Out-Null
     Copy-Item -LiteralPath $sourceScript -Destination (Join-Path $testScripts 'stop-demo.ps1')
+    Copy-Item -LiteralPath $lineageModule -Destination (Join-Path $testScripts 'process-lineage.psm1')
+    Import-Module (Join-Path $testScripts 'process-lineage.psm1') -Force
+    $parentStart = [DateTime]::Parse('2026-08-21T00:00:10Z').ToUniversalTime()
+    if (Test-IsTemporalDescendant -ParentStartedAt $parentStart -ChildStartedAt $parentStart.AddSeconds(-30)) {
+        throw 'Temporal lineage accepted a child that predates the parent identity (PID-reuse hazard).'
+    }
+    if (-not (Test-IsTemporalDescendant -ParentStartedAt $parentStart -ChildStartedAt $parentStart.AddMilliseconds(1))) {
+        throw 'Temporal lineage rejected a child created after its parent.'
+    }
     $sleeper = Start-Process -FilePath 'powershell.exe' `
         -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') `
         -WindowStyle Hidden -PassThru
@@ -80,6 +90,7 @@ try {
     & (Join-Path $testScripts 'stop-demo.ps1') | Out-Null
     Assert-ProcessHasExited -ProcessId $treeRoot.Id -Description 'The tree root'
     Assert-ProcessHasExited -ProcessId $treeChild.Id -Description 'The spawned child'
+
 
     $discoveryFailureSleeper = Start-Process -FilePath 'powershell.exe' `
         -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') `

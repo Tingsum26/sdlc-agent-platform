@@ -39,7 +39,7 @@
       "markerPaths": [
         "apps/vscode-extension/src/customization/bundleInstaller.ts"
       ],
-      "action": "Confirm Copilot hook policy and replace local echo scripts with approved deterministic hooks.",
+      "action": "Confirm Copilot hook policy and replace local Node no-op actions with approved deterministic hooks.",
       "evidence": "Sanitized hook activation log.",
       "rollback": "Disable hook activation while retaining bundle installation."
     },

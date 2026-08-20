@@ -5,10 +5,14 @@ export interface SdlcStepEvent {
 
 export interface FictionalSdlcResult {
   steps: SdlcStepEvent[];
-  auditTrail: SdlcStepEvent[];
+  auditTrail: Array<{ action: string; detail?: string }>;
   artifactIds: string[];
   ticketId: string;
   stageTypes: string[];
+  epic: { epicId: string; status: string; version?: number };
+  ticket: { ticketId: string; status: string; version: number };
+  repoTask: { repoTaskId: string; status: string; version: number };
+  tasks: Array<{ taskId: string; type: string; status: string }>;
 }
 
 export interface FictionalSdlcInput {
@@ -22,6 +26,8 @@ const STAGES: Array<{ type: string; artifactType: string; label: string }> = [
   { type: "DESIGN", artifactType: "DESIGN_REPORT", label: "design" },
   { type: "IMPLEMENTATION", artifactType: "DELIVERY_REPORT", label: "implementation" },
   { type: "TEST_GENERATION", artifactType: "TEST_REPORT", label: "generated tests" },
+  { type: "PR_REVIEW", artifactType: "PR_REVIEW_REPORT", label: "PR review" },
+  { type: "MANUAL_E2E", artifactType: "MANUAL_E2E_REPORT", label: "manual E2E" },
 ];
 
 /**
@@ -77,6 +83,14 @@ export async function runFictionalSdlc(
     repoTaskVersion = advanced.version;
   };
   await advanceRepoTask("IN_PROGRESS");
+  let ticketVersion = 0;
+  const advanceTicket = async (target: string) => {
+    const ticket = await json<{ version: number }>(`/tickets/${ticketId}/advance`, {
+      method: "POST", body: JSON.stringify({ expectedVersion: ticketVersion, target }),
+    });
+    ticketVersion = ticket.version;
+  };
+  await advanceTicket("IN_ANALYSIS");
 
   for (const stage of STAGES) {
     const created = await json<{ taskId: string; version: number }>("/workflows/from-ticket", {
@@ -145,30 +159,29 @@ export async function runFictionalSdlc(
       }),
     });
     steps.push({ label: "manual E2E passed", detail: "E2E-M7-1" });
-  }
 
-  let ticketVersion = 0;
-  const advanceTicket = async (target: string) => {
-    const ticket = await json<{ version: number }>(`/tickets/${ticketId}/advance`, {
-      method: "POST", body: JSON.stringify({ expectedVersion: ticketVersion, target }),
-    });
-    ticketVersion = ticket.version;
-  };
-  for (const target of ["IN_ANALYSIS", "WAITING_FOR_APPROVAL", "IN_DEVELOPMENT", "PR_OPEN"]) {
-    await advanceTicket(target);
+    // Aggregate state follows the completed work instead of being replayed as
+    // a client-authored label list after all stages have already finished.
+    if (stage.type === "REQUIREMENT_ANALYSIS") await advanceTicket("WAITING_FOR_APPROVAL");
+    if (stage.type === "DESIGN") await advanceTicket("IN_DEVELOPMENT");
+    if (stage.type === "TEST_GENERATION") {
+      await advanceTicket("PR_OPEN");
+      await advanceRepoTask("PR_OPEN");
+    }
+    if (stage.type === "PR_REVIEW") {
+      const ci = await json<{ ticket: { version: number }; state: string }>(`/tickets/${ticketId}/ci`, {
+        method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, revision: input.targetCommit }),
+      });
+      ticketVersion = ci.ticket.version;
+      steps.push({ label: "CI passed", detail: ci.state });
+    }
   }
-  await advanceRepoTask("PR_OPEN");
-  const ci = await json<{ ticket: { version: number }; state: string }>(`/tickets/${ticketId}/ci`, {
-    method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, revision: input.targetCommit }),
-  });
-  ticketVersion = ci.ticket.version;
-  steps.push({ label: "CI passed", detail: ci.state });
   await advanceRepoTask("MERGED");
   steps.push({ label: "repo task merged", detail: repoTask.repoTaskId });
   for (const target of ["MERGED", "RELEASED", "FLAG_ENABLED", "E2E_VERIFIED"]) {
     await advanceTicket(target);
   }
-  const tasks = await json<Array<{ taskId: string; type: string }>>("/tasks");
+  const tasks = await json<Array<{ taskId: string; type: string; status: string }>>("/tasks");
   const stageTypes = createdTaskIds.map((taskId) => tasks.find((task) => task.taskId === taskId)?.type ?? "MISSING");
   if (stageTypes.join(",") !== STAGES.map((stage) => stage.type).join(",")) {
     throw new Error("fictional-sdlc: persisted stage types do not match requested stages");
@@ -176,5 +189,26 @@ export async function runFictionalSdlc(
   steps.push({ label: "persisted stage types", detail: stageTypes.join(", ") });
   steps.push({ label: "ticket release evidence recorded", detail: `${ticketId} · E2E_VERIFIED` });
 
-  return { steps, auditTrail: steps, artifactIds, ticketId, stageTypes };
+  const resume = await json<{
+    epic: { epicId: string; status: string; version?: number };
+    tickets: Array<{ ticket: { ticketId: string; status: string; version: number } }>;
+    auditTrail: Array<{ action: string; detail?: string }>;
+  }>(`/epics/${epicId}/resume`);
+  const persistedTicket = resume.tickets.find((entry) => entry.ticket.ticketId === ticketId)?.ticket;
+  const persistedRepoTasks = await json<Array<{ repoTaskId: string; status: string; version: number }>>(`/tickets/${ticketId}/repo-tasks`);
+  const persistedRepoTask = persistedRepoTasks.find((entry) => entry.repoTaskId === repoTask.repoTaskId);
+  const persistedTasks = createdTaskIds.map((taskId) => tasks.find((task) => task.taskId === taskId)).filter((task): task is NonNullable<typeof task> => Boolean(task));
+  const taskAudit = (await Promise.all(createdTaskIds.map((taskId) =>
+    json<Array<{ action: string; detail?: string }>>(`/tasks/${taskId}/audit`)))).flat();
+  if (resume.epic.status !== "ACTIVE" || !persistedTicket || persistedTicket.status !== "E2E_VERIFIED" || !persistedRepoTask || persistedRepoTask.status !== "MERGED"
+      || persistedTasks.length !== STAGES.length || persistedTasks.some((task) => task.status !== "COMPLETED")) {
+    throw new Error("fictional-sdlc: persisted lifecycle evidence is incomplete");
+  }
+  steps.push({ label: "persisted epic state", detail: `${resume.epic.epicId} · ${resume.epic.status}` });
+  steps.push({ label: "persisted ticket state", detail: `${persistedTicket.ticketId} · ${persistedTicket.status}` });
+  steps.push({ label: "persisted repo task state", detail: `${persistedRepoTask.repoTaskId} · ${persistedRepoTask.status}` });
+  steps.push({ label: "persisted service audit", detail: `${resume.auditTrail.length + taskAudit.length} events` });
+
+  return { steps, auditTrail: [...resume.auditTrail, ...taskAudit], artifactIds, ticketId, stageTypes,
+    epic: resume.epic, ticket: persistedTicket, repoTask: persistedRepoTask, tasks: persistedTasks };
 }

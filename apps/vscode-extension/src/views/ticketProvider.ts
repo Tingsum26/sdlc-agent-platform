@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { RepoTaskSummary, TicketSummary } from "../api/workflowClient.js";
-import { toViewState, type Freshness } from "./viewState.js";
+import { retainLastKnownData, toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
 import { type EpicSelection, type ViewStateWithFreshness, type WorkflowViewsClient } from "./types.js";
 
@@ -49,7 +49,7 @@ export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem>,
       this.state = toViewState({ kind: "data", data: tickets, at: Date.now() });
     } catch (error) {
       if (this.selection.selectedEpicId() !== epicId) return;
-      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+      this.state = retainLastKnownData(this.state, error);
     }
     this.changed.fire();
   }
@@ -64,7 +64,9 @@ export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem>,
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     if (this.needsEpicSelection) return [emptyItem("Select an epic in Epic View")];
     if (this.state.data.length === 0) return [emptyItem("No tickets")];
-    return this.state.data.map((ticket) => this.ticketItem(ticket, this.state.freshness));
+    const rows: vscode.TreeItem[] = this.state.data.map((ticket) => this.ticketItem(ticket, this.state.freshness));
+    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
+    return rows;
   }
 
   private ticketItem(ticket: TicketSummary, freshness: Freshness): TicketItem {

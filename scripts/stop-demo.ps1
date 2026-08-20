@@ -4,6 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $stateFile = Join-Path $repoRoot '.demo\processes.json'
+Import-Module (Join-Path $PSScriptRoot 'process-lineage.psm1') -Force
 if (-not (Test-Path -LiteralPath $stateFile)) {
     Write-Output 'No demo process state found.'
     exit 0
@@ -46,26 +47,30 @@ function Test-ProcessIdentity($Identity) {
             return $false
         }
 
-        return [Math]::Abs(($Identity.handle.StartTime.ToUniversalTime() - ([DateTime]$Identity.startedAt).ToUniversalTime()).TotalSeconds) -le 5
+        return [Math]::Abs(($Identity.handle.StartTime.ToUniversalTime() - ([DateTime]$Identity.startedAt).ToUniversalTime()).TotalMilliseconds) -le 100
     } catch {
         return $false
     }
 }
 
-function Get-DescendantProcessIdentities([int]$ParentId) {
+function Get-DescendantProcessIdentities($ParentIdentity) {
     if ($env:SDLC_STOP_DEMO_TEST_FORCE_DESCENDANT_DISCOVERY_FAILURE -eq '1') {
         throw 'Descendant process discovery was forced to fail for lifecycle regression coverage.'
     }
 
     try {
-        $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction Stop)
+        $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($ParentIdentity.id)" -ErrorAction Stop)
     } catch {
-        throw "Could not inspect descendants for PID ${ParentId}: $($_.Exception.Message)"
+        throw "Could not inspect descendants for PID $($ParentIdentity.id): $($_.Exception.Message)"
     }
     foreach ($child in $children) {
         $identity = Get-ProcessIdentity -ProcessId $child.ProcessId
         if ($null -eq $identity) { continue }
-        Get-DescendantProcessIdentities -ParentId $identity.id
+        if (-not (Test-IsTemporalDescendant -ParentStartedAt $ParentIdentity.startedAt -ChildStartedAt $identity.startedAt)) {
+            Dispose-ProcessIdentity -Identity $identity
+            continue
+        }
+        Get-DescendantProcessIdentities -ParentIdentity $identity
         $identity
     }
 }
@@ -91,7 +96,7 @@ function Test-RootPidCanBeRescanned($RootIdentity) {
     }
 
     try {
-        return [Math]::Abs(($current.startedAt - ([DateTime]$RootIdentity.startedAt).ToUniversalTime()).TotalSeconds) -le 5
+        return [Math]::Abs(($current.startedAt - ([DateTime]$RootIdentity.startedAt).ToUniversalTime()).TotalMilliseconds) -le 100
     } finally {
         if ($current.handle -is [System.IDisposable]) {
             $current.handle.Dispose()
@@ -113,7 +118,7 @@ function Stop-ProcessTreeSafely($RootIdentity, [int]$TimeoutSeconds = 10) {
         do {
             $rootStillRunning = Test-ProcessIdentity -Identity $RootIdentity
             if ($rootStillRunning -or (Test-RootPidCanBeRescanned -RootIdentity $RootIdentity)) {
-                $rescannedDescendants = @(Get-DescendantProcessIdentities -ParentId ([int]$RootIdentity.id))
+                $rescannedDescendants = @(Get-DescendantProcessIdentities -ParentIdentity $RootIdentity)
                 foreach ($descendant in $rescannedDescendants) {
                     $observedDescendants[(Get-IdentityKey -Identity $descendant)] = $descendant
                 }

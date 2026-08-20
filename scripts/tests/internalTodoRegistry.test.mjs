@@ -14,7 +14,7 @@ const registryEntry = (id, markerPaths = ['apps/sample/src/Example.java']) => ({
   rollback: 'Restore the fake adapter.'
 });
 
-async function fixture({ entries, markdownIds, markers }) {
+async function fixture({ entries, markdownIds, markers, templateMarkers = [] }) {
   const rootDirectory = await mkdtemp(join(tmpdir(), 'internal-todo-registry-'));
   await mkdir(join(rootDirectory, 'apps/sample/src'), { recursive: true });
   await mkdir(join(rootDirectory, 'docs/handoff'), { recursive: true });
@@ -23,6 +23,9 @@ async function fixture({ entries, markdownIds, markers }) {
     join(rootDirectory, 'docs/handoff/internal-todo-registry.json'),
     JSON.stringify({ entries }, null, 2)
   );
+  if (templateMarkers.length > 0) {
+    await writeFile(join(rootDirectory, 'docs/handoff/internal-agent-completion-report-template.md'), templateMarkers.join('\n'));
+  }
   await writeFile(
     join(rootDirectory, 'docs/handoff/INTERNAL_TODO.md'),
     ['| ID | Component |', '|---|---|', ...markdownIds.map((id) => `| ${id} | sample |`)].join('\n')
@@ -122,7 +125,7 @@ test('reports duplicate IDs in the Markdown registry table', async () => {
   );
 });
 
-test('does not mistake a template placeholder for a canonical source marker', async () => {
+test('rejects a template-shaped placeholder outside the explicit template file', async () => {
   await withFixture(
     {
       entries: [registryEntry('INTERNAL-SAMPLE-001')],
@@ -131,8 +134,73 @@ test('does not mistake a template placeholder for a canonical source marker', as
     },
     async (rootDirectory) => {
       const result = validateRegistry({ rootDirectory });
-      assert.deepEqual(result.errors, []);
+      assert.ok(result.errors.some((error) => error.includes('Malformed internal TODO marker')));
       assert.equal(result.markerCount, 1);
+    }
+  );
+});
+
+test('rejects wrong registry field types, invalid IDs, and unsafe marker paths', async () => {
+  await withFixture(
+    {
+      entries: [{ ...registryEntry('bad-id'), component: 7, markerPaths: ['../outside.java'], action: 7, evidence: {}, rollback: false }],
+      markdownIds: [],
+      markers: ['// no canonical marker'],
+    },
+    async (rootDirectory) => {
+      const result = validateRegistry({ rootDirectory });
+      assert.ok(result.errors.some((error) => error.includes('invalid id')));
+      assert.ok(result.errors.some((error) => error.includes('component')));
+      assert.ok(result.errors.some((error) => error.includes('markerPaths')));
+      assert.ok(result.errors.some((error) => error.includes('action')));
+    }
+  );
+});
+
+test('reports malformed internal markers instead of silently ignoring them', async () => {
+  await withFixture(
+    {
+      entries: [registryEntry('INTERNAL-SAMPLE-001')],
+      markdownIds: ['INTERNAL-SAMPLE-001'],
+      markers: [
+        '// TODO(INTERNAL): INTERNAL-SAMPLE-001 valid',
+        '// TODO(INTERNAL): internal-bad-1 malformed',
+        '// TODO(INTERNAL): INTERNAL-BAD-XYZ malformed',
+      ],
+    },
+    async (rootDirectory) => {
+      const result = validateRegistry({ rootDirectory });
+      assert.ok(result.errors.some((error) => error.includes('Malformed internal TODO marker')));
+    }
+  );
+});
+
+test('allows the placeholder only in the explicit completion-report template', async () => {
+  await withFixture(
+    {
+      entries: [registryEntry('INTERNAL-SAMPLE-001')],
+      markdownIds: ['INTERNAL-SAMPLE-001'],
+      markers: ['// TODO(INTERNAL): INTERNAL-SAMPLE-001 valid'],
+      templateMarkers: ['TODO(INTERNAL): INTERNAL-XXX placeholder row'],
+    },
+    async (rootDirectory) => {
+      const result = validateRegistry({ rootDirectory });
+      assert.deepEqual(result.errors, []);
+    }
+  );
+});
+
+test('rejects unknown entry fields and duplicate marker paths', async () => {
+  await withFixture(
+    {
+      entries: [{ ...registryEntry('INTERNAL-SAMPLE-001', ['apps/sample/src/Example.java', 'apps/sample/src/Example.java']), extra: true }],
+      markdownIds: ['INTERNAL-SAMPLE-001'],
+      markers: ['// TODO(INTERNAL): INTERNAL-SAMPLE-001 valid'],
+    },
+    async (rootDirectory) => {
+      const result = validateRegistry({ rootDirectory });
+      assert.ok(result.errors.some((error) => error.includes('unknown fields')));
+      assert.ok(result.errors.some((error) => error.includes('duplicate markerPaths')));
     }
   );
 });

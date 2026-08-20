@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { EpicResume } from "../api/workflowClient.js";
-import { toViewState, type Freshness } from "./viewState.js";
+import { retainLastKnownData, toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
 import { type EpicSelection, type ViewStateWithFreshness, type WorkflowViewsClient } from "./types.js";
 
@@ -39,7 +39,7 @@ export class ScrumMasterProvider implements vscode.TreeDataProvider<vscode.TreeI
       this.state = toViewState({ kind: "data", data: resume, at: Date.now() });
     } catch (error) {
       if (this.selection.selectedEpicId() !== epicId) return;
-      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+      this.state = retainLastKnownData(this.state, error);
     }
     this.changed.fire();
   }
@@ -50,7 +50,9 @@ export class ScrumMasterProvider implements vscode.TreeDataProvider<vscode.TreeI
     if (!this.state.data) return [emptyItem("Select an epic in Epic View")];
     const tickets = this.state.data.tickets;
     if (tickets.length === 0) return [emptyItem("No next actions")];
-    return tickets.map((entry) => this.ticketItem(entry, this.state.freshness));
+    const rows = tickets.map((entry) => this.ticketItem(entry, this.state.freshness));
+    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
+    return rows;
   }
 
   private ticketItem(entry: EpicResume["tickets"][number], freshness: Freshness): vscode.TreeItem {

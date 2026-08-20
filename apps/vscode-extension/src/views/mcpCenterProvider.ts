@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { toViewState, type Freshness } from "./viewState.js";
+import { retainLastKnownData, toViewState, type Freshness } from "./viewState.js";
 import { commandItem, emptyItem, errorItem, loadingItem, safeMessage } from "./treeItems.js";
 import type { McpCatalogEntry, ViewStateWithFreshness } from "./types.js";
 
@@ -20,7 +20,7 @@ export class McpCenterProvider implements vscode.TreeDataProvider<vscode.TreeIte
     try {
       this.state = toViewState({ kind: "data", data: this.catalog, at: Date.now() });
     } catch (error) {
-      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+      this.state = retainLastKnownData(this.state, error);
     }
     this.changed.fire();
   }
@@ -29,6 +29,7 @@ export class McpCenterProvider implements vscode.TreeDataProvider<vscode.TreeIte
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     const rows = this.state.data.map((entry) => this.serverItem(entry, this.state.freshness));
+    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
     if (rows.length === 0) rows.push(emptyItem("No catalog servers"));
     rows.push(commandItem("Open MCP onboarding", "sdlc.openMcpCenter"));
     return rows;

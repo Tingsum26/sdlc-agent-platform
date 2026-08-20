@@ -37,7 +37,7 @@ import { EpicSelectionStore } from "../src/views/epicSelection.js";
 const task = { taskId: "TASK-1", type: "REQUIREMENT_ANALYSIS", status: "WAITING_FOR_LOCAL_COPILOT", scope: { ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567" }, version: 0, updatedAt: "2026-08-18T00:00:00Z" };
 
 describe("view providers", () => {
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
   it("my work shows only actionable tasks with freshness", async () => {
     const client = { listTasks: vi.fn().mockResolvedValue([task]) };
@@ -46,6 +46,21 @@ describe("view providers", () => {
     const items = provider.getChildren() as vscode.TreeItem[];
     expect(items.length).toBe(1);
     expect(items[0]!.label).toContain("DEMO-123");
+  });
+
+  it("my work keeps last-known rows and visibly marks aged data after a failed refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse("2026-08-21T00:00:00Z"));
+    const client = { listTasks: vi.fn().mockResolvedValueOnce([task]).mockRejectedValueOnce(new Error("offline")) };
+    const provider = new MyWorkProvider(client as never);
+    await provider.refresh();
+    vi.setSystemTime(Date.parse("2026-08-21T00:16:00Z"));
+    await provider.refresh();
+
+    const items = provider.getChildren() as vscode.TreeItem[];
+    expect(String(items[0]!.label)).toContain("showing STALE data: offline");
+    expect(items.map((item) => String(item.label))).toContain("DEMO-123 · WAITING_FOR_LOCAL_COPILOT");
+    vi.useRealTimers();
   });
 
   it("ticket and scrum views ask the user to select an epic instead of querying a fixture id", async () => {

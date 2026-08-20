@@ -64,7 +64,7 @@ class JiraProjectionIT {
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("JIRA-SAFE")))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("REQUIREMENT_REPORT")))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("APPROVED")))
-                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("Approved requirement scope")))
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Approved requirement scope"))))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("ARTIFACT_BODY_MUST_NOT_APPEAR"))));
     }
 
@@ -77,6 +77,19 @@ class JiraProjectionIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("COMPOUND_SECRET_VALUE"))));
+    }
+
+    @Test
+    void neverPublishesCredentialBearingArtifactTitles() throws Exception {
+        createApprovedArtifact("JIRA-TITLE-CREDENTIAL", "ART-TITLE-CREDENTIAL",
+                "Authorization: Bearer title-secret-value");
+
+        mvc.perform(jiraDraft("JIRA-TITLE-CREDENTIAL", "ART-TITLE-CREDENTIAL", 1))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("title-secret-value"))))
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Authorization"))));
     }
 
     @Test

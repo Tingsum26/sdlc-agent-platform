@@ -48,10 +48,9 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
       // Published versions are immutable. Preserve the already published copy
       // rather than deleting it for a conflicting reinstallation attempt.
       await rejectBundleSymlinks(destination);
-      await activateBundleLocations(context, destination);
       const installed = context.globalState.get<InstalledBundle[]>(stateKey, []).filter((entry) => entry.version !== manifest.bundleVersion);
       installed.unshift({ version: manifest.bundleVersion, root: destination, installedAt: new Date().toISOString() });
-      await context.globalState.update(stateKey, installed.slice(0, 5));
+      await activateBundleTransaction(context, destination, installed.slice(0, 5));
       void vscode.window.showInformationMessage(`Activated SDLC customization bundle ${manifest.bundleVersion}. Verify it in Chat Customizations diagnostics.`);
       return;
     }
@@ -85,12 +84,11 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
     candidate = undefined;
     destinationCreatedByThisAttempt = true;
     await rejectBundleSymlinks(destination);
-    destinationCreatedByThisAttempt = false;
-    await activateBundleLocations(context, destination);
 
     const installed = context.globalState.get<InstalledBundle[]>(stateKey, []).filter((entry) => entry.version !== manifest.bundleVersion);
     installed.unshift({ version: manifest.bundleVersion, root: destination, installedAt: new Date().toISOString() });
-    await context.globalState.update(stateKey, installed.slice(0, 5));
+    await activateBundleTransaction(context, destination, installed.slice(0, 5));
+    destinationCreatedByThisAttempt = false;
     void vscode.window.showInformationMessage(`Activated SDLC customization bundle ${manifest.bundleVersion}. Verify it in Chat Customizations diagnostics.`);
   } catch (error) {
     if (candidate) await rm(candidate, { recursive: true, force: true });
@@ -107,31 +105,69 @@ export async function rollbackCustomizationBundle(context: vscode.ExtensionConte
   const choice = await vscode.window.showQuickPick(installed.slice(1).map((entry) => ({ label: entry.version, description: entry.installedAt, entry })),
     { title: "Select last-known-good customization bundle" });
   if (!choice) return;
-  await activateBundleLocations(context, choice.entry.root);
   const reordered = [choice.entry, ...installed.filter((entry) => entry.version !== choice.entry.version)];
-  await context.globalState.update(stateKey, reordered);
+  await activateBundleTransaction(context, choice.entry.root, reordered);
   void vscode.window.showInformationMessage(`Rolled back SDLC customizations to ${choice.entry.version}.`);
 }
 
-async function activateBundleLocations(context: vscode.ExtensionContext, root: string): Promise<void> {
+async function activateBundleTransaction(
+  context: vscode.ExtensionContext,
+  root: string,
+  installed: InstalledBundle[],
+): Promise<void> {
   const agents = join(root, "agents");
   const skills = join(root, "skills");
   const instructions = join(root, "instructions");
-  const previous = context.globalState.get<Record<string, string>>(activeLocationsKey, {});
-  await addLocation("agentFilesLocations", agents, previous["agentFilesLocations"]);
-  await addLocation("agentSkillsLocations", skills, previous["agentSkillsLocations"]);
-  await addLocation("instructionsFilesLocations", instructions, previous["instructionsFilesLocations"]);
-  await context.globalState.update(activeLocationsKey, {
+  const chat = vscode.workspace.getConfiguration("chat");
+  const chatAgent = vscode.workspace.getConfiguration("chat.agent");
+  const previousLocations = context.globalState.get<Record<string, string>>(activeLocationsKey, {});
+  const previousHookSettings = context.globalState.get<Record<string, unknown>>(activeHookSettingsKey, {});
+  const previousInstalled = context.globalState.get<InstalledBundle[] | undefined>(stateKey, undefined);
+  const previousActiveLocations = context.globalState.get<Record<string, string> | undefined>(activeLocationsKey, undefined);
+  const previousActiveHooks = context.globalState.get<Record<string, unknown> | undefined>(activeHookSettingsKey, undefined);
+  const priorConfig = {
+    agentFilesLocations: chat.get<Record<string, boolean>>("agentFilesLocations", {}),
+    agentSkillsLocations: chat.get<Record<string, boolean>>("agentSkillsLocations", {}),
+    instructionsFilesLocations: chat.get<Record<string, boolean>>("instructionsFilesLocations", {}),
+    hooks: chatAgent.get<Record<string, unknown>>("hooks", {}),
+  };
+  const hookEntries = await readHookEntries(root);
+  const nextLocations = {
     agentFilesLocations: agents, agentSkillsLocations: skills, instructionsFilesLocations: instructions,
-  });
-  await activateHooks(context, root);
+  };
+  const nextHooks = nextHookSettings(priorConfig.hooks, previousHookSettings, root, hookEntries);
+
+  try {
+    await chat.update("agentFilesLocations", nextLocation(priorConfig.agentFilesLocations, agents, previousLocations.agentFilesLocations), vscode.ConfigurationTarget.Global);
+    await chat.update("agentSkillsLocations", nextLocation(priorConfig.agentSkillsLocations, skills, previousLocations.agentSkillsLocations), vscode.ConfigurationTarget.Global);
+    await chat.update("instructionsFilesLocations", nextLocation(priorConfig.instructionsFilesLocations, instructions, previousLocations.instructionsFilesLocations), vscode.ConfigurationTarget.Global);
+    await chatAgent.update("hooks", nextHooks.live, vscode.ConfigurationTarget.Global);
+    await context.globalState.update(activeLocationsKey, nextLocations);
+    await context.globalState.update(activeHookSettingsKey, nextHooks.recorded);
+    await context.globalState.update(stateKey, installed);
+  } catch (error) {
+    // Configuration and Memento have no shared transaction primitive. Restore
+    // every participant from its pre-activation snapshot; compensation is
+    // best-effort so the original activation failure remains the reported one.
+    await Promise.allSettled([
+      chat.update("agentFilesLocations", priorConfig.agentFilesLocations, vscode.ConfigurationTarget.Global),
+      chat.update("agentSkillsLocations", priorConfig.agentSkillsLocations, vscode.ConfigurationTarget.Global),
+      chat.update("instructionsFilesLocations", priorConfig.instructionsFilesLocations, vscode.ConfigurationTarget.Global),
+      chatAgent.update("hooks", priorConfig.hooks, vscode.ConfigurationTarget.Global),
+      context.globalState.update(activeLocationsKey, previousActiveLocations),
+      context.globalState.update(activeHookSettingsKey, previousActiveHooks),
+      context.globalState.update(stateKey, previousInstalled),
+    ]);
+    throw error;
+  }
 }
 
 // The exact command recorded for a validated hook entry. JSON string quoting is
 // accepted by both cmd.exe and POSIX shells, so bundle paths with spaces cannot
 // alter the command that invokes the installed Node no-op shim.
-export function hookCommand(root: string, action: string): string {
-  return `${JSON.stringify(process.execPath)} ${JSON.stringify(join(root, "hooks", "run-hook.mjs"))} ${JSON.stringify(action)}`;
+export function hookCommand(root: string, action: string, runtime = process.execPath): string {
+  const electronNodeMode = /^node(?:\.exe)?$/i.test(basename(runtime)) ? "" : " --ms-enable-electron-run-as-node";
+  return `${JSON.stringify(runtime)}${electronNodeMode} ${JSON.stringify(join(root, "hooks", "run-hook.mjs"))} ${JSON.stringify(action)}`;
 }
 
 const hookEventNames = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"] as const;
@@ -158,14 +194,19 @@ async function readHookEntries(root: string): Promise<HookEvent[]> {
 }
 
 // TODO(INTERNAL): INTERNAL-HOOKS-001 — Confirm the company Copilot policy
-// allows VS Code agent hooks; replace the local echo no-op commands with the
+// allows VS Code agent hooks; replace the local Node no-op actions with the
 // approved deterministic hook commands, and only then enable real hook
 // execution. The declared events are still recorded in chat.agent.hooks so the
 // activation surface is visible, but every command is a local no-op today.
-// NOTE: `echo … >/dev/null && exit 0` is POSIX-shell syntax; real hook commands
-// must be invoked platform-safely (e.g. a Node shim shipped in the bundle or a
-// per-OS command builder), never as a bare POSIX pipeline on Windows.
-async function activateHooks(context: vscode.ExtensionContext, root: string): Promise<void> {
+// The shipped Node shim is invoked through Node itself, including Electron's
+// explicit Node mode in an extension host; real actions must preserve this
+// platform-neutral invocation boundary.
+function nextHookSettings(
+  liveValue: Record<string, unknown>,
+  recorded: Record<string, unknown>,
+  root: string,
+  entries: HookEvent[],
+): { live: Record<string, unknown>; recorded: Record<string, unknown> } {
   // Merge/stale semantics: chat.agent.hooks is the user's live config and may
   // hold user-managed keys that must never be touched. The installer manages
   // only the keys it recorded in globalState (activeHookSettingsKey) for the
@@ -174,29 +215,23 @@ async function activateHooks(context: vscode.ExtensionContext, root: string): Pr
   // add this bundle's validated entries, and write back. Stale installer
   // entries are therefore removed on rollback or when a bundle declares no
   // events, while user-managed keys are preserved.
-  const chat = vscode.workspace.getConfiguration("chat.agent");
-  const live = chat.get<Record<string, unknown>>("hooks", {});
-  const hookSettings: Record<string, unknown> = live && typeof live === "object" && !Array.isArray(live) ? { ...live } : {};
-  const recorded = context.globalState.get<Record<string, unknown>>(activeHookSettingsKey, {});
+  const hookSettings: Record<string, unknown> = liveValue && typeof liveValue === "object" && !Array.isArray(liveValue) ? { ...liveValue } : {};
   for (const key of Object.keys(recorded)) delete hookSettings[key];
 
   const nextRecorded: Record<string, unknown> = {};
-  for (const { event, action } of await readHookEntries(root)) {
+  for (const { event, action } of entries) {
     hookSettings[event] = hookCommand(root, action);
     nextRecorded[event] = hookCommand(root, action);
   }
 
-  await chat.update("hooks", hookSettings, vscode.ConfigurationTarget.Global);
-  await context.globalState.update(activeHookSettingsKey, nextRecorded);
+  return { live: hookSettings, recorded: nextRecorded };
 }
 
-async function addLocation(key: string, path: string, previous: string | undefined): Promise<void> {
-  const chat = vscode.workspace.getConfiguration("chat");
-  const current = chat.get<Record<string, boolean>>(key, {});
+function nextLocation(current: Record<string, boolean>, path: string, previous: string | undefined): Record<string, boolean> {
   const next = { ...current };
   if (previous) delete next[previous];
   next[path] = true;
-  await chat.update(key, next, vscode.ConfigurationTarget.Global);
+  return next;
 }
 
 // Skills install relative to the skills root, keeping each skill's unique

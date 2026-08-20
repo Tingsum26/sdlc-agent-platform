@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { EpicSummary } from "../api/workflowClient.js";
-import { toViewState, type Freshness } from "./viewState.js";
+import { retainLastKnownData, toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
 import type { EpicSelection, ViewStateWithFreshness, WorkflowViewsClient } from "./types.js";
 
@@ -22,7 +22,7 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem>, v
       this.state = toViewState({ kind: "data", data: epics, at: Date.now() });
       if (!this.selection.selectedEpicId() && epics[0]) this.selection.select(epics[0].epicId);
     } catch (error) {
-      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+      this.state = retainLastKnownData(this.state, error);
     }
     this.changed.fire();
   }
@@ -31,7 +31,9 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem>, v
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     if (this.state.data.length === 0) return [emptyItem("No epics")];
-    return this.state.data.map((epic) => this.epicItem(epic, this.state.freshness));
+    const rows = this.state.data.map((epic) => this.epicItem(epic, this.state.freshness));
+    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
+    return rows;
   }
 
   private epicItem(epic: EpicSummary, freshness: Freshness): vscode.TreeItem {

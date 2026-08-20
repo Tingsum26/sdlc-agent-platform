@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { toViewState, type Freshness } from "./viewState.js";
+import { retainLastKnownData, toViewState, type Freshness } from "./viewState.js";
 import { commandItem, emptyItem, errorItem, loadingItem, safeMessage } from "./treeItems.js";
 import { INSTALLED_BUNDLES_KEY, type InstalledBundle, type KeyValueStore, type ViewStateWithFreshness } from "./types.js";
 
@@ -21,7 +21,7 @@ export class CustomizationProvider implements vscode.TreeDataProvider<vscode.Tre
       const bundles = this.store.get<InstalledBundle[]>(INSTALLED_BUNDLES_KEY, []);
       this.state = toViewState({ kind: "data", data: bundles, at: Date.now() });
     } catch (error) {
-      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+      this.state = retainLastKnownData(this.state, error);
     }
     this.changed.fire();
   }
@@ -30,6 +30,7 @@ export class CustomizationProvider implements vscode.TreeDataProvider<vscode.Tre
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     const rows: vscode.TreeItem[] = [];
+    if (this.state.warning) rows.push(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
     if (this.state.data.length === 0) rows.push(emptyItem("No installed bundles"));
     else rows.push(...this.state.data.map((bundle) => this.bundleItem(bundle, this.state.freshness)));
     rows.push(

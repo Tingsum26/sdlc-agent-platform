@@ -62,6 +62,26 @@ class WorkflowApiIT {
     }
 
     @Test
+    void repositoryIdentitySeparatesSameTicketCommitAndTypeWhileLegacyLookupStaysInScope() throws Exception {
+        tasks.createTask("TASK-LEGACY-SCOPED", TaskType.REQUIREMENT_ANALYSIS,
+                new WorkflowScope("LEGACY-SCOPED", "REPO_A", "same-ref"),
+                "ticket:LEGACY-SCOPED:same-ref", "PRINCIPAL-EMP-100", "legacy-seed");
+
+        mvc.perform(post("/api/v1/workflows/from-ticket").header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"LEGACY-SCOPED\",\"repositoryAlias\":\"REPO_A\",\"targetCommit\":\"same-ref\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.taskId").value("TASK-LEGACY-SCOPED"));
+
+        String repoB = mvc.perform(post("/api/v1/workflows/from-ticket").header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"LEGACY-SCOPED\",\"repositoryAlias\":\"REPO_B\",\"targetCommit\":\"same-ref\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.scope.repositoryAlias").value("REPO_B"))
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(new com.fasterxml.jackson.databind.ObjectMapper().readTree(repoB)
+                .path("taskId").asText()).isNotEqualTo("TASK-LEGACY-SCOPED");
+    }
+
+    @Test
     void createsAndListsAWorkflowFromAFictionalTicket() throws Exception {
         String created = mvc.perform(post("/api/v1/workflows/from-ticket")
                         .header("X-Demo-User", "developer-1")

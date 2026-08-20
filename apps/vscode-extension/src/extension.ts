@@ -118,8 +118,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
 
-  const poller = new TaskPoller(refresh, () => vscode.window.state.focused,
-    () => Boolean(config().get<string>("demoActorId")), {
+  const poller = new TaskPoller(refresh, () => vscode.window.state.focused, {
       foregroundMs: config().get<number>("foregroundPollSeconds", 60) * 1000,
       backgroundMs: config().get<number>("backgroundPollSeconds", 300) * 1000,
     });

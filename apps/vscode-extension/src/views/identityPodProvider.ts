@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { EnterpriseIdentity, PodMember } from "../api/workflowClient.js";
-import { toViewState, type Freshness } from "./viewState.js";
+import { retainLastKnownData, toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage } from "./treeItems.js";
 import { ACCOUNT_OPENING_JOURNEY, type ViewStateWithFreshness, type WorkflowViewsClient } from "./types.js";
 
@@ -30,7 +30,7 @@ export class IdentityPodProvider implements vscode.TreeDataProvider<vscode.TreeI
       ]);
       this.state = toViewState({ kind: "data", data: { identity, members }, at: Date.now() });
     } catch (error) {
-      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+      this.state = retainLastKnownData(this.state, error);
     }
     this.changed.fire();
   }
@@ -40,6 +40,7 @@ export class IdentityPodProvider implements vscode.TreeDataProvider<vscode.TreeI
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     const { identity, members } = this.state.data;
     const rows = [this.identityItem(identity, this.state.freshness)];
+    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
     rows.push(...members.map((member) => this.memberItem(member, this.state.freshness)));
     if (members.length === 0) rows.push(emptyItem("No pod members"));
     return rows;

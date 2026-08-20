@@ -55,13 +55,12 @@ public class WorkflowTaskController {
         String taskId = "TASK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         WorkflowScope scope = new WorkflowScope(body.ticketId(), body.repositoryAlias(), body.targetCommit());
         TaskType type = body.type() == null ? TaskType.REQUIREMENT_ANALYSIS : body.type();
-        // Requirement analysis was the only legacy stage. An omitted type and an explicit
-        // REQUIREMENT_ANALYSIS deliberately share its original idempotency key.
-        String idempotencyKey = "ticket:" + body.ticketId() + ":" + body.targetCommit();
-        if (type != TaskType.REQUIREMENT_ANALYSIS) {
-            idempotencyKey += ":" + type;
-        }
-        WorkflowTask task = tasks.createTask(taskId, type, scope, idempotencyKey,
+        String idempotencyKey = "ticket:" + body.ticketId() + ":" + body.repositoryAlias()
+                + ":" + body.targetCommit() + ":" + type;
+        String compatibleLegacyKey = type == TaskType.REQUIREMENT_ANALYSIS
+                ? "ticket:" + body.ticketId() + ":" + body.targetCommit()
+                : null;
+        WorkflowTask task = tasks.createTask(taskId, type, scope, idempotencyKey, compatibleLegacyKey,
                 user.actorId(), CorrelationIdFilter.from(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowTaskResponse.from(task));
     }

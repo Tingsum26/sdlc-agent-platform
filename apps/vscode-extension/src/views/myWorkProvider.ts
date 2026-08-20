@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { WorkflowTask } from "../api/workflowClient.js";
-import { toViewState, type Freshness } from "./viewState.js";
+import { retainLastKnownData, toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
 import type { ViewStateWithFreshness, WorkflowViewsClient } from "./types.js";
 
@@ -23,7 +23,7 @@ export class MyWorkProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
         .filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status));
       this.state = toViewState({ kind: "data", data: tasks, at: Date.now() });
     } catch (error) {
-      this.state = toViewState({ kind: "error", message: safeMessage(error) });
+      this.state = retainLastKnownData(this.state, error);
     }
     this.changed.fire();
   }
@@ -32,7 +32,9 @@ export class MyWorkProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     if (this.state.data.length === 0) return [emptyItem("No actionable tasks")];
-    return this.state.data.map((task) => this.taskItem(task, this.state.freshness));
+    const rows = this.state.data.map((task) => this.taskItem(task, this.state.freshness));
+    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
+    return rows;
   }
 
   private taskItem(task: WorkflowTask, freshness: Freshness): vscode.TreeItem {

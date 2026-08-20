@@ -7,11 +7,11 @@ import type {
   TicketSummary,
   WorkflowTask,
 } from "../api/workflowClient.js";
-import type { Freshness, ViewState } from "./viewState.js";
+import type { FreshViewState } from "./viewState.js";
 import type * as vscode from "vscode";
 
 /** A ViewState plus the freshness badge computed by toViewState. */
-export type ViewStateWithFreshness<T> = ViewState<T> & { freshness: Freshness };
+export type ViewStateWithFreshness<T> = FreshViewState<T>;
 
 /**
  * Narrow client surface the workbench views need. The concrete WorkflowClient

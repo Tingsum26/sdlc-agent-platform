@@ -8,7 +8,6 @@ export class TaskPoller {
   constructor(
     private readonly refresh: () => Promise<void>,
     private readonly isForeground: () => boolean,
-    private readonly isSignedIn: () => boolean,
     private readonly intervals: PollIntervals,
   ) {}
 
@@ -25,7 +24,7 @@ export class TaskPoller {
   }
 
   async onFocus(): Promise<void> {
-    if (!this.running || !this.isSignedIn()) return;
+    if (!this.running) return;
     if (this.timer) clearTimeout(this.timer);
     await this.tick();
   }
@@ -37,10 +36,6 @@ export class TaskPoller {
 
   private async tick(): Promise<void> {
     if (!this.running) return;
-    if (!this.isSignedIn()) {
-      this.schedule(this.intervals.backgroundMs);
-      return;
-    }
     try {
       await this.refresh();
       this.failures = 0;

@@ -20,6 +20,8 @@ const sourceCopyMutation = vi.hoisted(() => ({
   triggered: false,
   renameFailure: undefined as Error | undefined,
   renameCalls: 0,
+  failConfigWriteAt: 0,
+  configWriteCalls: 0,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -56,6 +58,11 @@ vi.mock("vscode", () => ({
         return configState.has(stateKey) ? configState.get(stateKey) : fallback;
       }),
       update: vi.fn((key: string, value: unknown) => {
+        sourceCopyMutation.configWriteCalls++;
+        if (sourceCopyMutation.failConfigWriteAt === sourceCopyMutation.configWriteCalls) {
+          sourceCopyMutation.failConfigWriteAt = 0;
+          return Promise.reject(new Error("forced configuration write failure"));
+        }
         configUpdates.push({ section, key, value });
         configState.set(`${section ?? ""}|${key}`, value);
         return Promise.resolve();
@@ -76,17 +83,24 @@ beforeEach(() => {
   sourceCopyMutation.triggered = false;
   sourceCopyMutation.renameFailure = undefined;
   sourceCopyMutation.renameCalls = 0;
+  sourceCopyMutation.failConfigWriteAt = 0;
+  sourceCopyMutation.configWriteCalls = 0;
 });
 
 // The extension context's globalState must actually retain written values so a
 // multi-step install → install → rollback scenario behaves like the real host.
-function createStatefulContext(storageRoot: string): vscode.ExtensionContext {
+function createStatefulContext(storageRoot: string, failStateWriteAt = 0): vscode.ExtensionContext {
   const store = new Map<string, unknown>();
+  let stateWrites = 0;
   return {
     globalStorageUri: { fsPath: storageRoot },
     globalState: {
       get: vi.fn((key: string, fallback: unknown) => (store.has(key) ? store.get(key) : fallback)),
-      update: vi.fn(async (key: string, value: unknown) => { store.set(key, value); }),
+      update: vi.fn(async (key: string, value: unknown) => {
+        stateWrites++;
+        if (stateWrites === failStateWriteAt) throw new Error("forced global state write failure");
+        store.set(key, value);
+      }),
     },
   } as unknown as vscode.ExtensionContext;
 }
@@ -233,6 +247,40 @@ describe("customization bundle installer", () => {
     expect(command).toContain(JSON.stringify(join(root, "hooks", "run-hook.mjs")));
     expect(command).toContain("verify-stage-output");
     expect(command).not.toMatch(/[>&|;]/);
+  });
+
+  it("uses Electron's Node mode when the extension host executable is Code", () => {
+    const command = hookCommand("C:\\bundle", "verify-stage-output", "C:\\Program Files\\Microsoft VS Code\\Code.exe");
+    expect(command).toContain(JSON.stringify("C:\\Program Files\\Microsoft VS Code\\Code.exe"));
+    expect(command).toContain("--ms-enable-electron-run-as-node");
+  });
+
+  it("compensates every partial configuration and global-state activation write", async () => {
+    for (let failure = 1; failure <= 7; failure++) {
+      configState.clear();
+      configState.set("chat|agentFilesLocations", { "C:\\existing-agent": true });
+      configState.set("chat|agentSkillsLocations", { "C:\\existing-skill": true });
+      configState.set("chat|instructionsFilesLocations", { "C:\\existing-instruction": true });
+      configState.set("chat.agent|hooks", { Stop: "user-hook" });
+      sourceCopyMutation.configWriteCalls = 0;
+      sourceCopyMutation.failConfigWriteAt = failure <= 4 ? failure : 0;
+      const sourceRoot = createSourceBundle(`transaction-${failure}`, [{ event: "PreToolUse", action: "guard" }]);
+      const storageRoot = mkdtempSync(join(tmpdir(), `sdlc-transaction-${failure}-`));
+      vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+      const stateFailure = failure > 4 ? failure - 4 : 0;
+      const context = createStatefulContext(storageRoot, stateFailure);
+
+      await expect(installCustomizationBundle(context)).rejects.toThrow(/forced/);
+
+      expect(configState.get("chat|agentFilesLocations")).toEqual({ "C:\\existing-agent": true });
+      expect(configState.get("chat|agentSkillsLocations")).toEqual({ "C:\\existing-skill": true });
+      expect(configState.get("chat|instructionsFilesLocations")).toEqual({ "C:\\existing-instruction": true });
+      expect(configState.get("chat.agent|hooks")).toEqual({ Stop: "user-hook" });
+      expect(context.globalState.get("sdlc.activeCustomizationLocations", undefined)).toBeUndefined();
+      expect(context.globalState.get("sdlc.activeCustomizationHookSettings", undefined)).toBeUndefined();
+      expect(context.globalState.get("sdlc.installedCustomizationBundles", undefined)).toBeUndefined();
+      expect(existsSync(join(storageRoot, "customizations", `transaction-${failure}`))).toBe(false);
+    }
   });
 
   it("installs hooks and profiles into the bundle and activates hook settings", async () => {

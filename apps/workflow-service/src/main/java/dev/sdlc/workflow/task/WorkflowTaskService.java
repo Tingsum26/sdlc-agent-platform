@@ -32,14 +32,31 @@ public final class WorkflowTaskService {
             String idempotencyKey,
             String actorId,
             String correlationId) {
-        return tasks.findByIdempotencyKey(idempotencyKey).orElseGet(() -> {
-            Instant now = clock.instant();
-            WorkflowTask task = new WorkflowTask(taskId, type, TaskStatus.WAITING_FOR_LOCAL_COPILOT,
-                    scope, idempotencyKey, null, null, 0, now, now);
-            tasks.save(task);
-            audit(task, actorId, "TASK_CREATED", null, task.status(), correlationId);
-            return task;
-        });
+        return createTask(taskId, type, scope, idempotencyKey, null, actorId, correlationId);
+    }
+
+    public synchronized WorkflowTask createTask(
+            String taskId,
+            TaskType type,
+            WorkflowScope scope,
+            String idempotencyKey,
+            String compatibleLegacyKey,
+            String actorId,
+            String correlationId) {
+        WorkflowTask existing = tasks.findByIdempotencyKey(idempotencyKey).orElse(null);
+        if (existing == null && compatibleLegacyKey != null) {
+            existing = tasks.findByIdempotencyKey(compatibleLegacyKey)
+                    .filter(task -> task.type() == type
+                            && task.scope().repositoryAlias().equals(scope.repositoryAlias()))
+                    .orElse(null);
+        }
+        if (existing != null) return existing;
+        Instant now = clock.instant();
+        WorkflowTask task = new WorkflowTask(taskId, type, TaskStatus.WAITING_FOR_LOCAL_COPILOT,
+                scope, idempotencyKey, null, null, 0, now, now);
+        tasks.save(task);
+        audit(task, actorId, "TASK_CREATED", null, task.status(), correlationId);
+        return task;
     }
 
     public synchronized WorkflowTask claimTask(

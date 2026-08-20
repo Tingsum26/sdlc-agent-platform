@@ -15,6 +15,5 @@ enforcement so an unregistered marker fails the build.
 | INTERNAL-CI-001 | workflow-service | `config/*RuntimeConfiguration.java`, `api/EpicController.java` | Route CI status to the real Jenkins adapter | Sanitized CI status log | Revert to the mock CI adapter |
 | INTERNAL-SPLUNK-001 | workflow-service | `config/*RuntimeConfiguration.java` | Point the Splunk audit publisher at the real HEC endpoint | Sanitized HEC event log | Revert to the fake transport |
 | INTERNAL-JOURNEY-001 | workflow-service | `api/JourneyController.java`, `config/*RuntimeConfiguration.java` | Feed real repository observation events (merge hooks) into the freshness engine and persist observations in MongoDB | Sanitized observation log | Revert to in-memory observations |
-| INTERNAL-HOOKS-001 | vscode-extension | `customization/bundleInstaller.ts` | Confirm company Copilot policy allows VS Code agent hooks; replace the local echo scripts with the approved deterministic hook commands | Sanitized hook activation log | Disable hook activation (bundle still installs) |
-
+| INTERNAL-HOOKS-001 | vscode-extension | `customization/bundleInstaller.ts` | Confirm company Copilot policy allows VS Code agent hooks; replace the local Node no-op actions with approved deterministic hook commands | Sanitized hook activation log | Disable hook activation (bundle still installs) |
 
