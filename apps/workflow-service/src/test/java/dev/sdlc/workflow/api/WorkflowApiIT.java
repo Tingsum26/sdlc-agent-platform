@@ -146,4 +146,19 @@ class WorkflowApiIT {
                                 """))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void rejectsASimulatedActorCreatingARealWorkflowTask() throws Exception {
+        mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "SIMULATED-UNTRUSTED-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ticketId":"DEMO-REAL-BY-SIMULATED",
+                                  "repositoryAlias":"REPO_A",
+                                  "targetCommit":"3123456789abcdef0123456789abcdef01234567"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
 }

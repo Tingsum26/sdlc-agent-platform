@@ -112,6 +112,23 @@ class TicketWorkflowServiceTest {
                 incompatibleActor, "corr-release"));
     }
 
+    @ParameterizedTest
+    @CsvSource({ "REAL,SIMULATED-M7-RUNNER,EMP-100", "SIMULATED_PASS,EMP-100,SIMULATED-M7-RUNNER" })
+    void rejectsActorClassificationMismatchForMerge(
+            EvidenceClassification classification, String incompatibleActor, String matchingActor) {
+        Fixture fixture = fixture();
+        fixture.tickets().create("EPIC-M2-1", "M2-ACTOR-MERGE", Channel.API, classification,
+                matchingActor, "corr-create");
+        long version = advance(fixture.tickets(), "M2-ACTOR-MERGE", 0, matchingActor,
+                TicketDeliveryStatus.IN_ANALYSIS, TicketDeliveryStatus.WAITING_FOR_APPROVAL,
+                TicketDeliveryStatus.IN_DEVELOPMENT, TicketDeliveryStatus.PR_OPEN,
+                TicketDeliveryStatus.CI_PASSED);
+
+        assertThrows(WorkflowConflictException.class, () -> fixture.tickets().transition(
+                "M2-ACTOR-MERGE", version, TicketDeliveryStatus.MERGED,
+                incompatibleActor, "corr-merge"));
+    }
+
     @Test
     void rejectsInvalidTransitions() {
         Fixture fixture = fixture();

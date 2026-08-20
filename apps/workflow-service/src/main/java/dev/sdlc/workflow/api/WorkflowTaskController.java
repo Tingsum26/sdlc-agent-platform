@@ -126,11 +126,9 @@ public class WorkflowTaskController {
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
         WorkflowTask task = tasks.getTask(taskId);
+        requireClassificationActor(task.evidenceClassification(), user);
         requireMatchingPassClassification(task.evidenceClassification(), body.state() == CiResult.PASSED,
                 body.state() == CiResult.SIMULATED_PASS);
-        if (body.state() == CiResult.SIMULATED_PASS && !isSimulatedActor(user)) {
-            throw new IllegalArgumentException("SIMULATED_PASS requires a simulated actor");
-        }
         if (body.state() != CiResult.PASSED && body.state() != CiResult.SIMULATED_PASS) {
             return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_CI,
                     TaskStatus.BLOCKED, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
@@ -146,6 +144,7 @@ public class WorkflowTaskController {
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
         WorkflowTask task = tasks.getTask(taskId);
+        requireClassificationActor(task.evidenceClassification(), user);
         requireMatchingPassClassification(task.evidenceClassification(), body.result() == ManualResult.PASS,
                 body.result() == ManualResult.SIMULATED_PASS);
         validateManualResult(body, user);
@@ -163,6 +162,7 @@ public class WorkflowTaskController {
             @Valid @RequestBody VersionRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
+        requireClassificationActor(tasks.getTask(taskId).evidenceClassification(), user);
         return WorkflowTaskResponse.from(tasks.completeLegacyApprovalOnlyTask(
                 taskId, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
     }
@@ -178,6 +178,7 @@ public class WorkflowTaskController {
             @Valid @RequestBody ApprovalRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
+        requireClassificationActor(tasks.getTask(body.taskId()).evidenceClassification(), user);
         return WorkflowTaskResponse.from(approvals.approve(body.taskId(), body.artifactId(), body.artifactVersion(),
                 body.expectedTaskVersion(), user.actorId(), CorrelationIdFilter.from(request)).task());
     }
@@ -261,8 +262,9 @@ public class WorkflowTaskController {
     }
 
     private static void requireClassificationActor(EvidenceClassification classification, CurrentUser user) {
-        if (classification == EvidenceClassification.SIMULATED_PASS && !isSimulatedActor(user)) {
-            throw new IllegalArgumentException("SIMULATED_PASS classification requires a simulated actor");
+        boolean simulatedClassification = classification == EvidenceClassification.SIMULATED_PASS;
+        if (simulatedClassification != isSimulatedActor(user)) {
+            throw new IllegalArgumentException("Actor must match the workflow task evidence classification");
         }
     }
 

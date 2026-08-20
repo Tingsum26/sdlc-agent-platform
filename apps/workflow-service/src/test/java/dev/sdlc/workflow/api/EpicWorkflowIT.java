@@ -67,6 +67,13 @@ class EpicWorkflowIT {
                                 "\"targetCommit\":\"standalone-ref\",\"type\":\"DESIGN\","+
                                 "\"evidenceClassification\":\"SIMULATED_PASS\"}"))
                 .andExpect(status().isBadRequest());
+
+        mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "developer-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"SIM-DERIVED-1\",\"repositoryAlias\":\"REPO_C\","+
+                                "\"targetCommit\":\"normal-on-simulated-ref\",\"type\":\"DESIGN\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

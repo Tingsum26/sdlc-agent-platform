@@ -7,6 +7,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.sdlc.workflow.artifact.ArtifactSection;
+import dev.sdlc.workflow.artifact.ArtifactService;
+import dev.sdlc.workflow.artifact.ArtifactType;
 import dev.sdlc.workflow.evidence.EvidenceClassification;
 import dev.sdlc.workflow.task.TaskType;
 import dev.sdlc.workflow.task.TaskStatus;
@@ -16,6 +19,7 @@ import dev.sdlc.workflow.task.WorkflowTaskRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class WorkflowLifecycleIT {
     @Autowired MockMvc mvc;
     @Autowired WorkflowTaskRepository taskRepository;
+    @Autowired ArtifactService artifacts;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
@@ -213,6 +218,96 @@ class WorkflowLifecycleIT {
                     {"expectedVersion":5,"result":"SIMULATED_PASS","actorRole":"SIMULATED_RUNNER","actualResult":"QA passed","evidenceOrWaiver":"fake evidence"}
                     """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "REAL,SIMULATED-M7-RUNNER,PASSED",
+            "SIMULATED_PASS,developer-1,SIMULATED_PASS"
+    })
+    void rejectsActorClassificationMismatchForCiPass(
+            EvidenceClassification classification, String actorId, String result) throws Exception {
+        String taskId = "TASK-CI-ACTOR-" + classification;
+        seedTask(taskId, TaskType.IMPLEMENTATION, TaskStatus.WAITING_FOR_CI, classification, 4);
+
+        mvc.perform(post("/api/v1/tasks/{id}/ci", taskId)
+                        .header("X-Demo-User", actorId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":4,\"state\":\"%s\",\"buildFingerprint\":\"actor-check\"}"
+                                .formatted(result)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "REAL,SIMULATED-M7-RUNNER,PASS,QA",
+            "SIMULATED_PASS,developer-1,SIMULATED_PASS,SIMULATED_RUNNER"
+    })
+    void rejectsActorClassificationMismatchForManualPass(
+            EvidenceClassification classification, String actorId, String result, String actorRole) throws Exception {
+        String taskId = "TASK-MANUAL-ACTOR-" + classification;
+        seedTask(taskId, TaskType.MANUAL_E2E, TaskStatus.WAITING_FOR_MANUAL_E2E, classification, 5);
+        String evidence = result.equals("PASS")
+                ? ",\"caseId\":\"E2E-ACTOR\",\"executedAt\":\"2026-08-16T08:00:00Z\","
+                        + "\"buildFingerprint\":\"actor-check\",\"actualResult\":\"passed\","
+                        + "\"evidenceOrWaiver\":\"EVIDENCE-ACTOR\""
+                : "";
+
+        mvc.perform(post("/api/v1/tasks/{id}/manual-e2e", taskId)
+                        .header("X-Demo-User", actorId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":5,\"result\":\"%s\",\"actorRole\":\"%s\"%s}"
+                                .formatted(result, actorRole, evidence)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "REAL,SIMULATED-M7-RUNNER",
+            "SIMULATED_PASS,reviewer-1"
+    })
+    void rejectsActorClassificationMismatchForApproval(
+            EvidenceClassification classification, String actorId) throws Exception {
+        String suffix = classification.name();
+        String taskId = "TASK-APPROVAL-ACTOR-" + suffix;
+        String artifactId = "ART-APPROVAL-ACTOR-" + suffix;
+        seedTask(taskId, TaskType.DESIGN, TaskStatus.WAITING_FOR_APPROVAL, classification, 3);
+        artifacts.create(artifactId, taskId, ArtifactType.DESIGN_REPORT,
+                java.util.List.of(new ArtifactSection("summary", "Summary", "Actor boundary")),
+                "seed-user", null);
+
+        mvc.perform(post("/api/v1/approvals")
+                        .header("X-Demo-User", actorId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskId\":\"%s\",\"artifactId\":\"%s\","
+                                .formatted(taskId, artifactId)
+                                + "\"artifactVersion\":1,\"expectedTaskVersion\":3}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "REAL,SIMULATED-M7-RUNNER",
+            "SIMULATED_PASS,migration-operator"
+    })
+    void rejectsActorClassificationMismatchForCompatibilityCompletion(
+            EvidenceClassification classification, String actorId) throws Exception {
+        String taskId = "TASK-COMPAT-ACTOR-" + classification;
+        seedTask(taskId, TaskType.DESIGN, TaskStatus.WAITING_FOR_MANUAL_E2E, classification, 5);
+
+        mvc.perform(post("/api/v1/tasks/{id}/compatibility-complete", taskId)
+                        .header("X-Demo-User", actorId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":5}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    private void seedTask(String taskId, TaskType type, TaskStatus status,
+            EvidenceClassification classification, long version) {
+        Instant now = Instant.parse("2026-08-16T00:00:00Z");
+        taskRepository.save(new WorkflowTask(taskId, type, status, classification,
+                new WorkflowScope(taskId, "REPO_A", "actor-check-ref"),
+                "actor-check-" + taskId, "seed-user", null, version, now, now));
     }
 
     private JsonNode json(String value) throws Exception { return mapper.readTree(value); }

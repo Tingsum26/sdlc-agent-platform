@@ -153,6 +153,7 @@ public final class TicketWorkflowService {
 
     private static void requireEvidenceActor(TicketWorkflow ticket, TicketDeliveryStatus target, String actorId) {
         if (target != TicketDeliveryStatus.CI_PASSED
+                && target != TicketDeliveryStatus.MERGED
                 && target != TicketDeliveryStatus.RELEASED
                 && target != TicketDeliveryStatus.FLAG_ENABLED
                 && target != TicketDeliveryStatus.E2E_VERIFIED) {
