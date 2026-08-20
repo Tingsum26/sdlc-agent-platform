@@ -48,11 +48,11 @@ export class ScrumMasterProvider implements vscode.TreeDataProvider<vscode.TreeI
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
     if (!this.state.data) return [emptyItem("Select an epic in Epic View")];
+    const warning = this.state.warning ? [errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`)] : [];
     const tickets = this.state.data.tickets;
-    if (tickets.length === 0) return [emptyItem("No next actions")];
+    if (tickets.length === 0) return [...warning, emptyItem("No next actions")];
     const rows = tickets.map((entry) => this.ticketItem(entry, this.state.freshness));
-    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
-    return rows;
+    return [...warning, ...rows];
   }
 
   private ticketItem(entry: EpicResume["tickets"][number], freshness: Freshness): vscode.TreeItem {

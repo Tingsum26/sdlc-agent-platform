@@ -30,10 +30,10 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem>, v
   getChildren(): vscode.TreeItem[] {
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
-    if (this.state.data.length === 0) return [emptyItem("No epics")];
+    const warning = this.state.warning ? [errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`)] : [];
+    if (this.state.data.length === 0) return [...warning, emptyItem("No epics")];
     const rows = this.state.data.map((epic) => this.epicItem(epic, this.state.freshness));
-    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
-    return rows;
+    return [...warning, ...rows];
   }
 
   private epicItem(epic: EpicSummary, freshness: Freshness): vscode.TreeItem {

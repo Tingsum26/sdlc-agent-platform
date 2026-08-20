@@ -63,6 +63,28 @@ describe("view providers", () => {
     vi.useRealTimers();
   });
 
+  it("renders refresh warnings before empty states after an empty response is followed by a failure", async () => {
+    const epic = { epicId: "EPIC-EMPTY", title: "Empty", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 1 };
+    const selection = new EpicSelectionStore();
+    selection.select(epic.epicId);
+    const myWork = new MyWorkProvider({ listTasks: vi.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("offline")) } as never);
+    const epicView = new EpicProvider({ listEpics: vi.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("offline")) } as never, new EpicSelectionStore());
+    const scrum = new ScrumMasterProvider({ getEpicResume: vi.fn().mockResolvedValueOnce({ epic, tickets: [], auditTrail: [] }).mockRejectedValueOnce(new Error("offline")) } as never, selection);
+    const ticket = new TicketProvider({ listTickets: vi.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("offline")) } as never, selection);
+
+    const emptyLabels = ["No actionable tasks", "No epics", "No next actions", "No tickets"];
+    for (const [index, provider] of [myWork, epicView, scrum, ticket].entries()) {
+      await provider.refresh();
+      await provider.refresh();
+      const items = provider.getChildren() as vscode.TreeItem[];
+      expect(String(items[0]!.label)).toContain("Last refresh failed; showing LIVE data: offline");
+      expect(items[0]!.accessibilityInformation!.label).toContain("Last refresh failed; showing LIVE data: offline");
+      expect(items).toHaveLength(2);
+      expect(String(items[1]!.label)).toBe(emptyLabels[index]);
+      expect(items[1]!.accessibilityInformation!.label).toContain("No data. Refresh with SDLC: Refresh Tasks.");
+    }
+  });
+
   it("ticket and scrum views ask the user to select an epic instead of querying a fixture id", async () => {
     const selection = new EpicSelectionStore();
     const client = { listTickets: vi.fn(), getEpicResume: vi.fn() };

@@ -31,10 +31,10 @@ export class MyWorkProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
   getChildren(): vscode.TreeItem[] {
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
-    if (this.state.data.length === 0) return [emptyItem("No actionable tasks")];
+    const warning = this.state.warning ? [errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`)] : [];
+    if (this.state.data.length === 0) return [...warning, emptyItem("No actionable tasks")];
     const rows = this.state.data.map((task) => this.taskItem(task, this.state.freshness));
-    if (this.state.warning) rows.unshift(errorItem(`Last refresh failed; showing ${this.state.freshness} data: ${this.state.warning}`));
-    return rows;
+    return [...warning, ...rows];
   }
 
   private taskItem(task: WorkflowTask, freshness: Freshness): vscode.TreeItem {
