@@ -3,6 +3,7 @@ package dev.sdlc.workflow.task;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class WorkflowTaskServiceTest {
 
@@ -43,6 +45,39 @@ class WorkflowTaskServiceTest {
         assertThat(first.status()).isEqualTo(TaskStatus.WAITING_FOR_LOCAL_COPILOT);
         assertThat(tasks.findAll()).hasSize(1);
         assertThat(auditEvents.findByTaskId(first.taskId())).extracting(AuditEvent::action).containsExactly("TASK_CREATED");
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "REAL,SIMULATED_PASS", "SIMULATED_PASS,REAL" })
+    void doesNotReuseALegacyTaskAcrossEvidenceClassifications(
+            EvidenceClassification existingClassification,
+            EvidenceClassification requestedClassification) {
+        WorkflowScope scope = new WorkflowScope("DEMO-CLASS", "REPO_A", "same-ref");
+        String legacyKey = "ticket:DEMO-CLASS:same-ref";
+        service.createTask("TASK-LEGACY", TaskType.REQUIREMENT_ANALYSIS, scope, legacyKey, null,
+                existingClassification, "seed", "corr-seed");
+
+        WorkflowTask created = service.createTask("TASK-CURRENT", TaskType.REQUIREMENT_ANALYSIS, scope,
+                "ticket:DEMO-CLASS:REPO_A:same-ref:REQUIREMENT_ANALYSIS:" + requestedClassification,
+                legacyKey, requestedClassification, "requester", "corr-current");
+
+        assertThat(created.taskId()).isEqualTo("TASK-CURRENT");
+        assertThat(created.evidenceClassification()).isEqualTo(requestedClassification);
+        assertThat(tasks.findAll()).hasSize(2);
+    }
+
+    @Test
+    void doesNotReuseALegacyTaskOutsideTheExactScope() {
+        String legacyKey = "ticket:DEMO-SCOPE:legacy-ref";
+        service.createTask("TASK-LEGACY", TaskType.REQUIREMENT_ANALYSIS,
+                new WorkflowScope("DEMO-SCOPE", "REPO_A", "legacy-ref"), legacyKey, null,
+                EvidenceClassification.REAL, "seed", "corr-seed");
+
+        WorkflowTask created = service.createTask("TASK-NEW-SCOPE", TaskType.REQUIREMENT_ANALYSIS,
+                new WorkflowScope("DEMO-SCOPE", "REPO_A", "different-ref"), "new-key", legacyKey,
+                EvidenceClassification.REAL, "requester", "corr-current");
+
+        assertThat(created.taskId()).isEqualTo("TASK-NEW-SCOPE");
     }
 
     @Test

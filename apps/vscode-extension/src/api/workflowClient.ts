@@ -4,7 +4,8 @@ export interface WorkflowTask {
   taskId: string;
   type: string;
   status: string;
-  evidenceClassification: EvidenceClassification;
+  /** Optional for older v1 responses; views default a missing value to REAL. */
+  evidenceClassification?: EvidenceClassification;
   scope: { ticketId: string; repositoryAlias: string; targetCommit: string };
   version: number;
   updatedAt: string;
@@ -17,9 +18,9 @@ export interface IntegrationDiagnostic { provider: string; status: string; obser
 export interface NextInternalValidation { complete: boolean; provider?: string; status?: string; instruction?: string }
 
 export interface EpicSummary { epicId: string; title: string; journeyId: string; status: string; version: number }
-export interface TicketSummary { ticketId: string; epicId: string; channel: string; status: string; evidenceClassification: EvidenceClassification; pendingChangeConfirmation: boolean; version: number }
-export interface RepoTaskSummary { repoTaskId: string; ticketId: string; repositoryAlias: string; status: string; evidenceClassification: EvidenceClassification; version: number }
-export interface EpicResume { epic: EpicSummary; tickets: Array<{ ticket: TicketSummary; openTasks: WorkflowTask[]; nextAction: string }>; auditTrail: Array<{ action: string; actorId: string; occurredAt: string; evidenceClassification: EvidenceClassification }> }
+export interface TicketSummary { ticketId: string; epicId: string; channel: string; status: string; evidenceClassification?: EvidenceClassification; pendingChangeConfirmation: boolean; version: number }
+export interface RepoTaskSummary { repoTaskId: string; ticketId: string; repositoryAlias: string; status: string; evidenceClassification?: EvidenceClassification; version: number }
+export interface EpicResume { epic: EpicSummary; tickets: Array<{ ticket: TicketSummary; openTasks: WorkflowTask[]; nextAction: string }>; auditTrail: Array<{ action: string; actorId: string; occurredAt: string; evidenceClassification?: EvidenceClassification }> }
 export interface PodMember { principalId: string; employeeId: string; displayLabel: string; role: string; onboardingStatus: string }
 export interface JourneyFreshnessMap { [alias: string]: string }
 

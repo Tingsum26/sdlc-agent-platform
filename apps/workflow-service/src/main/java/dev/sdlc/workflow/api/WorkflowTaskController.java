@@ -13,6 +13,7 @@ import dev.sdlc.workflow.task.TaskType;
 import dev.sdlc.workflow.task.WorkflowScope;
 import dev.sdlc.workflow.task.WorkflowTask;
 import dev.sdlc.workflow.task.WorkflowTaskService;
+import dev.sdlc.workflow.ticket.TicketWorkflowService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -41,11 +42,14 @@ public class WorkflowTaskController {
     private final WorkflowTaskService tasks;
     private final ArtifactService artifacts;
     private final ApprovalService approvals;
+    private final TicketWorkflowService tickets;
 
-    public WorkflowTaskController(WorkflowTaskService tasks, ArtifactService artifacts, ApprovalService approvals) {
+    public WorkflowTaskController(WorkflowTaskService tasks, ArtifactService artifacts, ApprovalService approvals,
+            TicketWorkflowService tickets) {
         this.tasks = tasks;
         this.artifacts = artifacts;
         this.approvals = approvals;
+        this.tickets = tickets;
     }
 
     @PostMapping("/workflows/from-ticket")
@@ -56,15 +60,15 @@ public class WorkflowTaskController {
         String taskId = "TASK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         WorkflowScope scope = new WorkflowScope(body.ticketId(), body.repositoryAlias(), body.targetCommit());
         TaskType type = body.type() == null ? TaskType.REQUIREMENT_ANALYSIS : body.type();
-        EvidenceClassification evidenceClassification = body.evidenceClassification() == null
-                ? EvidenceClassification.REAL : body.evidenceClassification();
+        EvidenceClassification evidenceClassification = classificationFor(body.ticketId(), body.evidenceClassification());
         requireClassificationActor(evidenceClassification, user);
-        String idempotencyKey = "ticket:" + body.ticketId() + ":" + body.repositoryAlias()
+        String previousIdempotencyKey = "ticket:" + body.ticketId() + ":" + body.repositoryAlias()
                 + ":" + body.targetCommit() + ":" + type;
-        String compatibleLegacyKey = type == TaskType.REQUIREMENT_ANALYSIS
-                ? "ticket:" + body.ticketId() + ":" + body.targetCommit()
-                : null;
-        WorkflowTask task = tasks.createTask(taskId, type, scope, idempotencyKey, compatibleLegacyKey,
+        String idempotencyKey = previousIdempotencyKey + ":" + evidenceClassification;
+        List<String> compatibleLegacyKeys = type == TaskType.REQUIREMENT_ANALYSIS
+                ? List.of(previousIdempotencyKey, "ticket:" + body.ticketId() + ":" + body.targetCommit())
+                : List.of(previousIdempotencyKey);
+        WorkflowTask task = tasks.createTaskWithLegacyKeys(taskId, type, scope, idempotencyKey, compatibleLegacyKeys,
                 evidenceClassification, user.actorId(), CorrelationIdFilter.from(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowTaskResponse.from(task));
     }
@@ -260,6 +264,20 @@ public class WorkflowTaskController {
         if (classification == EvidenceClassification.SIMULATED_PASS && !isSimulatedActor(user)) {
             throw new IllegalArgumentException("SIMULATED_PASS classification requires a simulated actor");
         }
+    }
+
+    private EvidenceClassification classificationFor(String ticketId, EvidenceClassification requested) {
+        var ticket = tickets.findTicket(ticketId).orElse(null);
+        if (ticket == null) {
+            if (requested == EvidenceClassification.SIMULATED_PASS) {
+                throw new IllegalArgumentException("SIMULATED_PASS tasks require an existing classified ticket");
+            }
+            return EvidenceClassification.REAL;
+        }
+        if (requested != null && requested != ticket.evidenceClassification()) {
+            throw new IllegalArgumentException("Task evidence classification must match its ticket");
+        }
+        return ticket.evidenceClassification();
     }
 
     private static void requireMatchingPassClassification(EvidenceClassification classification,

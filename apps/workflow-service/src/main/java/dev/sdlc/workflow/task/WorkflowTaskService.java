@@ -4,9 +4,9 @@ import dev.sdlc.workflow.evidence.EvidenceClassification;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.List;
 
 public final class WorkflowTaskService {
 
@@ -57,12 +57,32 @@ public final class WorkflowTaskService {
             EvidenceClassification evidenceClassification,
             String actorId,
             String correlationId) {
+        List<String> compatibleLegacyKeys = compatibleLegacyKey == null
+                ? List.of() : List.of(compatibleLegacyKey);
+        return createTaskWithLegacyKeys(taskId, type, scope, idempotencyKey, compatibleLegacyKeys,
+                evidenceClassification, actorId, correlationId);
+    }
+
+    public synchronized WorkflowTask createTaskWithLegacyKeys(
+            String taskId,
+            TaskType type,
+            WorkflowScope scope,
+            String idempotencyKey,
+            List<String> compatibleLegacyKeys,
+            EvidenceClassification evidenceClassification,
+            String actorId,
+            String correlationId) {
         WorkflowTask existing = tasks.findByIdempotencyKey(idempotencyKey).orElse(null);
-        if (existing == null && compatibleLegacyKey != null) {
-            existing = tasks.findByIdempotencyKey(compatibleLegacyKey)
-                    .filter(task -> task.type() == type
-                            && task.scope().repositoryAlias().equals(scope.repositoryAlias()))
-                    .orElse(null);
+        if (existing != null && !sameTaskIdentity(existing, type, scope, evidenceClassification)) {
+            throw new IllegalArgumentException("Idempotency key belongs to a different task identity");
+        }
+        if (existing == null) {
+            for (String compatibleLegacyKey : compatibleLegacyKeys) {
+                existing = tasks.findByIdempotencyKey(compatibleLegacyKey)
+                        .filter(task -> sameTaskIdentity(task, type, scope, evidenceClassification))
+                        .orElse(null);
+                if (existing != null) break;
+            }
         }
         if (existing != null) return existing;
         Instant now = clock.instant();
@@ -71,6 +91,13 @@ public final class WorkflowTaskService {
         tasks.save(task);
         audit(task, actorId, "TASK_CREATED", null, task.status(), correlationId);
         return task;
+    }
+
+    private static boolean sameTaskIdentity(WorkflowTask task, TaskType type, WorkflowScope scope,
+            EvidenceClassification evidenceClassification) {
+        return task.type() == type
+                && task.scope().equals(scope)
+                && task.evidenceClassification() == evidenceClassification;
     }
 
     public synchronized WorkflowTask claimTask(

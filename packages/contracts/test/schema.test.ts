@@ -35,6 +35,11 @@ describe("workflow task schema", () => {
     expect(validator()(validTask)).toBe(true);
   });
 
+  it("accepts an old v1 task payload without evidence classification", () => {
+    const { evidenceClassification: _classification, ...oldV1Task } = validTask;
+    expect(validator()(oldV1Task)).toBe(true);
+  });
+
   it("rejects an unknown workflow status", () => {
     expect(validator()({ ...validTask, status: "AI_RUNNING_IN_CLOUD" })).toBe(false);
   });

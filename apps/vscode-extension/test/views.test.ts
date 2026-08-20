@@ -34,7 +34,7 @@ import { CustomizationProvider } from "../src/views/customizationProvider.js";
 import { McpCenterProvider } from "../src/views/mcpCenterProvider.js";
 import { EpicSelectionStore } from "../src/views/epicSelection.js";
 
-const task = { taskId: "TASK-1", type: "REQUIREMENT_ANALYSIS", status: "WAITING_FOR_LOCAL_COPILOT", evidenceClassification: "REAL", scope: { ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567" }, version: 0, updatedAt: "2026-08-18T00:00:00Z" };
+const task = { taskId: "TASK-1", type: "REQUIREMENT_ANALYSIS", status: "WAITING_FOR_LOCAL_COPILOT", scope: { ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567" }, version: 0, updatedAt: "2026-08-18T00:00:00Z" };
 
 describe("view providers", () => {
   afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
@@ -48,6 +48,15 @@ describe("view providers", () => {
     expect(items[0]!.label).toContain("DEMO-123");
     expect(items[0]!.description).toContain("SIMULATED_PASS");
     expect(items[0]!.accessibilityInformation!.label).toContain("Simulated workflow evidence");
+  });
+
+  it("my work defaults an old v1 task without classification to REAL", async () => {
+    const provider = new MyWorkProvider({ listTasks: vi.fn().mockResolvedValue([task]) } as never);
+    await provider.refresh();
+
+    const item = (provider.getChildren() as vscode.TreeItem[])[0]!;
+    expect(item.description).toContain("REAL");
+    expect(item.accessibilityInformation!.label).toContain("Non-simulated workflow record");
   });
 
   it("my work keeps last-known rows and visibly marks aged data after a failed refresh", async () => {

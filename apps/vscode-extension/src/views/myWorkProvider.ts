@@ -39,14 +39,15 @@ export class MyWorkProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
 
   private taskItem(task: WorkflowTask, freshness: Freshness): vscode.TreeItem {
     const label = `${task.scope.ticketId} · ${task.status}`;
+    const evidenceClassification = task.evidenceClassification ?? "REAL";
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = `${task.scope.repositoryAlias} · ${task.evidenceClassification} · ${freshness}`;
-    item.tooltip = `${task.taskId}\nEvidence: ${task.evidenceClassification}\nVersion ${task.version}\nUpdated ${task.updatedAt}\nFreshness: ${freshness}`;
+    item.description = `${task.scope.repositoryAlias} · ${evidenceClassification} · ${freshness}`;
+    item.tooltip = `${task.taskId}\nEvidence: ${evidenceClassification}\nVersion ${task.version}\nUpdated ${task.updatedAt}\nFreshness: ${freshness}`;
     item.iconPath = statusIcon(task.status);
     item.command = { command: "sdlc.openTask", title: "Open task", arguments: [task.taskId] };
     item.contextValue = "sdlcTask";
-    const evidenceLabel = task.evidenceClassification === "SIMULATED_PASS"
-      ? "Simulated workflow evidence" : "Real workflow evidence";
+    const evidenceLabel = evidenceClassification === "SIMULATED_PASS"
+      ? "Simulated workflow evidence" : "Non-simulated workflow record";
     item.accessibilityInformation = { label: `${label}. ${task.scope.repositoryAlias}. ${evidenceLabel}. Status ${task.status}. Freshness ${freshness}.` };
     return item;
   }

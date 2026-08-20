@@ -53,7 +53,7 @@ describe("fictional SDLC driver", () => {
         return json({ ticket: { ticketId: "M7-API-1", status: "CI_PASSED", evidenceClassification: "SIMULATED_PASS", version: 5 }, state: "PASSED", evidenceClassification: "SIMULATED_PASS" });
       }
       if (path.endsWith("/from-ticket")) {
-        if (body().evidenceClassification !== "SIMULATED_PASS") return json({ title: "Simulation classification required" }, 400);
+        if ("evidenceClassification" in body()) return json({ title: "Ticket must own classification" }, 400);
         fromTicketCount += 1;
         const scope = body();
         const taskId = `TASK-M7-${fromTicketCount}`;
@@ -160,8 +160,9 @@ describe("fictional SDLC driver", () => {
     expect(labels).toContain("simulated release-state path recorded");
     expect(calls.filter((path) => path.endsWith("/from-ticket"))).toHaveLength(6);
     const stageBodies = fetchMock.mock.calls.filter(([path]) => String(path).endsWith("/from-ticket"))
-      .map(([, init]) => (JSON.parse(String(init?.body)) as { type: string }).type);
-    expect(stageBodies).toEqual(["REQUIREMENT_ANALYSIS", "DESIGN", "IMPLEMENTATION", "TEST_GENERATION", "PR_REVIEW", "MANUAL_E2E"]);
+      .map(([, init]) => JSON.parse(String(init?.body)) as { type: string; evidenceClassification?: string });
+    expect(stageBodies.map((body) => body.type)).toEqual(["REQUIREMENT_ANALYSIS", "DESIGN", "IMPLEMENTATION", "TEST_GENERATION", "PR_REVIEW", "MANUAL_E2E"]);
+    expect(stageBodies.every((body) => body.evidenceClassification === undefined)).toBe(true);
     expect(calls.some((path) => path.includes("/repo-tasks/REPO-TASK-M7-1/advance"))).toBe(true);
     expect(calls.filter((path) => /\/tasks\/[^/]+\/ci$/.test(path))).toHaveLength(4);
     expect(calls.filter((path) => /\/tasks\/[^/]+\/manual-e2e$/.test(path))).toHaveLength(1);

@@ -110,7 +110,7 @@ export async function runFictionalSdlc(
     const created = await json<{ taskId: string; version: number }>("/workflows/from-ticket", {
       method: "POST",
       body: JSON.stringify({ ticketId, repositoryAlias: input.repositoryAlias,
-        targetCommit: input.targetCommit, type: stage.type, evidenceClassification: "SIMULATED_PASS" }),
+        targetCommit: input.targetCommit, type: stage.type }),
     });
     createdTaskIds.push(created.taskId);
     steps.push({ label: "task created", detail: created.taskId });

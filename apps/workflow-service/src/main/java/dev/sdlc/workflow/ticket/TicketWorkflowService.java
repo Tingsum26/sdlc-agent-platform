@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -87,6 +88,7 @@ public final class TicketWorkflowService {
         if (!ALLOWED.getOrDefault(ticket.status(), Set.of()).contains(target)) {
             throw new WorkflowConflictException("Transition not allowed: " + ticket.status() + " -> " + target);
         }
+        requireEvidenceActor(ticket, target, actorId);
         if (target == TicketDeliveryStatus.MERGED && dependencies.findByEpicId(ticket.epicId()).stream()
                 .anyMatch(dep -> dep.toTicketId().equals(ticketId) && dep.status() == DependencyStatus.BLOCKING)) {
             throw new WorkflowConflictException("Ticket is blocked by an unresolved dependency");
@@ -123,6 +125,10 @@ public final class TicketWorkflowService {
         return tickets.findById(ticketId).orElseThrow(() -> new IllegalArgumentException("Ticket not found: " + ticketId));
     }
 
+    public Optional<TicketWorkflow> findTicket(String ticketId) {
+        return tickets.findById(ticketId);
+    }
+
     public List<TicketWorkflow> listByEpic(String epicId) {
         return tickets.findByEpicId(epicId);
     }
@@ -142,6 +148,21 @@ public final class TicketWorkflowService {
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
+        }
+    }
+
+    private static void requireEvidenceActor(TicketWorkflow ticket, TicketDeliveryStatus target, String actorId) {
+        if (target != TicketDeliveryStatus.CI_PASSED
+                && target != TicketDeliveryStatus.RELEASED
+                && target != TicketDeliveryStatus.FLAG_ENABLED
+                && target != TicketDeliveryStatus.E2E_VERIFIED) {
+            return;
+        }
+        boolean simulatedActor = actorId.startsWith("SIMULATED-");
+        boolean simulatedTicket = ticket.evidenceClassification() == EvidenceClassification.SIMULATED_PASS;
+        if (simulatedActor != simulatedTicket) {
+            throw new WorkflowConflictException(
+                    "Actor does not match ticket evidence classification for " + target);
         }
     }
 }

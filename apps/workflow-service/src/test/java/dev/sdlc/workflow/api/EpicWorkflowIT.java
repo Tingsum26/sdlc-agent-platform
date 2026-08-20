@@ -27,6 +27,49 @@ class EpicWorkflowIT {
     private final ObjectMapper json = new ObjectMapper();
 
     @Test
+    void derivesTaskClassificationFromExistingTicketAndRejectsCallerMismatch() throws Exception {
+        mvc.perform(post("/api/v1/epics")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"epicId\":\"EPIC-TASK-CLASS\",\"title\":\"Simulation\",\"journeyId\":\"ACCOUNT_OPENING\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/epics/{id}/activate", "EPIC-TASK-CLASS")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":0}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/epics/{id}/tickets", "EPIC-TASK-CLASS")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"SIM-DERIVED-1\",\"channel\":\"API\",\"evidenceClassification\":\"SIMULATED_PASS\"}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"SIM-DERIVED-1\",\"repositoryAlias\":\"REPO_A\","+
+                                "\"targetCommit\":\"derived-ref\",\"type\":\"DESIGN\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.evidenceClassification").value("SIMULATED_PASS"));
+
+        mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"SIM-DERIVED-1\",\"repositoryAlias\":\"REPO_B\","+
+                                "\"targetCommit\":\"mismatch-ref\",\"type\":\"DESIGN\","+
+                                "\"evidenceClassification\":\"REAL\"}"))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"NO-TICKET-SIM\",\"repositoryAlias\":\"REPO_A\","+
+                                "\"targetCommit\":\"standalone-ref\",\"type\":\"DESIGN\","+
+                                "\"evidenceClassification\":\"SIMULATED_PASS\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void persistsAndReturnsSimulatedEvidenceClassificationAcrossM7AggregatesAndAudits() throws Exception {
         mvc.perform(post("/api/v1/epics")
                         .header("X-Demo-User", "SIMULATED-M7-RUNNER")

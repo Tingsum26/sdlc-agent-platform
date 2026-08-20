@@ -15,9 +15,12 @@ import dev.sdlc.workflow.epic.EpicStatus;
 import dev.sdlc.workflow.epic.EpicWorkflow;
 import dev.sdlc.workflow.epic.EpicWorkflowService;
 import dev.sdlc.workflow.epic.InMemoryEpicWorkflowRepository;
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class TicketWorkflowServiceTest {
 
@@ -72,6 +75,41 @@ class TicketWorkflowServiceTest {
         }
         assertEquals(TicketDeliveryStatus.CI_PASSED,
                 fixture.tickets().ticket("M2-API-1").status());
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "REAL,SIMULATED-M7-RUNNER,EMP-100", "SIMULATED_PASS,EMP-100,SIMULATED-M7-RUNNER" })
+    void rejectsActorClassificationMismatchForPassedCi(
+            EvidenceClassification classification, String incompatibleActor, String matchingActor) {
+        Fixture fixture = fixture();
+        fixture.tickets().create("EPIC-M2-1", "M2-ACTOR-CI", Channel.API, classification,
+                matchingActor, "corr-create");
+        long version = advance(fixture.tickets(), "M2-ACTOR-CI", 0, matchingActor,
+                TicketDeliveryStatus.IN_ANALYSIS, TicketDeliveryStatus.WAITING_FOR_APPROVAL,
+                TicketDeliveryStatus.IN_DEVELOPMENT, TicketDeliveryStatus.PR_OPEN);
+
+        long waitingVersion = version;
+        assertThrows(WorkflowConflictException.class, () -> fixture.tickets().transition(
+                "M2-ACTOR-CI", waitingVersion, TicketDeliveryStatus.CI_PASSED,
+                incompatibleActor, "corr-ci"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "REAL,SIMULATED-M7-RUNNER,EMP-100", "SIMULATED_PASS,EMP-100,SIMULATED-M7-RUNNER" })
+    void rejectsActorClassificationMismatchForRelease(
+            EvidenceClassification classification, String incompatibleActor, String matchingActor) {
+        Fixture fixture = fixture();
+        fixture.tickets().create("EPIC-M2-1", "M2-ACTOR-RELEASE", Channel.API, classification,
+                matchingActor, "corr-create");
+        long version = advance(fixture.tickets(), "M2-ACTOR-RELEASE", 0, matchingActor,
+                TicketDeliveryStatus.IN_ANALYSIS, TicketDeliveryStatus.WAITING_FOR_APPROVAL,
+                TicketDeliveryStatus.IN_DEVELOPMENT, TicketDeliveryStatus.PR_OPEN,
+                TicketDeliveryStatus.CI_PASSED, TicketDeliveryStatus.MERGED);
+
+        long mergedVersion = version;
+        assertThrows(WorkflowConflictException.class, () -> fixture.tickets().transition(
+                "M2-ACTOR-RELEASE", mergedVersion, TicketDeliveryStatus.RELEASED,
+                incompatibleActor, "corr-release"));
     }
 
     @Test
@@ -137,5 +175,14 @@ class TicketWorkflowServiceTest {
         assertEquals(true, flagged.pendingChangeConfirmation());
         TicketWorkflow acked = fixture.tickets().ackChange("M2-API-1", flagged.version(), "EMP-100", "corr-3");
         assertEquals(false, acked.pendingChangeConfirmation());
+    }
+
+    private static long advance(TicketWorkflowService tickets, String ticketId, long version, String actorId,
+            TicketDeliveryStatus... targets) {
+        long current = version;
+        for (TicketDeliveryStatus target : targets) {
+            current = tickets.transition(ticketId, current, target, actorId, "corr-advance").version();
+        }
+        return current;
     }
 }
