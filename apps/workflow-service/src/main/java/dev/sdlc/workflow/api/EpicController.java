@@ -20,6 +20,7 @@ import dev.sdlc.workflow.jiraprojection.JiraProjectionService;
 import dev.sdlc.workflow.jiraprojection.JiraSummaryFactory;
 import dev.sdlc.workflow.repotask.RepoTask;
 import dev.sdlc.workflow.repotask.RepoTaskService;
+import dev.sdlc.workflow.repotask.RepoTaskStatus;
 import dev.sdlc.workflow.security.CurrentUser;
 import dev.sdlc.workflow.skip.SkipAttestation;
 import dev.sdlc.workflow.skip.SkipResult;
@@ -222,6 +223,14 @@ public class EpicController {
         return repoTasks.listByTicket(ticketId);
     }
 
+    @PostMapping("/repo-tasks/{repoTaskId}/advance")
+    RepoTask advanceRepoTask(@PathVariable String repoTaskId, @Valid @RequestBody RepoTaskAdvanceRequest body,
+            HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        return repoTasks.transition(repoTaskId, body.expectedVersion(), body.target(), user.actorId(),
+                CorrelationIdFilter.from(request));
+    }
+
     @PostMapping("/epics/{epicId}/dependencies")
     ResponseEntity<Dependency> addDependency(@PathVariable String epicId, @Valid @RequestBody DependencyRequest body,
             HttpServletRequest request) {
@@ -352,6 +361,9 @@ public class EpicController {
     }
 
     public record RepoTaskRequest(@NotBlank String repositoryAlias, @NotBlank String baseCommit) {
+    }
+
+    public record RepoTaskAdvanceRequest(@Min(0) long expectedVersion, @NotNull RepoTaskStatus target) {
     }
 
     public record DependencyRequest(@NotBlank String fromTicketId, @NotBlank String toTicketId) {

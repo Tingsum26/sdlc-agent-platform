@@ -71,4 +71,27 @@ describe("epic MCP tools", () => {
     await client.close();
     await server.close();
   });
+
+  it("advances a repo task with an exact version through the tool surface", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      repoTaskId: "REPO-TASK-1", status: "IN_PROGRESS", version: 1,
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const server = createWorkflowMcpServer(new WorkflowApiClient("http://127.0.0.1:8080", fetcher));
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const result = await client.callTool({
+      name: "advance_repo_task",
+      arguments: { repoTaskId: "REPO-TASK-1", expectedVersion: 0, target: "IN_PROGRESS" },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(JSON.parse(String((result.content as Array<{ text: string }>)[0].text)).status).toBe("IN_PROGRESS");
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:8080/api/v1/repo-tasks/REPO-TASK-1/advance",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ expectedVersion: 0, target: "IN_PROGRESS" }) }));
+    await client.close();
+    await server.close();
+  });
 });

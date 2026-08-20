@@ -54,8 +54,10 @@ public class WorkflowTaskController {
         CurrentUser user = CurrentUser.require(request);
         String taskId = "TASK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         WorkflowScope scope = new WorkflowScope(body.ticketId(), body.repositoryAlias(), body.targetCommit());
-        WorkflowTask task = tasks.createTask(taskId, TaskType.REQUIREMENT_ANALYSIS, scope,
-                "ticket:" + body.ticketId() + ":" + body.targetCommit(), user.actorId(), CorrelationIdFilter.from(request));
+        TaskType type = body.type() == null ? TaskType.REQUIREMENT_ANALYSIS : body.type();
+        WorkflowTask task = tasks.createTask(taskId, type, scope,
+                "ticket:" + body.ticketId() + ":" + body.targetCommit() + ":" + type,
+                user.actorId(), CorrelationIdFilter.from(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowTaskResponse.from(task));
     }
 
@@ -157,7 +159,8 @@ public class WorkflowTaskController {
     public record CreateWorkflowRequest(
             @NotBlank String ticketId,
             @NotBlank String repositoryAlias,
-            @NotBlank String targetCommit) {
+            @NotBlank String targetCommit,
+            TaskType type) {
     }
 
     public record ClaimTaskRequest(long expectedVersion, @Min(1) @Max(120) int leaseMinutes) {

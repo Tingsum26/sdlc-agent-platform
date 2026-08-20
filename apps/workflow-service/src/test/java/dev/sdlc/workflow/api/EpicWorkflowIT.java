@@ -193,6 +193,52 @@ class EpicWorkflowIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void advancesARepoTaskWithVersionChecks() throws Exception {
+        mvc.perform(post("/api/v1/epics")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"epicId\":\"EPIC-REPO-1\",\"title\":\"Repo task epic\",\"journeyId\":\"ACCOUNT_OPENING\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/epics/{id}/activate", "EPIC-REPO-1")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":0}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/epics/{id}/tickets", "EPIC-REPO-1")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"REPO-API-1\",\"channel\":\"API\"}"))
+                .andExpect(status().isCreated());
+
+        String created = mvc.perform(post("/api/v1/tickets/{id}/repo-tasks", "REPO-API-1")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"repositoryAlias\":\"REPO_A\",\"baseCommit\":\"0123456789abcdef\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String repoTaskId = json.readTree(created).path("repoTaskId").asText();
+
+        long version = 0;
+        for (String target : new String[] {"IN_PROGRESS", "PR_OPEN", "MERGED"}) {
+            String advanced = mvc.perform(post("/api/v1/repo-tasks/{id}/advance", repoTaskId)
+                            .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"expectedVersion\":" + version + ",\"target\":\"" + target + "\"}"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            version = json.readTree(advanced).path("version").asLong();
+        }
+
+        mvc.perform(post("/api/v1/repo-tasks/{id}/advance", repoTaskId)
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":0,\"target\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/v1/repo-tasks/{id}/advance", repoTaskId)
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":" + version + ",\"target\":\"PR_OPEN\"}"))
+                .andExpect(status().isConflict());
+    }
+
     private static JsonNode findEpicById(JsonNode array, String epicId) {
         for (JsonNode node : array) {
             if (epicId.equals(node.path("epicId").asText())) {

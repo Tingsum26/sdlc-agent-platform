@@ -354,10 +354,13 @@ export function App() {
   };
 
   const draftJiraComment = async () => {
+    const approvedArtifactId = m7Artifacts[0];
+    if (!approvedArtifactId) return;
     setM2Busy("jira");
     try {
       setJiraDraft(await m2Api<JiraDraftState>("/api/v1/jira-drafts", {
-        method: "POST", body: JSON.stringify({ ticketId: "DEMO-123", milestoneId: "REQ-APPROVED", summary: "Requirement approved" }),
+        method: "POST", body: JSON.stringify({ ticketId: "M7-API-1", milestoneId: "REQ-APPROVED",
+          artifactId: approvedArtifactId, artifactVersion: 1 }),
       }));
     } catch { setDependencyError("jira-draft-failed"); } finally { setM2Busy(undefined); }
   };
@@ -590,7 +593,7 @@ export function App() {
       <section className="sdlc-card sdlc-stack readiness" aria-labelledby="m3-title">
         <div className="section-heading"><div><p className="eyebrow">M3 · Enterprise adapters</p><h2 id="m3-title">Jira projection and Jenkins CI</h2></div></div>
         <div className="sdlc-actions">
-          <button type="button" disabled={Boolean(m2Busy) || Boolean(jiraDraft)} aria-busy={Boolean(m2Busy)} onClick={() => void draftJiraComment()}>Draft Jira comment for DEMO-123</button>
+          <button type="button" disabled={Boolean(m2Busy) || Boolean(jiraDraft) || m7Artifacts.length === 0} aria-busy={Boolean(m2Busy)} onClick={() => void draftJiraComment()}>Draft Jira comment from approved M7 artifact</button>
           <button type="button" disabled={Boolean(m2Busy) || !jiraDraft || jiraDraft.status !== "JIRA_ARTIFACT_SYNC_PENDING"} aria-busy={Boolean(m2Busy)} onClick={() => void publishJiraComment()}>Confirm publish Jira comment</button>
           <button type="button" disabled={Boolean(m2Busy) || !jiraDraft} aria-busy={Boolean(m2Busy)} onClick={() => void retryJiraComments()}>Retry pending Jira comments</button>
           <button type="button" disabled={Boolean(m2Busy) || !tickets.some((item) => item.ticketId === "M2-API-1" && item.status === "PLANNED")} aria-busy={Boolean(m2Busy)} onClick={() => void advanceApiTicketToPr()}>Advance M2-API-1 to PR_OPEN</button>

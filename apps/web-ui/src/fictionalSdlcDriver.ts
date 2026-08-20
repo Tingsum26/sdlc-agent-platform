@@ -25,10 +25,9 @@ const STAGES: Array<{ type: string; artifactType: string; label: string }> = [
 /**
  * Fictional end-to-end SDLC driver for the Web demo.
  *
- * The Workflow Task API is single-stage: POST /workflows/from-ticket always creates a
- * REQUIREMENT_ANALYSIS task, keyed by idempotency key `ticket:<ticketId>:<targetCommit>`.
- * This driver therefore creates a NEW task per SDLC stage, each with a distinct
- * targetCommit, and walks each task through the real state machine:
+ * The Workflow Task API accepts an explicit stage type and creates one persisted task per
+ * stage. This driver also creates and advances a Repo Task for the ticket, then walks each
+ * stage through the real workflow-task state machine:
  *
  *   from-ticket (WAITING_FOR_LOCAL_COPILOT, v0)
  *     → claim (LOCAL_COPILOT_RUNNING, v1)
@@ -60,14 +59,24 @@ export async function runFictionalSdlc(
   await json("/epics", { method: "POST", body: JSON.stringify({ epicId: "EPIC-M7-1", title: "Fictional M7 epic", journeyId: "ACCOUNT_OPENING" }) });
   await json("/epics/EPIC-M7-1/activate", { method: "POST", body: JSON.stringify({ expectedVersion: 0 }) });
   await json("/epics/EPIC-M7-1/tickets", { method: "POST", body: JSON.stringify({ ticketId: "M7-API-1", channel: "API" }) });
+  const repoTask = await json<{ repoTaskId: string; version: number }>("/tickets/M7-API-1/repo-tasks", {
+    method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, baseCommit: input.targetCommit }),
+  });
+  steps.push({ label: "repo task created", detail: repoTask.repoTaskId });
+  let repoTaskVersion = repoTask.version;
+  const advanceRepoTask = async (target: "IN_PROGRESS" | "PR_OPEN" | "MERGED") => {
+    const advanced = await json<{ version: number }>(`/repo-tasks/${repoTask.repoTaskId}/advance`, {
+      method: "POST", body: JSON.stringify({ expectedVersion: repoTaskVersion, target }),
+    });
+    repoTaskVersion = advanced.version;
+  };
+  await advanceRepoTask("IN_PROGRESS");
 
-  for (const [stageIndex, stage] of STAGES.entries()) {
-    // Distinct targetCommit per stage keeps the idempotency key
-    // `ticket:<ticketId>:<targetCommit>` unique so each stage gets its own task.
-    const targetCommit = `${input.targetCommit.slice(0, 62)}${(stageIndex + 1).toString(16).padStart(2, "0")}`;
+  for (const stage of STAGES) {
     const created = await json<{ taskId: string; version: number }>("/workflows/from-ticket", {
       method: "POST",
-      body: JSON.stringify({ ticketId: input.ticketId, repositoryAlias: input.repositoryAlias, targetCommit }),
+      body: JSON.stringify({ ticketId: "M7-API-1", repositoryAlias: input.repositoryAlias,
+        targetCommit: input.targetCommit, type: stage.type }),
     });
     steps.push({ label: "task created", detail: created.taskId });
 
@@ -130,6 +139,29 @@ export async function runFictionalSdlc(
     });
     steps.push({ label: "manual E2E passed", detail: "E2E-M7-1" });
   }
+
+  let ticketVersion = 0;
+  const advanceTicket = async (target: string) => {
+    const ticket = await json<{ version: number }>("/tickets/M7-API-1/advance", {
+      method: "POST", body: JSON.stringify({ expectedVersion: ticketVersion, target }),
+    });
+    ticketVersion = ticket.version;
+  };
+  for (const target of ["IN_ANALYSIS", "WAITING_FOR_APPROVAL", "IN_DEVELOPMENT", "PR_OPEN"]) {
+    await advanceTicket(target);
+  }
+  await advanceRepoTask("PR_OPEN");
+  const ci = await json<{ ticket: { version: number }; state: string }>("/tickets/M7-API-1/ci", {
+    method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, revision: input.targetCommit }),
+  });
+  ticketVersion = ci.ticket.version;
+  steps.push({ label: "CI passed", detail: ci.state });
+  await advanceRepoTask("MERGED");
+  steps.push({ label: "repo task merged", detail: repoTask.repoTaskId });
+  for (const target of ["MERGED", "RELEASED", "FLAG_ENABLED", "E2E_VERIFIED"]) {
+    await advanceTicket(target);
+  }
+  steps.push({ label: "ticket release evidence recorded", detail: "M7-API-1 · E2E_VERIFIED" });
 
   return { steps, auditTrail: steps, artifactIds };
 }

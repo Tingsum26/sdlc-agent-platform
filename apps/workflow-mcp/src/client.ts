@@ -123,6 +123,13 @@ export class WorkflowApiClient {
     }, correlationId, signal);
   }
 
+  advanceRepoTask(repoTaskId: string, expectedVersion: number, target: string,
+    correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/repo-tasks/${encodeURIComponent(repoTaskId)}/advance`, {
+      method: "POST", body: JSON.stringify({ expectedVersion, target }),
+    }, correlationId, signal);
+  }
+
   addDependency(epicId: string, fromTicketId: string, toTicketId: string,
     correlationId: string, signal: AbortSignal): Promise<unknown> {
     return this.request(`/api/v1/epics/${encodeURIComponent(epicId)}/dependencies`, {

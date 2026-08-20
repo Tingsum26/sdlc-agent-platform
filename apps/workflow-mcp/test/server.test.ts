@@ -17,6 +17,7 @@ describe("workflow MCP", () => {
 
     const result = await client.listTools();
     expect(result.tools.map((tool) => tool.name).sort()).toEqual([
+      "advance_repo_task",
       "workflow_analyze_journey",
       "workflow_claim_task",
       "workflow_complete_task",

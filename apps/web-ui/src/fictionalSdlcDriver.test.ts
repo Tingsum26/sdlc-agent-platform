@@ -5,6 +5,7 @@ describe("fictional SDLC driver", () => {
   it("sequences the full path and returns an audit trail", async () => {
     const calls: string[] = [];
     let fromTicketCount = 0;
+    let repoTaskVersion = 0;
     const fetchMock = vi.fn<typeof fetch>(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
       calls.push(path);
@@ -18,14 +19,25 @@ describe("fictional SDLC driver", () => {
       if (path.endsWith("/tickets")) {
         return json({ ticketId: "M7-API-1", epicId: "EPIC-M7-1", channel: "API", status: "PLANNED", version: 0 });
       }
+      if (path.endsWith("/repo-tasks")) {
+        return json({ repoTaskId: "REPO-TASK-M7-1", status: "PLANNED", version: 0 });
+      }
+      if (path.includes("/repo-tasks/") && path.endsWith("/advance")) {
+        repoTaskVersion += 1;
+        return json({ repoTaskId: "REPO-TASK-M7-1", status: body().target, version: repoTaskVersion });
+      }
+      if (path.endsWith("/advance")) {
+        return json({ ticketId: "M7-API-1", status: body().target, version: 1 });
+      }
+      if (path.endsWith("/ci")) {
+        return json({ ticket: { ticketId: "M7-API-1", status: "CI_PASSED", version: 5 }, state: "PASSED" });
+      }
       if (path.endsWith("/from-ticket")) {
-        // Each SDLC stage creates its own single-stage REQUIREMENT_ANALYSIS task with a
-        // distinct targetCommit (idempotency key ticket:<ticketId>:<targetCommit>).
         fromTicketCount += 1;
         const scope = body();
         return json({
           taskId: `TASK-M7-${fromTicketCount}`,
-          type: "REQUIREMENT_ANALYSIS",
+          type: scope.type,
           status: "WAITING_FOR_LOCAL_COPILOT",
           version: 0,
           scope: { ticketId: scope.ticketId, repositoryAlias: scope.repositoryAlias, targetCommit: scope.targetCommit },
@@ -57,12 +69,17 @@ describe("fictional SDLC driver", () => {
     expect(result.steps.length).toBeGreaterThanOrEqual(7);
     const labels = result.steps.map((step: SdlcStepEvent) => step.label);
     expect(labels).toContain("epic created");
+    expect(labels).toContain("repo task created");
     // The driver labels stages specifically ("requirement analysis artifact submitted"),
     // so assert the plan's "requirement artifact submitted" intent by substring.
     expect(labels.some((label) => label.startsWith("requirement") && label.includes("artifact submitted"))).toBe(true);
     // Each stage approves its artifact ("requirement analysis approved", ...).
     expect(labels.some((label) => label.includes("approved"))).toBe(true);
     expect(labels).toContain("manual E2E passed");
+    expect(labels).toContain("repo task merged");
+    expect(labels).toContain("ticket release evidence recorded");
+    expect(calls.filter((path) => path.endsWith("/from-ticket"))).toHaveLength(4);
+    expect(calls.some((path) => path.includes("/repo-tasks/REPO-TASK-M7-1/advance"))).toBe(true);
     expect(result.auditTrail.length).toBeGreaterThan(0);
   });
 });

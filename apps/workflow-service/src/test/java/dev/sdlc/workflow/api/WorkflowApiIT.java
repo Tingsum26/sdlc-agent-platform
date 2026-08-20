@@ -22,6 +22,23 @@ class WorkflowApiIT {
     private MockMvc mvc;
 
     @Test
+    void createsTheRequestedWorkflowStageWhileDefaultingOldCallersToRequirementAnalysis() throws Exception {
+        mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"TYPE-1\",\"repositoryAlias\":\"REPO_A\",\"targetCommit\":\"0123456789abcdef\",\"type\":\"DESIGN\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("DESIGN"));
+
+        mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "PRINCIPAL-EMP-100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"TYPE-2\",\"repositoryAlias\":\"REPO_A\",\"targetCommit\":\"0123456789abcdef\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("REQUIREMENT_ANALYSIS"));
+    }
+
+    @Test
     void createsAndListsAWorkflowFromAFictionalTicket() throws Exception {
         String created = mvc.perform(post("/api/v1/workflows/from-ticket")
                         .header("X-Demo-User", "developer-1")

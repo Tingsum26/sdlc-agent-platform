@@ -165,6 +165,15 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
   }, ({ ticketId, repositoryAlias, baseCommit }, extra) => safe("workflow_ticket_add_repo_task",
     (correlationId) => api.addRepoTask(ticketId, repositoryAlias, baseCommit, correlationId, extra.signal)));
 
+  server.registerTool("advance_repo_task", {
+    description: "Advance a repo task through planning, pull request, and merge with an exact version.",
+    inputSchema: z.object({
+      repoTaskId: z.string().min(1), expectedVersion: z.number().int().nonnegative(),
+      target: z.enum(["PLANNED", "IN_PROGRESS", "PR_OPEN", "MERGED", "BLOCKED", "CANCELLED"]),
+    }),
+  }, ({ repoTaskId, expectedVersion, target }, extra) => safe("advance_repo_task",
+    (correlationId) => api.advanceRepoTask(repoTaskId, expectedVersion, target, correlationId, extra.signal)));
+
   server.registerTool("workflow_epic_add_dependency", {
     description: "Record a REQUIRES_BEFORE dependency between two tickets of one epic.",
     inputSchema: z.object({
