@@ -14,6 +14,28 @@ const { configUpdates, configState } = vi.hoisted(() => {
   };
 });
 
+const sourceCopyMutation = vi.hoisted(() => ({
+  sourceRoot: "",
+  afterCopy: undefined as (() => void) | undefined,
+  triggered: false,
+}));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    cp: async (source: string, destination: string, options?: Parameters<typeof actual.cp>[2]) => {
+      await actual.cp(source, destination, options);
+      if (source === sourceCopyMutation.sourceRoot && sourceCopyMutation.afterCopy) {
+        sourceCopyMutation.triggered = true;
+        const mutation = sourceCopyMutation.afterCopy;
+        sourceCopyMutation.afterCopy = undefined;
+        mutation();
+      }
+    },
+  };
+});
+
 vi.mock("vscode", () => ({
   window: {
     showOpenDialog: vi.fn(),
@@ -42,6 +64,9 @@ import { hookCommand, installCustomizationBundle, rollbackCustomizationBundle, s
 beforeEach(() => {
   configUpdates.length = 0;
   configState.clear();
+  sourceCopyMutation.sourceRoot = "";
+  sourceCopyMutation.afterCopy = undefined;
+  sourceCopyMutation.triggered = false;
 });
 
 // The extension context's globalState must actually retain written values so a
@@ -137,6 +162,41 @@ describe("customization bundle installer", () => {
 
     await expect(installCustomizationBundle(createStatefulContext(storageRoot))).rejects.toThrow(/symbolic link|symlink/i);
     expect(existsSync(join(storageRoot, "customizations", "symlinked-skill"))).toBe(false);
+  });
+
+  it("rejects a manifest directory symlink before reading its linked manifest", async () => {
+    const sourceRoot = createSourceBundle("symlinked-manifest", []);
+    const manifests = join(sourceRoot, "central", "manifests");
+    const outside = join(sourceRoot, "outside-manifests");
+    rmSync(manifests, { recursive: true, force: true });
+    mkdirSync(outside);
+    writeFileSync(join(outside, "bundle-manifest.json"), JSON.stringify({ token: "must-not-be-read" }));
+    symlinkSync(outside, manifests, "junction");
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-manifest-link-dest-"));
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+
+    await expect(installCustomizationBundle(createStatefulContext(storageRoot))).rejects.toThrow(/symbolic link|symlink/i);
+    expect(existsSync(join(storageRoot, "customizations", "symlinked-manifest"))).toBe(false);
+  });
+
+  it("installs from the validated staging copy when the selected source changes after staging", async () => {
+    const sourceRoot = createSourceBundle("staged-source", []);
+    const manifests = join(sourceRoot, "central", "manifests");
+    const outside = join(sourceRoot, "outside-manifests");
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-staged-source-dest-"));
+    sourceCopyMutation.sourceRoot = sourceRoot;
+    sourceCopyMutation.afterCopy = () => {
+      rmSync(manifests, { recursive: true, force: true });
+      mkdirSync(outside);
+      writeFileSync(join(outside, "bundle-manifest.json"), JSON.stringify({ token: "swapped-after-staging" }));
+      symlinkSync(outside, manifests, "junction");
+    };
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+
+    await installCustomizationBundle(createStatefulContext(storageRoot));
+
+    expect(sourceCopyMutation.triggered).toBe(true);
+    expect(readFileSync(join(storageRoot, "customizations", "staged-source", "agents", "a.agent.md"), "utf8")).toBe("a");
   });
 
   it("uses Node to invoke the installed no-op hook shim without shell redirection", () => {

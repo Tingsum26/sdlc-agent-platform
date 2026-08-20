@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import * as vscode from "vscode";
@@ -23,38 +23,69 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
   if (!selected?.[0]) return;
   const sourceRoot = selected[0].fsPath;
   const manifestPath = "central/manifests/bundle-manifest.json";
-  const manifest = loadAndValidateBundle(sourceRoot, manifestPath);
-  await rejectBundleSymlinks(sourceRoot);
-  const destination = join(context.globalStorageUri.fsPath, "customizations", manifest.bundleVersion);
-  const agentsRoot = join(destination, "agents");
-  const skillsRoot = join(destination, "skills");
-  const instructionsRoot = join(destination, "instructions");
-  await Promise.all([mkdir(agentsRoot, { recursive: true }), mkdir(skillsRoot, { recursive: true }), mkdir(instructionsRoot, { recursive: true })]);
+  const storageRoot = context.globalStorageUri.fsPath;
+  await mkdir(storageRoot, { recursive: true });
+  const sourceStaging = await mkdtemp(join(storageRoot, "customization-source-"));
+  const stagedRoot = join(sourceStaging, "bundle");
+  let candidate: string | undefined;
+  let destination: string | undefined;
+  let replacementInProgress = false;
 
-  for (const path of manifest.agents) await cp(safeResolve(sourceRoot, path), join(agentsRoot, basename(path)), { force: true });
-  for (const path of manifest.skills) {
-    const target = join(skillsRoot, skillInstallPath(path));
-    await mkdir(dirname(target), { recursive: true });
-    await cp(safeResolve(sourceRoot, path), target, { recursive: true, force: true });
-  }
-  for (const path of manifest.instructions.filter((value) => value.endsWith(".instructions.md"))) {
-    await cp(safeResolve(sourceRoot, path), join(instructionsRoot, basename(path)), { force: true });
-  }
-  await mkdir(dirname(join(destination, manifestPath)), { recursive: true });
-  await cp(safeResolve(sourceRoot, manifestPath), join(destination, manifestPath), { force: true });
-  for (const dir of shippedContentDirs) {
-    const sourceDir = safeResolve(sourceRoot, `central/${dir}`);
-    if (!existsSync(sourceDir)) continue;
-    const targetDir = join(destination, dir);
-    await mkdir(dirname(targetDir), { recursive: true });
-    await cp(sourceDir, targetDir, { recursive: true, force: true });
-  }
-  await activateBundleLocations(context, destination);
+  try {
+    // Copy the untrusted selection once without dereferencing links. All later
+    // parsing and copying use this extension-owned snapshot, closing the gap
+    // between validation and use of the user-selected filesystem tree.
+    await cp(sourceRoot, stagedRoot, { recursive: true, dereference: false });
+    await rejectBundleSymlinks(stagedRoot);
+    const manifest = loadAndValidateBundle(stagedRoot, manifestPath);
+    const customizationsRoot = join(storageRoot, "customizations");
+    await mkdir(customizationsRoot, { recursive: true });
+    candidate = await mkdtemp(join(customizationsRoot, ".bundle-install-"));
+    const agentsRoot = join(candidate, "agents");
+    const skillsRoot = join(candidate, "skills");
+    const instructionsRoot = join(candidate, "instructions");
+    await Promise.all([mkdir(agentsRoot, { recursive: true }), mkdir(skillsRoot, { recursive: true }), mkdir(instructionsRoot, { recursive: true })]);
 
-  const installed = context.globalState.get<InstalledBundle[]>(stateKey, []).filter((entry) => entry.version !== manifest.bundleVersion);
-  installed.unshift({ version: manifest.bundleVersion, root: destination, installedAt: new Date().toISOString() });
-  await context.globalState.update(stateKey, installed.slice(0, 5));
-  void vscode.window.showInformationMessage(`Activated SDLC customization bundle ${manifest.bundleVersion}. Verify it in Chat Customizations diagnostics.`);
+    for (const path of manifest.agents) await cp(safeResolve(stagedRoot, path), join(agentsRoot, basename(path)), { force: true });
+    for (const path of manifest.skills) {
+      const target = join(skillsRoot, skillInstallPath(path));
+      await mkdir(dirname(target), { recursive: true });
+      await cp(safeResolve(stagedRoot, path), target, { recursive: true, force: true });
+    }
+    for (const path of manifest.instructions.filter((value) => value.endsWith(".instructions.md"))) {
+      await cp(safeResolve(stagedRoot, path), join(instructionsRoot, basename(path)), { force: true });
+    }
+    await mkdir(dirname(join(candidate, manifestPath)), { recursive: true });
+    await cp(safeResolve(stagedRoot, manifestPath), join(candidate, manifestPath), { force: true });
+    for (const dir of shippedContentDirs) {
+      const sourceDir = safeResolve(stagedRoot, `central/${dir}`);
+      if (!existsSync(sourceDir)) continue;
+      const targetDir = join(candidate, dir);
+      await mkdir(dirname(targetDir), { recursive: true });
+      await cp(sourceDir, targetDir, { recursive: true, force: true });
+    }
+    await rejectBundleSymlinks(candidate);
+
+    destination = join(customizationsRoot, manifest.bundleVersion);
+    replacementInProgress = true;
+    await rm(destination, { recursive: true, force: true });
+    await rename(candidate, destination);
+    candidate = undefined;
+    await rejectBundleSymlinks(destination);
+    replacementInProgress = false;
+    await activateBundleLocations(context, destination);
+
+    const installed = context.globalState.get<InstalledBundle[]>(stateKey, []).filter((entry) => entry.version !== manifest.bundleVersion);
+    installed.unshift({ version: manifest.bundleVersion, root: destination, installedAt: new Date().toISOString() });
+    await context.globalState.update(stateKey, installed.slice(0, 5));
+    void vscode.window.showInformationMessage(`Activated SDLC customization bundle ${manifest.bundleVersion}. Verify it in Chat Customizations diagnostics.`);
+  } catch (error) {
+    if (candidate) await rm(candidate, { recursive: true, force: true });
+    if (replacementInProgress && destination) await rm(destination, { recursive: true, force: true });
+    throw error;
+  } finally {
+    await rm(sourceStaging, { recursive: true, force: true });
+  }
 }
 
 export async function rollbackCustomizationBundle(context: vscode.ExtensionContext): Promise<void> {
