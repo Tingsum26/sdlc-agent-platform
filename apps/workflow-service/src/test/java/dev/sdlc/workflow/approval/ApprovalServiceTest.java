@@ -18,17 +18,19 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class ApprovalServiceTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-08-16T00:00:00Z"), ZoneOffset.UTC);
 
-    @Test
-    void recordsTheActorAndAdvancesTheMatchingTaskAndArtifactVersions() {
+    @ParameterizedTest
+    @EnumSource(value = TaskType.class, names = { "REQUIREMENT_ANALYSIS", "DESIGN" })
+    void approvalOnlyStagesCompleteWithoutCiOrManualE2e(TaskType taskType) {
         ArtifactService artifacts = new ArtifactService(new FakeArtifactStore(), new ObjectMapper(), clock);
         WorkflowTaskService tasks = new WorkflowTaskService(new InMemoryWorkflowTaskRepository(),
                 new InMemoryAuditEventRepository(), new TaskTransitionPolicy(), clock);
-        tasks.createTask("TASK-1", TaskType.REQUIREMENT_ANALYSIS,
+        tasks.createTask("TASK-1", taskType,
                 new WorkflowScope("DEMO-123", "REPO_A", "abc"), "key", "author", "corr");
         tasks.claimTask("TASK-1", "author", java.time.Duration.ofMinutes(15), 0, "corr");
         artifacts.create("ART-1", "TASK-1", ArtifactType.REQUIREMENT_REPORT,
@@ -42,7 +44,7 @@ class ApprovalServiceTest {
         ApprovalDecision decision = service.approve("TASK-1", "ART-1", 1, 3, "architect-1", "corr");
 
         assertThat(decision.actorId()).isEqualTo("architect-1");
-        assertThat(decision.task().status()).isEqualTo(TaskStatus.WAITING_FOR_CI);
+        assertThat(decision.task().status()).isEqualTo(TaskStatus.COMPLETED);
         assertThat(decision.artifact().approvedBy()).isEqualTo("architect-1");
     }
 }

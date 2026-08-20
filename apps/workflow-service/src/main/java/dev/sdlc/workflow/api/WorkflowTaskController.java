@@ -121,8 +121,8 @@ public class WorkflowTaskController {
             return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_CI,
                     TaskStatus.BLOCKED, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
         }
-        return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_CI,
-                TaskStatus.WAITING_FOR_MANUAL_E2E, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
+        return WorkflowTaskResponse.from(tasks.transitionAfterPassedCi(
+                taskId, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
     }
 
     @PostMapping("/tasks/{taskId}/manual-e2e")

@@ -8,6 +8,14 @@ describe("fictional SDLC driver", () => {
     const ticketIds: string[] = [];
     let fromTicketCount = 0;
     let repoTaskVersion = 0;
+    const taskTypes = new Map<string, string>();
+    const taskStatuses = new Map<string, string>();
+    const taskAudits = new Map<string, Array<{ action: string; previousStatus: string; newStatus: string }>>();
+    const transitionTask = (taskId: string, next: string) => {
+      const previous = taskStatuses.get(taskId) ?? "MISSING";
+      taskStatuses.set(taskId, next);
+      taskAudits.get(taskId)?.push({ action: "TASK_TRANSITIONED", previousStatus: previous, newStatus: next });
+    };
     const fetchMock = vi.fn<typeof fetch>(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
       calls.push(path);
@@ -35,14 +43,18 @@ describe("fictional SDLC driver", () => {
       if (path.endsWith("/advance")) {
         return json({ ticketId: "M7-API-1", status: body().target, version: 1 });
       }
-      if (path.endsWith("/ci")) {
+      if (path.includes("/tickets/") && path.endsWith("/ci")) {
         return json({ ticket: { ticketId: "M7-API-1", status: "CI_PASSED", version: 5 }, state: "PASSED" });
       }
       if (path.endsWith("/from-ticket")) {
         fromTicketCount += 1;
         const scope = body();
+        const taskId = `TASK-M7-${fromTicketCount}`;
+        taskTypes.set(taskId, String(scope.type));
+        taskStatuses.set(taskId, "WAITING_FOR_LOCAL_COPILOT");
+        taskAudits.set(taskId, []);
         return json({
-          taskId: `TASK-M7-${fromTicketCount}`,
+          taskId,
           type: scope.type,
           status: "WAITING_FOR_LOCAL_COPILOT",
           version: 0,
@@ -50,8 +62,8 @@ describe("fictional SDLC driver", () => {
         });
       }
       if (path.endsWith("/tasks")) {
-        return json(["REQUIREMENT_ANALYSIS", "DESIGN", "IMPLEMENTATION", "TEST_GENERATION", "PR_REVIEW", "MANUAL_E2E"].map((type, index) => ({
-          taskId: `TASK-M7-${fromTicketCount - 5 + index}`, type, status: "COMPLETED",
+        return json([...taskTypes.entries()].map(([taskId, type]) => ({
+          taskId, type, status: taskStatuses.get(taskId),
         })));
       }
       if (path.endsWith("/resume")) return json({
@@ -59,20 +71,47 @@ describe("fictional SDLC driver", () => {
         tickets: [{ ticket: { ticketId: ticketIds.at(-1), status: "E2E_VERIFIED" }, openTasks: [] }],
         auditTrail: [{ action: "TICKET_TRANSITIONED", detail: "FLAG_ENABLED->E2E_VERIFIED" }],
       });
-      if (path.endsWith("/audit")) return json([{ action: "TASK_CREATED" }, { action: "TASK_TRANSITIONED" }]);
+      if (path.endsWith("/audit")) {
+        const taskId = path.match(/\/tasks\/([^/]+)\/audit$/)?.[1] ?? "MISSING";
+        return json(taskAudits.get(taskId) ?? []);
+      }
       const taskMatch = path.match(/\/tasks\/([^/]+)\/([\w-]+)$/);
       if (taskMatch) {
         const taskId = taskMatch[1];
         const action = taskMatch[2];
-        if (action === "claim") return json({ taskId, status: "LOCAL_COPILOT_RUNNING", version: 1 });
-        if (action === "results") return json({ artifactId: String(body().artifactId), taskId, type: "REQUIREMENT_REPORT", version: 1 });
-        if (action === "confirm") return json({ taskId, status: "WAITING_FOR_APPROVAL", version: 2 });
-        if (action === "ci") return json({ taskId, status: "WAITING_FOR_MANUAL_E2E", version: 4 });
-        if (action === "manual-e2e") return json({ taskId, status: "COMPLETED", version: 5 });
+        if (action === "claim") {
+          transitionTask(taskId, "LOCAL_COPILOT_RUNNING");
+          return json({ taskId, status: "LOCAL_COPILOT_RUNNING", version: 1 });
+        }
+        if (action === "results") {
+          transitionTask(taskId, "WAITING_FOR_USER_CONFIRMATION");
+          return json({ artifactId: String(body().artifactId), taskId, type: "REQUIREMENT_REPORT", version: 1 });
+        }
+        if (action === "confirm") {
+          transitionTask(taskId, "WAITING_FOR_APPROVAL");
+          return json({ taskId, status: "WAITING_FOR_APPROVAL", version: 3 });
+        }
+        if (action === "ci") {
+          if (taskStatuses.get(taskId) !== "WAITING_FOR_CI") return json({ title: "Workflow conflict" }, 409);
+          const next = taskTypes.get(taskId) === "MANUAL_E2E" ? "WAITING_FOR_MANUAL_E2E" : "COMPLETED";
+          transitionTask(taskId, next);
+          return json({ taskId, status: next, version: 5 });
+        }
+        if (action === "manual-e2e") {
+          if (taskTypes.get(taskId) !== "MANUAL_E2E" || taskStatuses.get(taskId) !== "WAITING_FOR_MANUAL_E2E") {
+            return json({ title: "Workflow conflict" }, 409);
+          }
+          transitionTask(taskId, "COMPLETED");
+          return json({ taskId, status: "COMPLETED", version: 6 });
+        }
       }
       if (path.endsWith("/approvals")) {
         const approval = body();
-        return json({ taskId: String(approval.taskId), status: "WAITING_FOR_CI", version: 3 });
+        const taskId = String(approval.taskId);
+        const type = taskTypes.get(taskId);
+        const next = type === "REQUIREMENT_ANALYSIS" || type === "DESIGN" ? "COMPLETED" : "WAITING_FOR_CI";
+        transitionTask(taskId, next);
+        return json({ taskId, status: next, version: 4 });
       }
       return json({});
     });
@@ -93,6 +132,8 @@ describe("fictional SDLC driver", () => {
     // Each stage approves its artifact ("requirement analysis approved", ...).
     expect(labels.some((label) => label.includes("approved"))).toBe(true);
     expect(labels).toContain("manual E2E passed");
+    expect(labels.filter((label) => label === "manual E2E passed")).toHaveLength(1);
+    expect(labels).toContain("stage terminal policy");
     expect(labels).toContain("repo task merged");
     expect(labels).toContain("ticket release evidence recorded");
     expect(calls.filter((path) => path.endsWith("/from-ticket"))).toHaveLength(6);
@@ -100,6 +141,8 @@ describe("fictional SDLC driver", () => {
       .map(([, init]) => (JSON.parse(String(init?.body)) as { type: string }).type);
     expect(stageBodies).toEqual(["REQUIREMENT_ANALYSIS", "DESIGN", "IMPLEMENTATION", "TEST_GENERATION", "PR_REVIEW", "MANUAL_E2E"]);
     expect(calls.some((path) => path.includes("/repo-tasks/REPO-TASK-M7-1/advance"))).toBe(true);
+    expect(calls.filter((path) => /\/tasks\/[^/]+\/ci$/.test(path))).toHaveLength(4);
+    expect(calls.filter((path) => /\/tasks\/[^/]+\/manual-e2e$/.test(path))).toHaveLength(1);
     expect(result.auditTrail).toEqual(expect.arrayContaining([expect.objectContaining({ action: "TICKET_TRANSITIONED" })]));
     expect(result.epic.status).toBe("ACTIVE");
     expect(result.repoTask.status).toBe("MERGED");
@@ -120,6 +163,6 @@ describe("fictional SDLC driver", () => {
   });
 });
 
-function json(body: unknown): Response {
-  return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }

@@ -69,7 +69,7 @@ public final class WorkflowTaskService {
             throw new IllegalArgumentException("Lease must be positive");
         }
         WorkflowTask task = requireVersion(taskId, expectedVersion);
-        transitionPolicy.requireAllowed(task.status(), TaskStatus.LOCAL_COPILOT_RUNNING);
+        transitionPolicy.requireAllowed(task.type(), task.status(), TaskStatus.LOCAL_COPILOT_RUNNING);
         Instant now = clock.instant();
         WorkflowTask claimed = task.claimedBy(actorId, now.plus(lease), now);
         tasks.save(claimed);
@@ -105,11 +105,31 @@ public final class WorkflowTaskService {
         if (task.status() != expectedStatus) {
             throw new IllegalTaskTransitionException("Expected status " + expectedStatus + " but was " + task.status());
         }
-        transitionPolicy.requireAllowed(task.status(), targetStatus);
+        transitionPolicy.requireAllowed(task.type(), task.status(), targetStatus);
         WorkflowTask changed = task.transitionedTo(targetStatus, clock.instant());
         tasks.save(changed);
         audit(changed, actorId, "TASK_TRANSITIONED", task.status(), changed.status(), correlationId);
         return changed;
+    }
+
+    public synchronized WorkflowTask transitionAfterApproval(
+            String taskId,
+            long expectedVersion,
+            String actorId,
+            String correlationId) {
+        WorkflowTask task = requireVersion(taskId, expectedVersion);
+        return transition(taskId, TaskStatus.WAITING_FOR_APPROVAL,
+                transitionPolicy.targetAfterApproval(task.type()), expectedVersion, actorId, correlationId);
+    }
+
+    public synchronized WorkflowTask transitionAfterPassedCi(
+            String taskId,
+            long expectedVersion,
+            String actorId,
+            String correlationId) {
+        WorkflowTask task = requireVersion(taskId, expectedVersion);
+        return transition(taskId, TaskStatus.WAITING_FOR_CI,
+                transitionPolicy.targetAfterPassedCi(task.type()), expectedVersion, actorId, correlationId);
     }
 
     public synchronized int releaseExpiredLeases(Instant now, String actorId, String correlationId) {

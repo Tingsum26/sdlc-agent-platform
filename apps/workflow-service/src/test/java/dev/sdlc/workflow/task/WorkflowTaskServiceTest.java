@@ -88,7 +88,13 @@ class WorkflowTaskServiceTest {
 
     @Test
     void rejectsRestartingACompletedTask() {
-        WorkflowTask task = createTask();
+        WorkflowTask task = service.createTask(
+                "TASK-MANUAL-E2E",
+                TaskType.MANUAL_E2E,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "manual-e2e-demo-123",
+                "user-1",
+                "corr-1");
         task = service.claimTask(task.taskId(), "developer-1", Duration.ofMinutes(15), task.version(), "corr-2");
         task = service.transition(task.taskId(), task.status(), TaskStatus.WAITING_FOR_USER_CONFIRMATION, task.version(), "developer-1", "corr-3");
         task = service.transition(task.taskId(), task.status(), TaskStatus.WAITING_FOR_APPROVAL, task.version(), "developer-1", "corr-4");
@@ -100,6 +106,49 @@ class WorkflowTaskServiceTest {
         assertThatThrownBy(() -> service.transition(completed.taskId(), TaskStatus.COMPLETED,
                 TaskStatus.LOCAL_COPILOT_RUNNING, completed.version(), "developer-1", "corr-8"))
                 .isInstanceOf(IllegalTaskTransitionException.class);
+    }
+
+    @Test
+    void rejectsSendingAnImplementationTaskToTheManualE2eGate() {
+        WorkflowTask task = service.createTask(
+                "TASK-IMPLEMENTATION",
+                TaskType.IMPLEMENTATION,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "implementation-demo-123",
+                "user-1",
+                "corr-1");
+        task = service.claimTask(task.taskId(), "developer-1", Duration.ofMinutes(15), task.version(), "corr-2");
+        task = service.transition(task.taskId(), task.status(), TaskStatus.WAITING_FOR_USER_CONFIRMATION,
+                task.version(), "developer-1", "corr-3");
+        task = service.transition(task.taskId(), task.status(), TaskStatus.WAITING_FOR_APPROVAL,
+                task.version(), "developer-1", "corr-4");
+        task = service.transition(task.taskId(), task.status(), TaskStatus.WAITING_FOR_CI,
+                task.version(), "reviewer-1", "corr-5");
+
+        WorkflowTask waitingForCi = task;
+        assertThatThrownBy(() -> service.transition(waitingForCi.taskId(), waitingForCi.status(),
+                TaskStatus.WAITING_FOR_MANUAL_E2E, waitingForCi.version(), "ci-reader", "corr-6"))
+                .isInstanceOf(IllegalTaskTransitionException.class);
+    }
+
+    @Test
+    void preservesBlockingForALegacyApprovalOnlyTaskAlreadyWaitingForCi() {
+        tasks.save(new WorkflowTask(
+                "TASK-LEGACY-CI",
+                TaskType.REQUIREMENT_ANALYSIS,
+                TaskStatus.WAITING_FOR_CI,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "legacy-ci-demo-123",
+                "developer-1",
+                null,
+                4,
+                NOW,
+                NOW));
+
+        WorkflowTask blocked = service.transition("TASK-LEGACY-CI", TaskStatus.WAITING_FOR_CI,
+                TaskStatus.BLOCKED, 4, "ci-reader", "corr-legacy");
+
+        assertThat(blocked.status()).isEqualTo(TaskStatus.BLOCKED);
     }
 
     private WorkflowTask createTask() {

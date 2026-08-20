@@ -17,15 +17,39 @@ public final class TaskTransitionPolicy {
         allow(TaskStatus.WAITING_FOR_USER_CONFIRMATION, TaskStatus.LOCAL_COPILOT_RUNNING,
                 TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.BLOCKED, TaskStatus.CANCELLED);
         allow(TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.LOCAL_COPILOT_RUNNING,
-                TaskStatus.WAITING_FOR_CI, TaskStatus.BLOCKED, TaskStatus.CANCELLED);
-        allow(TaskStatus.WAITING_FOR_CI, TaskStatus.WAITING_FOR_MANUAL_E2E, TaskStatus.BLOCKED, TaskStatus.CANCELLED);
-        allow(TaskStatus.WAITING_FOR_MANUAL_E2E, TaskStatus.COMPLETED, TaskStatus.BLOCKED, TaskStatus.CANCELLED);
+                TaskStatus.BLOCKED, TaskStatus.CANCELLED);
+        allow(TaskStatus.WAITING_FOR_CI, TaskStatus.BLOCKED, TaskStatus.CANCELLED);
+        allow(TaskStatus.WAITING_FOR_MANUAL_E2E, TaskStatus.BLOCKED, TaskStatus.CANCELLED);
         allow(TaskStatus.BLOCKED, TaskStatus.WAITING_FOR_LOCAL_COPILOT, TaskStatus.CANCELLED);
     }
 
-    public void requireAllowed(TaskStatus source, TaskStatus target) {
-        if (!allowed.getOrDefault(source, Set.of()).contains(target)) {
-            throw new IllegalTaskTransitionException("Transition is not allowed: " + source + " -> " + target);
+    public TaskStatus targetAfterApproval(TaskType type) {
+        return switch (type) {
+            case IMPLEMENTATION, TEST_GENERATION, PR_REVIEW, MANUAL_E2E -> TaskStatus.WAITING_FOR_CI;
+            case REQUIREMENT_ANALYSIS, DESIGN, DELIVERY_COORDINATION, ONBOARDING_SYNC -> TaskStatus.COMPLETED;
+        };
+    }
+
+    public TaskStatus targetAfterPassedCi(TaskType type) {
+        return switch (type) {
+            case IMPLEMENTATION, TEST_GENERATION, PR_REVIEW -> TaskStatus.COMPLETED;
+            case MANUAL_E2E -> TaskStatus.WAITING_FOR_MANUAL_E2E;
+            case REQUIREMENT_ANALYSIS, DESIGN, DELIVERY_COORDINATION, ONBOARDING_SYNC ->
+                    throw new IllegalTaskTransitionException("Task type does not use the CI gate: " + type);
+        };
+    }
+
+    public void requireAllowed(TaskType type, TaskStatus source, TaskStatus target) {
+        if (allowed.getOrDefault(source, Set.of()).contains(target)) {
+            return;
+        }
+        boolean stageTarget = source == TaskStatus.WAITING_FOR_APPROVAL && target == targetAfterApproval(type)
+                || source == TaskStatus.WAITING_FOR_CI && target == targetAfterPassedCi(type)
+                || source == TaskStatus.WAITING_FOR_MANUAL_E2E
+                    && type == TaskType.MANUAL_E2E && target == TaskStatus.COMPLETED;
+        if (!stageTarget) {
+            throw new IllegalTaskTransitionException(
+                    "Transition is not allowed for " + type + ": " + source + " -> " + target);
         }
     }
 

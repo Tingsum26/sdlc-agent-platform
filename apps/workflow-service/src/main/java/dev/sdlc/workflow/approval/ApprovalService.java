@@ -2,7 +2,6 @@ package dev.sdlc.workflow.approval;
 
 import dev.sdlc.workflow.artifact.ArtifactMetadata;
 import dev.sdlc.workflow.artifact.ArtifactService;
-import dev.sdlc.workflow.task.TaskStatus;
 import dev.sdlc.workflow.task.WorkflowTask;
 import dev.sdlc.workflow.task.WorkflowTaskService;
 
@@ -28,8 +27,8 @@ public final class ApprovalService {
             throw new IllegalArgumentException("Artifact does not belong to the workflow task");
         }
         ArtifactMetadata approved = artifacts.markApproved(artifactId, artifactVersion, actorId);
-        WorkflowTask advanced = tasks.transition(taskId, TaskStatus.WAITING_FOR_APPROVAL,
-                TaskStatus.WAITING_FOR_CI, expectedTaskVersion, actorId, correlationId);
+        WorkflowTask advanced = tasks.transitionAfterApproval(
+                taskId, expectedTaskVersion, actorId, correlationId);
         return new ApprovalDecision(actorId, "APPROVED", approved.approvedAt(), approved, advanced);
     }
 }

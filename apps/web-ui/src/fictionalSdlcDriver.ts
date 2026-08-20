@@ -5,7 +5,7 @@ export interface SdlcStepEvent {
 
 export interface FictionalSdlcResult {
   steps: SdlcStepEvent[];
-  auditTrail: Array<{ action: string; detail?: string }>;
+  auditTrail: TaskAuditEvent[];
   artifactIds: string[];
   ticketId: string;
   stageTypes: string[];
@@ -13,6 +13,15 @@ export interface FictionalSdlcResult {
   ticket: { ticketId: string; status: string; version: number };
   repoTask: { repoTaskId: string; status: string; version: number };
   tasks: Array<{ taskId: string; type: string; status: string }>;
+}
+
+interface TaskAuditEvent {
+  action: string;
+  detail?: string;
+  taskId?: string;
+  actorId?: string;
+  previousStatus?: string;
+  newStatus?: string;
 }
 
 export interface FictionalSdlcInput {
@@ -41,9 +50,9 @@ const STAGES: Array<{ type: string; artifactType: string; label: string }> = [
  *     → claim (LOCAL_COPILOT_RUNNING, v1)
  *     → results (WAITING_FOR_USER_CONFIRMATION, v2)
  *     → confirm (WAITING_FOR_APPROVAL, v3)
- *     → approvals (WAITING_FOR_CI, v4)
- *     → ci (WAITING_FOR_MANUAL_E2E, v5)
- *     → manual-e2e (COMPLETED, v6)
+ *     → approvals (COMPLETED for analysis/design; otherwise WAITING_FOR_CI, v4)
+ *     → ci (COMPLETED for CI-only stages; WAITING_FOR_MANUAL_E2E for MANUAL_E2E, v5)
+ *     → manual-e2e (MANUAL_E2E only, COMPLETED, v6)
  *
  * All data is fictitious; every REST call carries the demo identity header.
  */
@@ -126,7 +135,7 @@ export async function runFictionalSdlc(
     });
     taskVersion = confirmed.version;
 
-    const approved = await json<{ taskId: string; version: number }>("/approvals", {
+    const approved = await json<{ taskId: string; status: string; version: number }>("/approvals", {
       method: "POST", body: JSON.stringify({
         taskId: created.taskId,
         artifactId: artifact.artifactId,
@@ -137,28 +146,38 @@ export async function runFictionalSdlc(
     taskVersion = approved.version;
     steps.push({ label: `${stage.label} approved`, detail: artifact.artifactId });
 
-    const ci = await json<{ taskId: string; version: number }>(`/tasks/${created.taskId}/ci`, {
-      method: "POST", body: JSON.stringify({
-        expectedVersion: taskVersion,
-        state: "PASSED",
-        buildFingerprint: `m7-fake-build-${stage.type}`,
-      }),
-    });
-    taskVersion = ci.version;
+    let terminalStatus = approved.status;
+    if (approved.status === "WAITING_FOR_CI") {
+      const ci = await json<{ taskId: string; status: string; version: number }>(`/tasks/${created.taskId}/ci`, {
+        method: "POST", body: JSON.stringify({
+          expectedVersion: taskVersion,
+          state: "PASSED",
+          buildFingerprint: `m7-fake-build-${stage.type}`,
+        }),
+      });
+      taskVersion = ci.version;
+      terminalStatus = ci.status;
 
-    await json(`/tasks/${created.taskId}/manual-e2e`, {
-      method: "POST", body: JSON.stringify({
-        expectedVersion: taskVersion,
-        caseId: `E2E-M7-${runId}`,
-        result: "PASS",
-        actorRole: "QA",
-        executedAt: new Date().toISOString(),
-        buildFingerprint: `m7-fake-build-${stage.type}`,
-        actualResult: "Fictional manual E2E passed",
-        evidenceOrWaiver: "fictional-evidence",
-      }),
-    });
-    steps.push({ label: "manual E2E passed", detail: "E2E-M7-1" });
+      if (ci.status === "WAITING_FOR_MANUAL_E2E") {
+        const manual = await json<{ status: string }>(`/tasks/${created.taskId}/manual-e2e`, {
+          method: "POST", body: JSON.stringify({
+            expectedVersion: taskVersion,
+            caseId: `E2E-M7-${runId}`,
+            result: "PASS",
+            actorRole: "QA",
+            executedAt: new Date().toISOString(),
+            buildFingerprint: `m7-fake-build-${stage.type}`,
+            actualResult: "Fictional manual E2E passed",
+            evidenceOrWaiver: "fictional-evidence",
+          }),
+        });
+        terminalStatus = manual.status;
+        steps.push({ label: "manual E2E passed", detail: `E2E-M7-${runId}` });
+      }
+    }
+    if (terminalStatus !== "COMPLETED") {
+      throw new Error(`fictional-sdlc: ${stage.type} did not reach its terminal state`);
+    }
 
     // Aggregate state follows the completed work instead of being replayed as
     // a client-authored label list after all stages have already finished.
@@ -198,12 +217,30 @@ export async function runFictionalSdlc(
   const persistedRepoTasks = await json<Array<{ repoTaskId: string; status: string; version: number }>>(`/tickets/${ticketId}/repo-tasks`);
   const persistedRepoTask = persistedRepoTasks.find((entry) => entry.repoTaskId === repoTask.repoTaskId);
   const persistedTasks = createdTaskIds.map((taskId) => tasks.find((task) => task.taskId === taskId)).filter((task): task is NonNullable<typeof task> => Boolean(task));
-  const taskAudit = (await Promise.all(createdTaskIds.map((taskId) =>
-    json<Array<{ action: string; detail?: string }>>(`/tasks/${taskId}/audit`)))).flat();
+  const taskAuditsById = new Map(await Promise.all(createdTaskIds.map(async (taskId) => [
+    taskId,
+    await json<TaskAuditEvent[]>(`/tasks/${taskId}/audit`),
+  ] as const)));
+  const taskAudit = [...taskAuditsById.values()].flat();
   if (resume.epic.status !== "ACTIVE" || !persistedTicket || persistedTicket.status !== "E2E_VERIFIED" || !persistedRepoTask || persistedRepoTask.status !== "MERGED"
       || persistedTasks.length !== STAGES.length || persistedTasks.some((task) => task.status !== "COMPLETED")) {
     throw new Error("fictional-sdlc: persisted lifecycle evidence is incomplete");
   }
+  for (const task of persistedTasks) {
+    const states = (taskAuditsById.get(task.taskId) ?? []).map((event) => event.newStatus).filter(Boolean);
+    const passedThrough = (...expected: string[]) => expected.every((status, index) => {
+      const previousIndex = index === 0 ? -1 : states.indexOf(expected[index - 1]);
+      return states.indexOf(status, previousIndex + 1) > previousIndex;
+    });
+    const valid = task.type === "REQUIREMENT_ANALYSIS" || task.type === "DESIGN"
+      ? passedThrough("WAITING_FOR_APPROVAL", "COMPLETED")
+          && !states.includes("WAITING_FOR_CI") && !states.includes("WAITING_FOR_MANUAL_E2E")
+      : task.type === "MANUAL_E2E"
+        ? passedThrough("WAITING_FOR_CI", "WAITING_FOR_MANUAL_E2E", "COMPLETED")
+        : passedThrough("WAITING_FOR_CI", "COMPLETED") && !states.includes("WAITING_FOR_MANUAL_E2E");
+    if (!valid) throw new Error(`fictional-sdlc: persisted terminal evidence is invalid for ${task.type}`);
+  }
+  steps.push({ label: "stage terminal policy", detail: "approval-only 2 · CI-only 3 · manual E2E 1" });
   steps.push({ label: "persisted epic state", detail: `${resume.epic.epicId} · ${resume.epic.status}` });
   steps.push({ label: "persisted ticket state", detail: `${persistedTicket.ticketId} · ${persistedTicket.status}` });
   steps.push({ label: "persisted repo task state", detail: `${persistedRepoTask.repoTaskId} · ${persistedRepoTask.status}` });
