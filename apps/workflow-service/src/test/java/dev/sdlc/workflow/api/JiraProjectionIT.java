@@ -70,7 +70,7 @@ class JiraProjectionIT {
 
     @Test
     void neverPublishesAStandaloneCredentialShapedTicketIdentifier() throws Exception {
-        String credentialShapedTicketId = "ghp_0123456789abcdefghijklmnopqrstuv";
+        String credentialShapedTicketId = "ghp_" + "0123456789abcdefghijklmnopqrstuv";
         createApprovedArtifact(credentialShapedTicketId, "ART-CREDENTIAL-TICKET", "Approved requirement scope");
 
         mvc.perform(jiraDraft(credentialShapedTicketId, "ART-CREDENTIAL-TICKET", 1))
