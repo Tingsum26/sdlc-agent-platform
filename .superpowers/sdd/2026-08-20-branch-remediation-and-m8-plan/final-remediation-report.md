@@ -2,7 +2,11 @@
 
 Date: 2026-08-21
 
-Implementation commit: `3d00f8e399858495dd307d494cb4059bf1fb7b59`
+Implementation commits:
+
+- `3d00f8e399858495dd307d494cb4059bf1fb7b59` — main final-remediation wave
+- `a592296d76df11a74756e5d04c28819beece0716` — follow-up that resolves a real
+  `node/node.exe` from PATH for hooks when the extension host is Code/Electron
 
 Review range addressed: `f2f2871..1f996bd`
 
@@ -12,10 +16,10 @@ deliberately excluded from the implementation commit. No push was performed.
 
 ## Outcome by final-review finding
 
-1. Hook runtime: `hookCommand` now uses ordinary Node directly and adds
-   `--ms-enable-electron-run-as-node` when `process.execPath` is a VS Code /
-   Electron executable. A Code.exe-shaped regression covers the extension-host
-   case.
+1. Hook runtime: `hookCommand` now uses a real `node/node.exe`. If
+   `process.execPath` is Code/Electron, the installer resolves an executable
+   Node runtime from PATH and fails closed when none exists. A Code.exe-shaped
+   regression proves the hook command never invokes Code.exe.
 2. Transactional customization activation: all three global customization
    location settings, the global hook setting, active-location Memento,
    installer-managed-hook Memento, and installed-bundle Memento are snapshotted
@@ -66,6 +70,9 @@ deliberately excluded from the implementation commit. No push was performed.
   failed 5 regressions before implementation: Electron runtime flag,
   transactional cleanup, empty-actor refresh, elapsed freshness, and ungated
   polling.
+- The tightened Code.exe regression initially failed with
+  `resolveNodeRuntime is not a function`; it passed after adding real PATH
+  resolution and removing the Electron-runtime fallback.
 - `.\mvnw.cmd -q -pl apps/workflow-service test '-Dtest=WorkflowApiIT,JiraProjectionIT'`
   failed 3 regressions before implementation: cross-repository legacy-key
   collision and two artifact-title projection leaks.
@@ -93,7 +100,7 @@ runs.
 | `node --test scripts/tests/internalTodoRegistry.test.mjs` | PASS; 11/11 |
 | `pnpm verify:internal-todos` | PASS; 10 IDs and 19 canonical marker paths |
 | `powershell -File scripts/tests/stop-demo.test.ps1` | PASS; temporal lineage, PID reuse, tree, exit, and discovery failure |
-| `pnpm --filter sdlc-workbench package` | PASS; typecheck, build, 6-file 17.65-KB VSIX |
+| `pnpm --filter sdlc-workbench package` | PASS; typecheck, build, 6-file 17.84-KB VSIX |
 | `scripts/tests/build-bundle.test.ps1` | PASS |
 | `scripts/tests/bundle-lifecycle.test.ps1` | PASS |
 | `git diff --check` | PASS; only repository-configured LF/CRLF conversion notices |
@@ -133,9 +140,10 @@ stop-demo lifecycle PASS, and affected VSIX suites 40/40.
   itself refuses compensation writes, the original activation error is still
   raised and the newly created bundle directory is removed; company-host chaos
   testing remains advisable.
-- The Electron command regression verifies construction for a Code.exe-shaped
-  runtime; execution against the company's exact VS Code build remains an
-  internal compatibility check.
+- Hook activation requires a real Node executable on PATH when hosted by
+  Code/Electron. Node availability and PATH policy remain an internal
+  onboarding/compatibility check; activation fails before any setting write if
+  no runtime can be resolved.
 - M7 evidence is genuinely persisted/query-derived inside the fictional
   in-memory public service. It is not evidence of company-system connectivity
   or restart durability.
