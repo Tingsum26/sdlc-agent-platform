@@ -30,19 +30,22 @@ test("DEMO-123 completes the public local-Copilot vertical slice", async ({ page
   await client.close(); await server.close();
 
   const headers = { "X-Demo-User": "developer-1", "Content-Type": "application/json" };
-  await expect((await request.post(`http://127.0.0.1:8080/api/v1/tasks/${task.taskId}/ci`, {
-    headers, data: { expectedVersion: 4, state: "PASSED", buildFingerprint: "REPO_A@0123456" },
-  })).ok()).toBeTruthy();
-  await expect((await request.post(`http://127.0.0.1:8080/api/v1/tasks/${task.taskId}/manual-e2e`, {
-    headers, data: { expectedVersion: 5, caseId: "E2E-DEMO", result: "PASS", actorRole: "QA",
-      executedAt: "2026-08-16T08:00:00Z", buildFingerprint: "REPO_A@0123456",
-      actualResult: "Confirmation shown", evidenceOrWaiver: "EVIDENCE-DEMO" },
-  })).ok()).toBeTruthy();
+  const completedTask = await request.get(`http://127.0.0.1:8080/api/v1/tasks/${task.taskId}`, { headers });
+  expect(completedTask.ok()).toBeTruthy();
+  await expect(completedTask.json()).resolves.toMatchObject({
+    taskId: task.taskId,
+    type: "REQUIREMENT_ANALYSIS",
+    status: "COMPLETED",
+  });
 
   await page.getByRole("button", { name: "Refresh tasks" }).click();
   await expect(page.getByText("Completed")).toBeVisible();
   const audit = await request.get(`http://127.0.0.1:8080/api/v1/tasks/${task.taskId}/audit`, { headers });
-  expect((await audit.json())).toHaveLength(7);
+  expect(audit.ok()).toBeTruthy();
+  await expect(audit.json()).resolves.toEqual(expect.arrayContaining([
+    expect.objectContaining({ action: "TASK_CREATED" }),
+    expect.objectContaining({ action: "TASK_TRANSITIONED", newStatus: "COMPLETED" }),
+  ]));
   const report = await request.get("http://127.0.0.1:8080/api/v1/reports/ART-DEMO-123/versions/1", { headers });
   expect(await report.text()).toContain("Fictional public requirement evidence.");
 });
