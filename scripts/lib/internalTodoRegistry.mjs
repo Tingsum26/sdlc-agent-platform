@@ -69,15 +69,13 @@ function readRegistry(registryPath, errors) {
 
 function readMarkdownIds(markdownPath, errors) {
   try {
-    return new Set(
-      readFileSync(markdownPath, 'utf8')
-        .split(/\r?\n/)
-        .map((line) => line.match(TABLE_ID)?.[1])
-        .filter(Boolean)
-    );
+    return readFileSync(markdownPath, 'utf8')
+      .split(/\r?\n/)
+      .map((line) => line.match(TABLE_ID)?.[1])
+      .filter(Boolean);
   } catch (error) {
     errors.push(`Cannot read Markdown registry: ${error.message}`);
-    return new Set();
+    return [];
   }
 }
 
@@ -89,9 +87,16 @@ export function validateRegistry({ rootDirectory }) {
   const root = resolve(rootDirectory);
   const errors = [];
   const registryEntries = readRegistry(join(root, 'docs/handoff/internal-todo-registry.json'), errors);
-  const markdownIds = readMarkdownIds(join(root, 'docs/handoff/INTERNAL_TODO.md'), errors);
+  const markdownIdRows = readMarkdownIds(join(root, 'docs/handoff/INTERNAL_TODO.md'), errors);
+  const markdownIds = new Set(markdownIdRows);
   const { markers: sourceMarkers, markerCount } = readCanonicalMarkers(root);
   const registryById = new Map();
+
+  for (const id of sorted(markdownIds)) {
+    if (markdownIdRows.filter((rowId) => rowId === id).length > 1) {
+      errors.push(`Duplicate Markdown registry ID: ${id}`);
+    }
+  }
 
   for (const entry of registryEntries) {
     const missingFields = ['id', 'component', 'markerPaths', 'action', 'evidence', 'rollback']

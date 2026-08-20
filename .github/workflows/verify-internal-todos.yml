@@ -11,6 +11,7 @@ on:
       - 'scripts/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - '.github/workflows/verify-internal-todos.yml'
   pull_request:
     paths:
       - 'apps/**'
@@ -21,6 +22,7 @@ on:
       - 'scripts/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - '.github/workflows/verify-internal-todos.yml'
 
 jobs:
   verify:

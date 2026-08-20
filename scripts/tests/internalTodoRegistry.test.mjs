@@ -108,6 +108,20 @@ test('reports a Markdown and JSON ID mismatch', async () => {
   );
 });
 
+test('reports duplicate IDs in the Markdown registry table', async () => {
+  await withFixture(
+    {
+      entries: [registryEntry('INTERNAL-SAMPLE-001')],
+      markdownIds: ['INTERNAL-SAMPLE-001', 'INTERNAL-SAMPLE-001'],
+      markers: ['// TODO(INTERNAL): INTERNAL-SAMPLE-001 valid']
+    },
+    async (rootDirectory) => {
+      const result = validateRegistry({ rootDirectory });
+      assert.deepEqual(result.errors, ['Duplicate Markdown registry ID: INTERNAL-SAMPLE-001']);
+    }
+  );
+});
+
 test('does not mistake a template placeholder for a canonical source marker', async () => {
   await withFixture(
     {
