@@ -1,0 +1,112 @@
+{
+  "entries": [
+    {
+      "id": "INTERNAL-AUD-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/FakeRuntimeConfiguration.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/MongoRuntimeConfiguration.java"
+      ],
+      "action": "Persist M2 domain aggregates and audit events to the company MongoDB deployment.",
+      "evidence": "Sanitized Mongo mapping and restart-resume test report.",
+      "rollback": "Return the affected repositories to in-memory implementations."
+    },
+    {
+      "id": "INTERNAL-CI-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/api/EpicController.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/FakeRuntimeConfiguration.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/MongoRuntimeConfiguration.java"
+      ],
+      "action": "Route CI status to the company Jenkins adapter.",
+      "evidence": "Sanitized CI status projection log.",
+      "rollback": "Restore the deterministic mock CI adapter."
+    },
+    {
+      "id": "INTERNAL-EPIC-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/api/EpicController.java"
+      ],
+      "action": "Synchronize Epic creation and Ticket status changes with company Jira.",
+      "evidence": "Sanitized Jira projection log.",
+      "rollback": "Remove the sync call while retaining the fake profile."
+    },
+    {
+      "id": "INTERNAL-HOOKS-001",
+      "component": "vscode-extension",
+      "markerPaths": [
+        "apps/vscode-extension/src/customization/bundleInstaller.ts"
+      ],
+      "action": "Confirm Copilot hook policy and replace local echo scripts with approved deterministic hooks.",
+      "evidence": "Sanitized hook activation log.",
+      "rollback": "Disable hook activation while retaining bundle installation."
+    },
+    {
+      "id": "INTERNAL-IDN-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/api/InternalReadinessController.java"
+      ],
+      "action": "Replace demo enrollment-code issuance with corporate SSO or manual administrator binding.",
+      "evidence": "Sanitized identity binding test report.",
+      "rollback": "Keep the endpoint behind the fake profile."
+    },
+    {
+      "id": "INTERNAL-IDN-002",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/FakeRuntimeConfiguration.java"
+      ],
+      "action": "Provision real administrators instead of fictional EMP-100 data.",
+      "evidence": "Sanitized identity provisioning log.",
+      "rollback": "Re-seed the fictional principal."
+    },
+    {
+      "id": "INTERNAL-JIRA-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/api/EpicController.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/FakeRuntimeConfiguration.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/MongoRuntimeConfiguration.java"
+      ],
+      "action": "Route the Jira projection outbox to the real Jira comment API with approved credentials.",
+      "evidence": "Sanitized Jira comment publish log.",
+      "rollback": "Restore the fake projection client."
+    },
+    {
+      "id": "INTERNAL-JOURNEY-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/api/JourneyController.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/FakeRuntimeConfiguration.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/MongoRuntimeConfiguration.java"
+      ],
+      "action": "Feed real repository observations into freshness processing and persist them to MongoDB.",
+      "evidence": "Sanitized repository observation log.",
+      "rollback": "Restore in-memory observations and fake merge events."
+    },
+    {
+      "id": "INTERNAL-POD-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/api/InternalReadinessController.java"
+      ],
+      "action": "Replace manual roster import with Teambook or HR synchronization when approved.",
+      "evidence": "Sanitized roster import report.",
+      "rollback": "Keep manual CSV or JSON import active."
+    },
+    {
+      "id": "INTERNAL-SPLUNK-001",
+      "component": "workflow-service",
+      "markerPaths": [
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/FakeRuntimeConfiguration.java",
+        "apps/workflow-service/src/main/java/dev/sdlc/workflow/config/MongoRuntimeConfiguration.java"
+      ],
+      "action": "Point the Splunk audit publisher to the company HEC endpoint.",
+      "evidence": "Sanitized HEC event log.",
+      "rollback": "Restore the deterministic fake transport."
+    }
+  ]
+}

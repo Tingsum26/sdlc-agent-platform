@@ -49,6 +49,14 @@
 | Splunk | SIMULATED_PASS | | | | |
 | Pilot Journey | CONTRACT_PASS（仅虚构 Fixture） | | | | |
 
+### 3.2 Internal TODO 逐项完成记录
+
+对每一个适用的 `INTERNAL-…` ID 填一行。未执行必须说明原因；不要将代码提交当作证据。
+
+| Internal TODO ID | Status (PASS/PARTIAL/FAIL/BLOCKED/NOT RUN) | Evidence ID（仅内网） | 实际偏差/替代方案 | 已执行或验证的回滚 | Owner 角色 |
+|---|---|---|---|---|---|
+| INTERNAL-XXX | | | | | |
+
 ## 4. 测试摘要
 
 | 测试类别 | 总数 | 通过 | 失败 | 阻塞 | 跳过 | 耗时 |

@@ -1,0 +1,38 @@
+name: Verify internal TODO registry
+
+on:
+  push:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'central/**'
+      - 'docs/handoff/INTERNAL_TODO.md'
+      - 'docs/handoff/internal-todo-registry.json'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'central/**'
+      - 'docs/handoff/INTERNAL_TODO.md'
+      - 'docs/handoff/internal-todo-registry.json'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify:internal-todos
