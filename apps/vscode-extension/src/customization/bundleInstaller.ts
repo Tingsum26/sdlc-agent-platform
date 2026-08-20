@@ -13,9 +13,16 @@ const activeHookSettingsKey = "sdlc.activeCustomizationHookSettings";
 // walker derives agents/skills/instructions/policies/evals lists as the
 // manifest surface, but the installed bundle carries the full platform
 // configuration, so every content directory is copied as-is.
-const shippedContentDirs = ["hooks", "mcp", "policies", "templates", "evals"] as const;
+const shippedContentDirs = ["mcp", "policies", "templates", "evals"] as const;
 
 interface HookEvent { event: string; action: string }
+
+class BundleActivationRecoveryError extends Error {
+  constructor(cause: unknown) {
+    super("Customization activation failed and recovery was incomplete; the published bundle was retained", { cause });
+    this.name = "BundleActivationRecoveryError";
+  }
+}
 
 export async function installCustomizationBundle(context: vscode.ExtensionContext): Promise<void> {
   const selected = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false,
@@ -78,6 +85,14 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
       await mkdir(dirname(targetDir), { recursive: true });
       await cp(sourceDir, targetDir, { recursive: true, force: true });
     }
+    const hooksManifest = safeResolve(stagedRoot, "central/hooks/hooks-manifest.json");
+    if (existsSync(hooksManifest)) {
+      const targetHooks = join(candidate, "hooks");
+      await mkdir(targetHooks, { recursive: true });
+      // A selected bundle contributes declarations only. Its executable files
+      // never cross into the installed destination.
+      await cp(hooksManifest, join(targetHooks, "hooks-manifest.json"), { force: true });
+    }
     await rejectBundleSymlinks(candidate);
 
     await rename(candidate, destination);
@@ -92,7 +107,9 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
     void vscode.window.showInformationMessage(`Activated SDLC customization bundle ${manifest.bundleVersion}. Verify it in Chat Customizations diagnostics.`);
   } catch (error) {
     if (candidate) await rm(candidate, { recursive: true, force: true });
-    if (destinationCreatedByThisAttempt && destination) await rm(destination, { recursive: true, force: true });
+    if (destinationCreatedByThisAttempt && destination && !(error instanceof BundleActivationRecoveryError)) {
+      await rm(destination, { recursive: true, force: true });
+    }
     throw error;
   } finally {
     await rm(sourceStaging, { recursive: true, force: true });
@@ -135,7 +152,9 @@ async function activateBundleTransaction(
   const nextLocations = {
     agentFilesLocations: agents, agentSkillsLocations: skills, instructionsFilesLocations: instructions,
   };
-  const nextHooks = nextHookSettings(priorConfig.hooks, previousHookSettings, root, hookEntries);
+  const nextHooks = nextHookSettings(
+    priorConfig.hooks, previousHookSettings, context.extensionUri.fsPath, hookEntries,
+  );
 
   try {
     await chat.update("agentFilesLocations", nextLocation(priorConfig.agentFilesLocations, agents, previousLocations.agentFilesLocations), vscode.ConfigurationTarget.Global);
@@ -147,9 +166,9 @@ async function activateBundleTransaction(
     await context.globalState.update(stateKey, installed);
   } catch (error) {
     // Configuration and Memento have no shared transaction primitive. Restore
-    // every participant from its pre-activation snapshot; compensation is
-    // best-effort so the original activation failure remains the reported one.
-    await Promise.allSettled([
+    // every participant from its pre-activation snapshot. If any compensation
+    // fails, retain the published files and report a recovery-required error.
+    const recovery = await Promise.allSettled([
       chat.update("agentFilesLocations", priorConfig.agentFilesLocations, vscode.ConfigurationTarget.Global),
       chat.update("agentSkillsLocations", priorConfig.agentSkillsLocations, vscode.ConfigurationTarget.Global),
       chat.update("instructionsFilesLocations", priorConfig.instructionsFilesLocations, vscode.ConfigurationTarget.Global),
@@ -158,13 +177,19 @@ async function activateBundleTransaction(
       context.globalState.update(activeHookSettingsKey, previousActiveHooks),
       context.globalState.update(stateKey, previousInstalled),
     ]);
+    if (recovery.some((result) => result.status === "rejected")) {
+      // A surviving configuration value may still reference the new bundle.
+      // Retaining the immutable destination prevents a dangling path and gives
+      // diagnostics a recoverable state on the next activation.
+      throw new BundleActivationRecoveryError(error);
+    }
     throw error;
   }
 }
 
 // The exact command recorded for a validated hook entry. JSON string quoting is
-// accepted by both cmd.exe and POSIX shells, so bundle paths with spaces cannot
-// alter the command that invokes the installed Node no-op shim.
+// accepted by both cmd.exe and POSIX shells, so paths with spaces cannot alter
+// the command that invokes the extension-owned Node no-op shim.
 export function resolveNodeRuntime(
   executable = process.execPath,
   pathValue = process.env.PATH ?? "",
@@ -187,18 +212,22 @@ export function resolveNodeRuntime(
   throw new Error("A real Node runtime is required to activate customization hooks");
 }
 
-export function hookCommand(root: string, action: string, runtime = resolveNodeRuntime()): string {
-  return `${JSON.stringify(runtime)} ${JSON.stringify(join(root, "hooks", "run-hook.mjs"))} ${JSON.stringify(action)}`;
+export function hookCommand(extensionRoot: string, action: string, runtime = resolveNodeRuntime()): string {
+  return `${JSON.stringify(runtime)} ${JSON.stringify(join(extensionRoot, "media", "trusted-hook.mjs"))} ${JSON.stringify(action)}`;
 }
 
 const hookEventNames = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"] as const;
 const hookActionPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const trustedHookActions = new Set([
+  "verify-workflow-context", "record-redacted-metadata", "guard-dangerous-operations",
+  "format-and-record", "persist-checkpoint", "verify-stage-output",
+]);
 
 function isValidHookEntry(entry: unknown): entry is HookEvent {
   if (typeof entry !== "object" || entry === null) return false;
   const { event, action } = entry as Record<string, unknown>;
   return typeof event === "string" && (hookEventNames as readonly string[]).includes(event)
-    && typeof action === "string" && hookActionPattern.test(action);
+    && typeof action === "string" && hookActionPattern.test(action) && trustedHookActions.has(action);
 }
 
 // Reads and validates the target bundle's hooks manifest. A missing manifest,
@@ -219,13 +248,13 @@ async function readHookEntries(root: string): Promise<HookEvent[]> {
 // approved deterministic hook commands, and only then enable real hook
 // execution. The declared events are still recorded in chat.agent.hooks so the
 // activation surface is visible, but every command is a local no-op today.
-// The shipped Node shim is invoked through a real node/node.exe resolved from
-// the local PATH when the extension host executable is Electron/Code; real
-// actions must preserve this platform-neutral invocation boundary.
+// The extension-owned Node shim is invoked through a real node/node.exe
+// resolved from the local PATH when the extension host executable is
+// Electron/Code; real actions must preserve this invocation boundary.
 function nextHookSettings(
   liveValue: Record<string, unknown>,
   recorded: Record<string, unknown>,
-  root: string,
+  extensionRoot: string,
   entries: HookEvent[],
 ): { live: Record<string, unknown>; recorded: Record<string, unknown> } {
   // Merge/stale semantics: chat.agent.hooks is the user's live config and may
@@ -241,8 +270,8 @@ function nextHookSettings(
 
   const nextRecorded: Record<string, unknown> = {};
   for (const { event, action } of entries) {
-    hookSettings[event] = hookCommand(root, action);
-    nextRecorded[event] = hookCommand(root, action);
+    hookSettings[event] = hookCommand(extensionRoot, action);
+    nextRecorded[event] = hookCommand(extensionRoot, action);
   }
 
   return { live: hookSettings, recorded: nextRecorded };

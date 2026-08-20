@@ -16,7 +16,8 @@
     "e2e:m3": "playwright test e2e/m3-enterprise-adapters.spec.ts",
     "e2e:m4": "playwright test e2e/m4-journey-onboarding.spec.ts",
     "e2e:m7": "playwright test e2e/m7-end-to-end.spec.ts",
-    "verify:internal-todos": "node scripts/validate-internal-todos.mjs"
+    "verify:internal-todos": "node scripts/validate-internal-todos.mjs",
+    "verify:workflow-security": "node --test scripts/tests/githubWorkflows.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.55.1"

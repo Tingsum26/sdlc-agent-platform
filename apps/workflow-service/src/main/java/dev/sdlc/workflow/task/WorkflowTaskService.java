@@ -153,6 +153,25 @@ public final class WorkflowTaskService {
         return changed;
     }
 
+    public synchronized WorkflowTask validateTransition(
+            String taskId,
+            TaskStatus expectedStatus,
+            TaskStatus targetStatus,
+            long expectedVersion) {
+        WorkflowTask task = requireVersion(taskId, expectedVersion);
+        if (task.status() != expectedStatus) {
+            throw new IllegalTaskTransitionException("Expected status " + expectedStatus + " but was " + task.status());
+        }
+        transitionPolicy.requireAllowed(task.type(), task.status(), targetStatus);
+        return task;
+    }
+
+    public synchronized WorkflowTask validateTransitionAfterApproval(String taskId, long expectedVersion) {
+        WorkflowTask task = requireVersion(taskId, expectedVersion);
+        return validateTransition(taskId, TaskStatus.WAITING_FOR_APPROVAL,
+                transitionPolicy.targetAfterApproval(task.type()), expectedVersion);
+    }
+
     public synchronized WorkflowTask transitionAfterApproval(
             String taskId,
             long expectedVersion,

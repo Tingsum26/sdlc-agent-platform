@@ -4,6 +4,7 @@ import dev.sdlc.workflow.artifact.ArtifactMetadata;
 import dev.sdlc.workflow.artifact.ArtifactSection;
 import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactType;
+import dev.sdlc.workflow.artifact.TaskArtifactPolicy;
 import dev.sdlc.workflow.approval.ApprovalService;
 import dev.sdlc.workflow.security.CurrentUser;
 import dev.sdlc.workflow.evidence.EvidenceClassification;
@@ -101,12 +102,22 @@ public class WorkflowTaskController {
             @Valid @RequestBody SubmitArtifactRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
-        WorkflowTask task = tasks.getTask(taskId);
-        ArtifactMetadata artifact = artifacts.create(body.artifactId(), taskId, body.type(), body.sections(),
-                user.actorId(), body.contentHash());
-        tasks.transition(taskId, TaskStatus.LOCAL_COPILOT_RUNNING, TaskStatus.WAITING_FOR_USER_CONFIRMATION,
-                task.version(), user.actorId(), CorrelationIdFilter.from(request));
-        return artifact;
+        synchronized (tasks) {
+            WorkflowTask task = tasks.getTask(taskId);
+            TaskArtifactPolicy.requireCompatible(task.type(), body.type());
+            tasks.validateTransition(taskId, TaskStatus.LOCAL_COPILOT_RUNNING,
+                    TaskStatus.WAITING_FOR_USER_CONFIRMATION, task.version());
+            ArtifactMetadata artifact = artifacts.create(body.artifactId(), taskId, body.type(), body.sections(),
+                    user.actorId(), body.contentHash());
+            try {
+                tasks.transition(taskId, TaskStatus.LOCAL_COPILOT_RUNNING, TaskStatus.WAITING_FOR_USER_CONFIRMATION,
+                        task.version(), user.actorId(), CorrelationIdFilter.from(request));
+                return artifact;
+            } catch (RuntimeException exception) {
+                artifacts.delete(artifact);
+                throw exception;
+            }
+        }
     }
 
     @PostMapping("/tasks/{taskId}/confirm")

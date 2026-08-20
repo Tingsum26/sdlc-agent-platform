@@ -22,6 +22,12 @@ public final class MongoDocumentArtifactStore implements ArtifactStore {
     }
 
     @Override
+    public void delete(String artifactId, int version) {
+        Query query = Query.query(Criteria.where("artifactId").is(artifactId).and("version").is(version));
+        mongoOperations.remove(query, ArtifactDocument.class, COLLECTION);
+    }
+
+    @Override
     public Optional<ArtifactMetadata> find(String artifactId, int version) {
         Query query = Query.query(Criteria.where("artifactId").is(artifactId).and("version").is(version));
         return Optional.ofNullable(mongoOperations.findOne(query, ArtifactDocument.class, COLLECTION))

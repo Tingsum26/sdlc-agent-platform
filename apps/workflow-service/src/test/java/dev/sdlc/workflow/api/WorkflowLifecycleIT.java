@@ -50,7 +50,7 @@ class WorkflowLifecycleIT {
                 .andExpect(status().isOk());
         mvc.perform(post("/api/v1/tasks/{id}/results", taskId).header("X-Demo-User", "developer-1")
                 .contentType(MediaType.APPLICATION_JSON).content("""
-                    {"artifactId":"ART-LIFECYCLE","type":"REQUIREMENT_REPORT","sections":[{"key":"summary","title":"Summary","body":"Safe fictional evidence"}]}
+                    {"artifactId":"ART-LIFECYCLE","type":"MANUAL_E2E_REPORT","sections":[{"key":"summary","title":"Summary","body":"Safe fictional evidence"}]}
                     """)).andExpect(status().isOk());
         mvc.perform(post("/api/v1/tasks/{id}/confirm", taskId).header("X-Demo-User", "developer-1")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":2}"))

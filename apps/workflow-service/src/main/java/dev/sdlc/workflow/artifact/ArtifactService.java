@@ -54,6 +54,14 @@ public final class ArtifactService {
         return store.save(artifact.approvedBy(actorId, clock.instant()));
     }
 
+    public synchronized void restore(ArtifactMetadata artifact) {
+        store.save(artifact);
+    }
+
+    public synchronized void delete(ArtifactMetadata artifact) {
+        store.delete(artifact.artifactId(), artifact.version());
+    }
+
     public String renderHtml(String artifactId, int version) {
         ArtifactMetadata artifact = requireArtifact(artifactId, version);
         StringBuilder html = new StringBuilder("<!doctype html><html><head><meta charset=\"utf-8\"><title>")

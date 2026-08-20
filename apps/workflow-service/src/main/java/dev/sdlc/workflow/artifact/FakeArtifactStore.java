@@ -16,6 +16,11 @@ public final class FakeArtifactStore implements ArtifactStore {
     }
 
     @Override
+    public synchronized void delete(String artifactId, int version) {
+        artifacts.remove(key(artifactId, version));
+    }
+
+    @Override
     public synchronized Optional<ArtifactMetadata> find(String artifactId, int version) {
         return Optional.ofNullable(artifacts.get(key(artifactId, version)));
     }

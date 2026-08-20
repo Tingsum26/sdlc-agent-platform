@@ -38,4 +38,28 @@ describe("TaskPoller", () => {
     await vi.advanceTimersByTimeAsync(600_000);
     expect(refresh).toHaveBeenCalledTimes(4);
   });
+
+  it("coalesces focus events with an in-flight refresh and leaves exactly one timer", async () => {
+    let releaseRefresh!: () => void;
+    const pendingRefresh = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+    const refresh = vi.fn().mockReturnValueOnce(pendingRefresh).mockResolvedValue(undefined);
+    const poller = new TaskPoller(refresh, () => true, { foregroundMs: 60_000, backgroundMs: 300_000 });
+
+    poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    const firstFocus = poller.onFocus();
+    const secondFocus = poller.onFocus();
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    releaseRefresh();
+    await Promise.all([firstFocus, secondFocus]);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(1);
+  });
 });

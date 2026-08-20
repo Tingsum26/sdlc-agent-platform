@@ -33,7 +33,9 @@ class ApprovalServiceTest {
         tasks.createTask("TASK-1", taskType,
                 new WorkflowScope("DEMO-123", "REPO_A", "abc"), "key", "author", "corr");
         tasks.claimTask("TASK-1", "author", java.time.Duration.ofMinutes(15), 0, "corr");
-        artifacts.create("ART-1", "TASK-1", ArtifactType.REQUIREMENT_REPORT,
+        ArtifactType artifactType = taskType == TaskType.DESIGN
+                ? ArtifactType.DESIGN_REPORT : ArtifactType.REQUIREMENT_REPORT;
+        artifacts.create("ART-1", "TASK-1", artifactType,
                 List.of(new ArtifactSection("summary", "Summary", "Safe content")), "author", null);
         tasks.transition("TASK-1", TaskStatus.LOCAL_COPILOT_RUNNING,
                 TaskStatus.WAITING_FOR_USER_CONFIRMATION, 1, "author", "corr");

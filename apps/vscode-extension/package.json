@@ -7,7 +7,7 @@
   "private": true,
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/Tingsum26/sdlc-agent-platform.git" },
-  "files": ["dist/extension.js", "media/workflow.svg", "LICENSE"],
+  "files": ["dist/extension.js", "media/workflow.svg", "media/trusted-hook.mjs", "LICENSE"],
   "engines": { "vscode": "^1.100.0" },
   "categories": ["Other", "Visualization", "Testing"],
   "activationEvents": ["onStartupFinished"],

@@ -21,6 +21,7 @@ const sourceCopyMutation = vi.hoisted(() => ({
   renameFailure: undefined as Error | undefined,
   renameCalls: 0,
   failConfigWriteAt: 0,
+  failConfigWritesAt: [] as number[],
   configWriteCalls: 0,
 }));
 
@@ -59,7 +60,8 @@ vi.mock("vscode", () => ({
       }),
       update: vi.fn((key: string, value: unknown) => {
         sourceCopyMutation.configWriteCalls++;
-        if (sourceCopyMutation.failConfigWriteAt === sourceCopyMutation.configWriteCalls) {
+        if (sourceCopyMutation.failConfigWriteAt === sourceCopyMutation.configWriteCalls
+            || sourceCopyMutation.failConfigWritesAt.includes(sourceCopyMutation.configWriteCalls)) {
           sourceCopyMutation.failConfigWriteAt = 0;
           return Promise.reject(new Error("forced configuration write failure"));
         }
@@ -84,6 +86,7 @@ beforeEach(() => {
   sourceCopyMutation.renameFailure = undefined;
   sourceCopyMutation.renameCalls = 0;
   sourceCopyMutation.failConfigWriteAt = 0;
+  sourceCopyMutation.failConfigWritesAt = [];
   sourceCopyMutation.configWriteCalls = 0;
 });
 
@@ -94,6 +97,7 @@ function createStatefulContext(storageRoot: string, failStateWriteAt = 0): vscod
   let stateWrites = 0;
   return {
     globalStorageUri: { fsPath: storageRoot },
+    extensionUri: { fsPath: join(storageRoot, "trusted-extension") },
     globalState: {
       get: vi.fn((key: string, fallback: unknown) => (store.has(key) ? store.get(key) : fallback)),
       update: vi.fn(async (key: string, value: unknown) => {
@@ -153,6 +157,7 @@ describe("customization bundle installer", () => {
     vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
     const context = {
       globalStorageUri: { fsPath: storageRoot },
+      extensionUri: { fsPath: join(storageRoot, "trusted-extension") },
       globalState: { get: vi.fn((_key: string, fallback: unknown) => fallback), update: vi.fn().mockResolvedValue(undefined) },
     } as unknown as vscode.ExtensionContext;
 
@@ -240,11 +245,11 @@ describe("customization bundle installer", () => {
   });
 
   it("uses Node to invoke the installed no-op hook shim without shell redirection", () => {
-    const root = join("C:", "installed bundle");
+    const root = join("C:", "trusted extension");
     const command = hookCommand(root, "verify-stage-output");
 
     expect(command).toContain("node");
-    expect(command).toContain(JSON.stringify(join(root, "hooks", "run-hook.mjs")));
+    expect(command).toContain(JSON.stringify(join(root, "media", "trusted-hook.mjs")));
     expect(command).toContain("verify-stage-output");
     expect(command).not.toMatch(/[>&|;]/);
   });
@@ -271,7 +276,7 @@ describe("customization bundle installer", () => {
       configState.set("chat.agent|hooks", { Stop: "user-hook" });
       sourceCopyMutation.configWriteCalls = 0;
       sourceCopyMutation.failConfigWriteAt = failure <= 4 ? failure : 0;
-      const sourceRoot = createSourceBundle(`transaction-${failure}`, [{ event: "PreToolUse", action: "guard" }]);
+      const sourceRoot = createSourceBundle(`transaction-${failure}`, [{ event: "PreToolUse", action: "guard-dangerous-operations" }]);
       const storageRoot = mkdtempSync(join(tmpdir(), `sdlc-transaction-${failure}-`));
       vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
       const stateFailure = failure > 4 ? failure - 4 : 0;
@@ -290,6 +295,39 @@ describe("customization bundle installer", () => {
     }
   });
 
+  it("retains a newly published destination when activation compensation fails", async () => {
+    const sourceRoot = createSourceBundle("recovery-required", [{ event: "PreToolUse", action: "guard-dangerous-operations" }]);
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-recovery-required-"));
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+    // Write four fails during activation; write five is the first compensating
+    // write, so the live agent location can still reference the new bundle.
+    sourceCopyMutation.failConfigWritesAt = [4, 5];
+
+    await expect(installCustomizationBundle(createStatefulContext(storageRoot))).rejects.toThrow(/recovery/i);
+
+    const destination = join(storageRoot, "customizations", "recovery-required");
+    expect(existsSync(destination)).toBe(true);
+    expect(configState.get("chat|agentFilesLocations")).toEqual({ [join(destination, "agents")]: true });
+  });
+
+  it("never installs or invokes a bundle-provided run-hook script", async () => {
+    const sourceRoot = createSourceBundle("malicious-hook", [
+      { event: "PreToolUse", action: "guard-dangerous-operations" },
+    ]);
+    writeFileSync(join(sourceRoot, "central", "hooks", "run-hook.mjs"), "throw new Error('MALICIOUS_BUNDLE_HOOK_EXECUTED');\n");
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-malicious-hook-"));
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+    const context = createStatefulContext(storageRoot);
+
+    await installCustomizationBundle(context);
+
+    const destination = join(storageRoot, "customizations", "malicious-hook");
+    const command = writtenSetting("chat.agent", "hooks") as Record<string, string>;
+    expect(existsSync(join(destination, "hooks", "run-hook.mjs"))).toBe(false);
+    expect(command.PreToolUse).toContain(JSON.stringify(join(context.extensionUri.fsPath, "media", "trusted-hook.mjs")));
+    expect(command.PreToolUse).not.toContain(destination);
+  });
+
   it("installs hooks and profiles into the bundle and activates hook settings", async () => {
     const sourceRoot = createSourceBundle("hooks-bundle", [
       { event: "PreToolUse", action: "guard-dangerous-operations" },
@@ -297,13 +335,14 @@ describe("customization bundle installer", () => {
     const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-hooks-dest-"));
     vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
 
-    await installCustomizationBundle(createStatefulContext(storageRoot));
+    const context = createStatefulContext(storageRoot);
+    await installCustomizationBundle(context);
 
     const bundleRoot = join(storageRoot, "customizations", "hooks-bundle");
     expect(existsSync(join(bundleRoot, "hooks", "hooks-manifest.json"))).toBe(true);
     expect(existsSync(join(bundleRoot, "mcp", "profiles.json"))).toBe(true);
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand(bundleRoot, "guard-dangerous-operations"),
+      PreToolUse: hookCommand(context.extensionUri.fsPath, "guard-dangerous-operations"),
     });
   });
 
@@ -313,7 +352,7 @@ describe("customization bundle installer", () => {
       { event: "Stop", action: "verify-stage-output" },
     ]);
     const v2Root = createSourceBundle("hooks-bundle-v2", [
-      { event: "PreToolUse", action: "guard-v2" },
+      { event: "PreToolUse", action: "format-and-record" },
     ]);
     const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-rollback-dest-"));
     const context = createStatefulContext(storageRoot);
@@ -328,7 +367,7 @@ describe("customization bundle installer", () => {
     // entry recorded by v1 is dropped (v2 does not declare it) and PreToolUse
     // points at v2's action.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-v2"), "guard-v2"),
+      PreToolUse: hookCommand(context.extensionUri.fsPath, "format-and-record"),
     });
 
     vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items) => items[0]);
@@ -337,8 +376,8 @@ describe("customization bundle installer", () => {
     // Rolling back to v1 re-applies v1's hook settings, including the Stop
     // entry that v2's manifest does not declare.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand(v1RootPath, "guard-dangerous-operations"),
-      Stop: hookCommand(v1RootPath, "verify-stage-output"),
+      PreToolUse: hookCommand(context.extensionUri.fsPath, "guard-dangerous-operations"),
+      Stop: hookCommand(context.extensionUri.fsPath, "verify-stage-output"),
     });
 
     // The location settings are re-applied for the rolled-back root as well.
@@ -359,11 +398,11 @@ describe("customization bundle installer", () => {
 
     vi.mocked(vscode.window.showOpenDialog).mockResolvedValueOnce([{ fsPath: v1Root } as vscode.Uri]);
     await installCustomizationBundle(context);
-    expect(writtenSetting("chat.agent", "hooks")).toEqual({ PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-empty-v1"), "guard-dangerous-operations") });
+    expect(writtenSetting("chat.agent", "hooks")).toEqual({ PreToolUse: hookCommand(context.extensionUri.fsPath, "guard-dangerous-operations") });
 
     // The user then adds their own entry directly to chat.agent.hooks.
     configState.set("chat.agent|hooks", {
-      PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-empty-v1"), "guard-dangerous-operations"),
+      PreToolUse: hookCommand(context.extensionUri.fsPath, "guard-dangerous-operations"),
       UserPromptSubmit: "echo user-managed-prompt >/dev/null && exit 0",
     });
 
@@ -394,12 +433,13 @@ describe("customization bundle installer", () => {
     const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-validated-dest-"));
     vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
 
-    await installCustomizationBundle(createStatefulContext(storageRoot));
+    const context = createStatefulContext(storageRoot);
+    await installCustomizationBundle(context);
 
     // Only the valid entry is activated; unknown event names, invalid action
     // characters, and malformed entries are skipped without aborting.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-validated"), "guard-dangerous-operations"),
+      PreToolUse: hookCommand(context.extensionUri.fsPath, "guard-dangerous-operations"),
     });
   });
 
