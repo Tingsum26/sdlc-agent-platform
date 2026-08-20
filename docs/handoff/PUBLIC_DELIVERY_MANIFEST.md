@@ -3,7 +3,7 @@
 ## 1. 交付信息
 
 - Release/Commit：`agent/mvp-vertical-slice`（以 Draft PR head commit 为准）
-- 日期：2026-08-16
+- 日期：2026-08-21（M8 公网验证）
 - 设计文档版本：v2
 - 实施计划版本：2026-08-14, reviewed 2026-08-16
 - 兼容 Schema 版本：1.0
@@ -31,6 +31,9 @@
 | Logging/diagnostics contract | COMPLETE | service/MCP/VSIX + docs | redaction tests and structured event implementations |
 | LLM Wiki | NOT_STARTED | extension backlog | deliberately excluded from MVP |
 | Cross-repository Journey manifest/analyzer | PARTIAL | schema, Java analyzer, fixture and HTML | fictional analyzer passes; complete onboarding, graph freshness and impact workflow remain missing |
+| M8 internal TODO registry and CI gate | COMPLETE | `docs/handoff/internal-todo-registry.json`, validator, GitHub Actions workflow | 10 IDs / 19 canonical source marker paths; JSON/Markdown/source parity tests pass |
+| M2–M4 aggregate Mongo persistence (`INTERNAL-AUD-001`) | NOT_STARTED | internal-only implementation | public fake runtime remains intentionally in-memory; managed Mongo validation is pending |
+| Approved seven-repository split | NOT_STARTED | target delivery structure | public run-first monorepo is verified; the seven independent repositories are pending |
 
 状态只使用：`COMPLETE`、`PARTIAL`、`NOT_STARTED`、`NOT_APPLICABLE`。
 
@@ -50,6 +53,8 @@
 | `pnpm audit --audit-level low` | PASS | no known npm vulnerabilities | snapshot of registry advisory data at verification time |
 | start → health → stop → port release | PASS | Workflow `UP`, Web `200`, ports 8080/4173 released | Fake profile only |
 | no-prohibited-infrastructure/secret scan | PASS | no Docker/local DB/object store/cloud-agent dependency | not a company security scan |
+| M8 fresh public gate | PASS | 2026-08-21: Maven 117/117; Node 111/111; public + M1/M2/M3/M4/M7 browser suites 1/1 each; registry 10 IDs/19 paths | fictional loopback and fake profile only; see `docs/verification/m8-milestone-2026-08-20.md` |
+| M8 registry/VSIX/lifecycle checks | PASS | registry tests 7/7; bundle tests; Windows stop lifecycle; VSIX package; health `UP`, Web `200`, ports released | no company endpoint, credentials, policy, or live VS Code session |
 
 ## 4. Mock 与假设
 
