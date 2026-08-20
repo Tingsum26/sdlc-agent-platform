@@ -10,6 +10,7 @@ $sleeper = $null
 $pidReuseSleeper = $null
 $treeRoot = $null
 $treeChild = $null
+$discoveryFailureSleeper = $null
 
 function Set-DemoProcessState($Entries) {
     @{
@@ -80,6 +81,33 @@ try {
     Assert-ProcessHasExited -ProcessId $treeRoot.Id -Description 'The tree root'
     Assert-ProcessHasExited -ProcessId $treeChild.Id -Description 'The spawned child'
 
+    $discoveryFailureSleeper = Start-Process -FilePath 'powershell.exe' `
+        -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') `
+        -WindowStyle Hidden -PassThru
+    Set-DemoProcessState @{
+        name = 'discovery-failure-candidate'
+        pid = $discoveryFailureSleeper.Id
+        startedAt = $discoveryFailureSleeper.StartTime.ToUniversalTime().ToString('o')
+    }
+    $env:SDLC_STOP_DEMO_TEST_FORCE_DESCENDANT_DISCOVERY_FAILURE = '1'
+    $discoveryFailedAsExpected = $false
+    try {
+        & (Join-Path $testScripts 'stop-demo.ps1') | Out-Null
+    } catch {
+        $discoveryFailedAsExpected = $true
+    } finally {
+        Remove-Item Env:SDLC_STOP_DEMO_TEST_FORCE_DESCENDANT_DISCOVERY_FAILURE -ErrorAction SilentlyContinue
+    }
+    if (-not $discoveryFailedAsExpected) {
+        throw 'stop-demo.ps1 treated an indeterminate descendant discovery as a successful empty scan.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $testState 'processes.json'))) {
+        throw 'stop-demo.ps1 removed state after descendant discovery failed.'
+    }
+    if ($null -eq (Get-Process -Id $discoveryFailureSleeper.Id -ErrorAction SilentlyContinue)) {
+        throw 'stop-demo.ps1 terminated the root after descendant discovery failed.'
+    }
+
     Write-Output 'stop-demo process identity and tree lifecycle tests passed.'
 } finally {
     if ($null -ne $sleeper) {
@@ -94,6 +122,10 @@ try {
     if ($null -ne $treeChild) {
         Stop-Process -Id $treeChild.Id -Force -ErrorAction SilentlyContinue
     }
+    if ($null -ne $discoveryFailureSleeper) {
+        Stop-Process -Id $discoveryFailureSleeper.Id -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item Env:SDLC_STOP_DEMO_TEST_FORCE_DESCENDANT_DISCOVERY_FAILURE -ErrorAction SilentlyContinue
     Remove-Item Env:SDLC_STOP_DEMO_CHILD_PID_FILE -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force

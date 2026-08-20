@@ -53,7 +53,15 @@ function Test-ProcessIdentity($Identity) {
 }
 
 function Get-DescendantProcessIdentities([int]$ParentId) {
-    $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction SilentlyContinue)
+    if ($env:SDLC_STOP_DEMO_TEST_FORCE_DESCENDANT_DISCOVERY_FAILURE -eq '1') {
+        throw 'Descendant process discovery was forced to fail for lifecycle regression coverage.'
+    }
+
+    try {
+        $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction Stop)
+    } catch {
+        throw "Could not inspect descendants for PID ${ParentId}: $($_.Exception.Message)"
+    }
     foreach ($child in $children) {
         $identity = Get-ProcessIdentity -ProcessId $child.ProcessId
         if ($null -eq $identity) { continue }
