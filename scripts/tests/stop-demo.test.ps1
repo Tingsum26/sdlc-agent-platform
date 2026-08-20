@@ -32,6 +32,9 @@ try {
     Copy-Item -LiteralPath $lineageModule -Destination (Join-Path $testScripts 'process-lineage.psm1')
     Import-Module (Join-Path $testScripts 'process-lineage.psm1') -Force
     $parentStart = [DateTime]::Parse('2026-08-21T00:00:10Z').ToUniversalTime()
+    if (Test-IsTemporalDescendant -ParentStartedAt $parentStart -ChildStartedAt $parentStart.AddMilliseconds(-1)) {
+        throw 'Temporal lineage accepted a prospective child that predates its parent identity.'
+    }
     if (Test-IsTemporalDescendant -ParentStartedAt $parentStart -ChildStartedAt $parentStart.AddSeconds(-30)) {
         throw 'Temporal lineage accepted a child that predates the parent identity (PID-reuse hazard).'
     }

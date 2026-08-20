@@ -5,10 +5,10 @@ function Test-IsTemporalDescendant {
         [Parameter(Mandatory = $true)][DateTime]$ChildStartedAt
     )
 
-    # StartTime precision differs between CIM and Process on Windows. Permit
-    # only a small clock-resolution tolerance; a materially older process can
-    # belong to an earlier owner of a reused parent PID and must never be killed.
-    return $ChildStartedAt.ToUniversalTime() -ge $ParentStartedAt.ToUniversalTime().AddMilliseconds(-100)
+    # A child must not predate its actual parent. Timestamp normalization is
+    # reserved for matching persisted root identities to a live process; using
+    # it here would accept a process belonging to a previous PID owner.
+    return $ChildStartedAt.ToUniversalTime() -ge $ParentStartedAt.ToUniversalTime()
 }
 
 Export-ModuleMember -Function Test-IsTemporalDescendant
