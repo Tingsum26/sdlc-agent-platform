@@ -10,11 +10,16 @@ describe("fictional SDLC driver", () => {
     let repoTaskVersion = 0;
     const taskTypes = new Map<string, string>();
     const taskStatuses = new Map<string, string>();
-    const taskAudits = new Map<string, Array<{ action: string; previousStatus: string; newStatus: string }>>();
+    const taskAudits = new Map<string, Array<{
+      action: string; previousStatus: string; newStatus: string; actorId: string;
+    }>>();
     const transitionTask = (taskId: string, next: string) => {
       const previous = taskStatuses.get(taskId) ?? "MISSING";
       taskStatuses.set(taskId, next);
-      taskAudits.get(taskId)?.push({ action: "TASK_TRANSITIONED", previousStatus: previous, newStatus: next });
+      taskAudits.get(taskId)?.push({
+        action: "TASK_TRANSITIONED", previousStatus: previous, newStatus: next,
+        actorId: "SIMULATED-M7-RUNNER",
+      });
     };
     const fetchMock = vi.fn<typeof fetch>(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
@@ -92,12 +97,18 @@ describe("fictional SDLC driver", () => {
           return json({ taskId, status: "WAITING_FOR_APPROVAL", version: 3 });
         }
         if (action === "ci") {
+          if (body().state !== "SIMULATED_PASS") return json({ title: "Simulation marker required" }, 400);
           if (taskStatuses.get(taskId) !== "WAITING_FOR_CI") return json({ title: "Workflow conflict" }, 409);
           const next = taskTypes.get(taskId) === "MANUAL_E2E" ? "WAITING_FOR_MANUAL_E2E" : "COMPLETED";
           transitionTask(taskId, next);
           return json({ taskId, status: next, version: 5 });
         }
         if (action === "manual-e2e") {
+          const manual = body();
+          if (manual.result !== "SIMULATED_PASS" || manual.actorRole !== "SIMULATED_RUNNER"
+              || manual.caseId || manual.executedAt || manual.buildFingerprint || manual.actualResult || manual.evidenceOrWaiver) {
+            return json({ title: "Invalid simulation marker" }, 400);
+          }
           if (taskTypes.get(taskId) !== "MANUAL_E2E" || taskStatuses.get(taskId) !== "WAITING_FOR_MANUAL_E2E") {
             return json({ title: "Workflow conflict" }, 409);
           }
@@ -131,8 +142,11 @@ describe("fictional SDLC driver", () => {
     expect(labels.some((label) => label.startsWith("requirement") && label.includes("artifact submitted"))).toBe(true);
     // Each stage approves its artifact ("requirement analysis approved", ...).
     expect(labels.some((label) => label.includes("approved"))).toBe(true);
-    expect(labels).toContain("manual E2E passed");
-    expect(labels.filter((label) => label === "manual E2E passed")).toHaveLength(1);
+    expect(labels).not.toContain("manual E2E passed");
+    expect(labels.filter((label) => label === "simulated manual E2E transition")).toHaveLength(1);
+    expect(labels).toContain("simulation evidence boundary");
+    expect(labels).not.toContain("CI passed");
+    expect(labels).toContain("simulated ticket CI transition");
     expect(labels).toContain("stage terminal policy");
     expect(labels).toContain("repo task merged");
     expect(labels).toContain("ticket release evidence recorded");
@@ -148,6 +162,7 @@ describe("fictional SDLC driver", () => {
     expect(result.repoTask.status).toBe("MERGED");
     expect(result.ticket.status).toBe("E2E_VERIFIED");
     expect(result.tasks.every((task) => task.status === "COMPLETED")).toBe(true);
+    expect(result.auditTrail.some((event) => event.actorId === "QA" || event.actorId === "qa-1")).toBe(false);
     expect(labels).toEqual(expect.arrayContaining([
       "persisted epic state", "persisted ticket state", "persisted repo task state", "persisted service audit",
     ]));
@@ -160,6 +175,8 @@ describe("fictional SDLC driver", () => {
     expect(ticketIds).toHaveLength(2);
     expect(new Set(ticketIds).size).toBe(2);
     expect(ticketIds.every((ticketId) => ticketId.startsWith("DEMO-123-M7-"))).toBe(true);
+    expect(fetchMock.mock.calls.every(([, init]) =>
+      new Headers(init?.headers).get("X-Demo-User") === "SIMULATED-M7-RUNNER")).toBe(true);
   });
 });
 

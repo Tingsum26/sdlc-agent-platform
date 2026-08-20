@@ -132,6 +132,23 @@ public final class WorkflowTaskService {
                 transitionPolicy.targetAfterPassedCi(task.type()), expectedVersion, actorId, correlationId);
     }
 
+    public synchronized WorkflowTask completeLegacyApprovalOnlyTask(
+            String taskId,
+            long expectedVersion,
+            String actorId,
+            String correlationId) {
+        WorkflowTask task = requireVersion(taskId, expectedVersion);
+        if (!transitionPolicy.isApprovalOnly(task.type())
+                || task.status() != TaskStatus.WAITING_FOR_MANUAL_E2E) {
+            throw new IllegalTaskTransitionException(
+                    "Compatibility completion is not allowed for " + task.type() + " in " + task.status());
+        }
+        WorkflowTask changed = task.transitionedTo(TaskStatus.COMPLETED, clock.instant());
+        tasks.save(changed);
+        audit(changed, actorId, "LEGACY_STAGE_COMPLETED", task.status(), changed.status(), correlationId);
+        return changed;
+    }
+
     public synchronized int releaseExpiredLeases(Instant now, String actorId, String correlationId) {
         int released = 0;
         for (WorkflowTask task : tasks.findAll()) {

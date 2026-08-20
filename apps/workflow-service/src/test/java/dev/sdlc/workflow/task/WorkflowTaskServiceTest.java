@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class WorkflowTaskServiceTest {
 
@@ -131,11 +133,13 @@ class WorkflowTaskServiceTest {
                 .isInstanceOf(IllegalTaskTransitionException.class);
     }
 
-    @Test
-    void preservesBlockingForALegacyApprovalOnlyTaskAlreadyWaitingForCi() {
+    @ParameterizedTest
+    @EnumSource(value = TaskType.class, names = {
+            "REQUIREMENT_ANALYSIS", "DESIGN", "DELIVERY_COORDINATION", "ONBOARDING_SYNC" })
+    void completesLegacyApprovalOnlyTasksAlreadyWaitingForCiAfterPassedCi(TaskType taskType) {
         tasks.save(new WorkflowTask(
                 "TASK-LEGACY-CI",
-                TaskType.REQUIREMENT_ANALYSIS,
+                taskType,
                 TaskStatus.WAITING_FOR_CI,
                 new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
                 "legacy-ci-demo-123",
@@ -145,10 +149,40 @@ class WorkflowTaskServiceTest {
                 NOW,
                 NOW));
 
-        WorkflowTask blocked = service.transition("TASK-LEGACY-CI", TaskStatus.WAITING_FOR_CI,
-                TaskStatus.BLOCKED, 4, "ci-reader", "corr-legacy");
+        WorkflowTask completed = service.transitionAfterPassedCi(
+                "TASK-LEGACY-CI", 4, "ci-reader", "corr-legacy");
 
-        assertThat(blocked.status()).isEqualTo(TaskStatus.BLOCKED);
+        assertThat(completed.status()).isEqualTo(TaskStatus.COMPLETED);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TaskType.class, names = {
+            "REQUIREMENT_ANALYSIS", "DESIGN", "DELIVERY_COORDINATION", "ONBOARDING_SYNC" })
+    void retainsBlockAndCancelRecoveryForLegacyApprovalOnlyTasks(TaskType taskType) {
+        saveLegacyTask("TASK-CI-BLOCK", taskType, TaskStatus.WAITING_FOR_CI, 4);
+        saveLegacyTask("TASK-CI-CANCEL", taskType, TaskStatus.WAITING_FOR_CI, 4);
+        saveLegacyTask("TASK-MANUAL-BLOCK", taskType, TaskStatus.WAITING_FOR_MANUAL_E2E, 5);
+        saveLegacyTask("TASK-MANUAL-CANCEL", taskType, TaskStatus.WAITING_FOR_MANUAL_E2E, 5);
+
+        WorkflowTask ciBlocked = service.transition("TASK-CI-BLOCK", TaskStatus.WAITING_FOR_CI,
+                TaskStatus.BLOCKED, 4, "ci-reader", "corr-block");
+        WorkflowTask ciCancelled = service.transition("TASK-CI-CANCEL", TaskStatus.WAITING_FOR_CI,
+                TaskStatus.CANCELLED, 4, "migration-operator", "corr-cancel");
+        WorkflowTask manualBlocked = service.transition("TASK-MANUAL-BLOCK", TaskStatus.WAITING_FOR_MANUAL_E2E,
+                TaskStatus.BLOCKED, 5, "migration-operator", "corr-block");
+        WorkflowTask manualCancelled = service.transition("TASK-MANUAL-CANCEL", TaskStatus.WAITING_FOR_MANUAL_E2E,
+                TaskStatus.CANCELLED, 5, "migration-operator", "corr-cancel");
+
+        assertThat(ciBlocked.status()).isEqualTo(TaskStatus.BLOCKED);
+        assertThat(ciCancelled.status()).isEqualTo(TaskStatus.CANCELLED);
+        assertThat(manualBlocked.status()).isEqualTo(TaskStatus.BLOCKED);
+        assertThat(manualCancelled.status()).isEqualTo(TaskStatus.CANCELLED);
+    }
+
+    private void saveLegacyTask(String taskId, TaskType taskType, TaskStatus status, long version) {
+        tasks.save(new WorkflowTask(taskId, taskType, status,
+                new WorkflowScope("DEMO-" + taskId, "REPO_A", "legacy-ref"),
+                "legacy-" + taskId + "-" + taskType, "developer-1", null, version, NOW, NOW));
     }
 
     private WorkflowTask createTask() {

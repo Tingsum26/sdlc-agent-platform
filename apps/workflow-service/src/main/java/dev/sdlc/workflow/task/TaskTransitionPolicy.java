@@ -30,12 +30,20 @@ public final class TaskTransitionPolicy {
         };
     }
 
+    public boolean isApprovalOnly(TaskType type) {
+        return switch (type) {
+            case REQUIREMENT_ANALYSIS, DESIGN, DELIVERY_COORDINATION, ONBOARDING_SYNC -> true;
+            case IMPLEMENTATION, TEST_GENERATION, PR_REVIEW, MANUAL_E2E -> false;
+        };
+    }
+
     public TaskStatus targetAfterPassedCi(TaskType type) {
         return switch (type) {
             case IMPLEMENTATION, TEST_GENERATION, PR_REVIEW -> TaskStatus.COMPLETED;
             case MANUAL_E2E -> TaskStatus.WAITING_FOR_MANUAL_E2E;
-            case REQUIREMENT_ANALYSIS, DESIGN, DELIVERY_COORDINATION, ONBOARDING_SYNC ->
-                    throw new IllegalTaskTransitionException("Task type does not use the CI gate: " + type);
+            // Compatibility for tasks persisted on the old generic path before
+            // approval-only stages began completing directly after approval.
+            case REQUIREMENT_ANALYSIS, DESIGN, DELIVERY_COORDINATION, ONBOARDING_SYNC -> TaskStatus.COMPLETED;
         };
     }
 

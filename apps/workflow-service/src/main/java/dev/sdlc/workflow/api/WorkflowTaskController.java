@@ -117,7 +117,10 @@ public class WorkflowTaskController {
             @Valid @RequestBody CiResultRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
-        if (body.state() != CiResult.PASSED) {
+        if (body.state() == CiResult.SIMULATED_PASS && !isSimulatedActor(user)) {
+            throw new IllegalArgumentException("SIMULATED_PASS requires a simulated actor");
+        }
+        if (body.state() != CiResult.PASSED && body.state() != CiResult.SIMULATED_PASS) {
             return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_CI,
                     TaskStatus.BLOCKED, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
         }
@@ -131,9 +134,23 @@ public class WorkflowTaskController {
             @Valid @RequestBody ManualE2eRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
-        TaskStatus target = body.result() == ManualResult.PASS ? TaskStatus.COMPLETED : TaskStatus.BLOCKED;
+        validateManualResult(body, user);
+        TaskStatus target = switch (body.result()) {
+            case PASS, SIMULATED_PASS -> TaskStatus.COMPLETED;
+            case FAIL, BLOCKED -> TaskStatus.BLOCKED;
+        };
         return WorkflowTaskResponse.from(tasks.transition(taskId, TaskStatus.WAITING_FOR_MANUAL_E2E,
                 target, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
+    }
+
+    @PostMapping("/tasks/{taskId}/compatibility-complete")
+    WorkflowTaskResponse completeLegacyStage(
+            @PathVariable String taskId,
+            @Valid @RequestBody VersionRequest body,
+            HttpServletRequest request) {
+        CurrentUser user = CurrentUser.require(request);
+        return WorkflowTaskResponse.from(tasks.completeLegacyApprovalOnlyTask(
+                taskId, body.expectedVersion(), user.actorId(), CorrelationIdFilter.from(request)));
     }
 
     @GetMapping("/tasks/{taskId}/audit")
@@ -173,7 +190,7 @@ public class WorkflowTaskController {
     public record VersionRequest(long expectedVersion) {
     }
 
-    public enum CiResult { PASSED, FAILED, PENDING }
+    public enum CiResult { PASSED, SIMULATED_PASS, FAILED, PENDING }
 
     public record CiResultRequest(
             @Min(0) long expectedVersion,
@@ -181,17 +198,17 @@ public class WorkflowTaskController {
             @NotBlank String buildFingerprint) {
     }
 
-    public enum ManualResult { PASS, FAIL, BLOCKED }
+    public enum ManualResult { PASS, SIMULATED_PASS, FAIL, BLOCKED }
 
     public record ManualE2eRequest(
             @Min(0) long expectedVersion,
-            @NotBlank String caseId,
+            String caseId,
             @NotNull ManualResult result,
             @NotBlank String actorRole,
-            @NotNull Instant executedAt,
-            @NotBlank String buildFingerprint,
-            @NotBlank String actualResult,
-            @NotBlank String evidenceOrWaiver) {
+            Instant executedAt,
+            String buildFingerprint,
+            String actualResult,
+            String evidenceOrWaiver) {
     }
 
     public record SubmitArtifactRequest(
@@ -206,5 +223,29 @@ public class WorkflowTaskController {
             @NotBlank String artifactId,
             @Min(1) int artifactVersion,
             @Min(0) long expectedTaskVersion) {
+    }
+
+    private static void validateManualResult(ManualE2eRequest body, CurrentUser user) {
+        if (body.result() == ManualResult.SIMULATED_PASS) {
+            if (!isSimulatedActor(user) || !"SIMULATED_RUNNER".equals(body.actorRole())
+                    || body.executedAt() != null || hasText(body.caseId()) || hasText(body.buildFingerprint())
+                    || hasText(body.actualResult()) || hasText(body.evidenceOrWaiver())) {
+                throw new IllegalArgumentException(
+                        "SIMULATED_PASS must not claim QA execution or manual evidence");
+            }
+            return;
+        }
+        if (!hasText(body.caseId()) || body.executedAt() == null || !hasText(body.buildFingerprint())
+                || !hasText(body.actualResult()) || !hasText(body.evidenceOrWaiver())) {
+            throw new IllegalArgumentException("Manual E2E results require execution evidence");
+        }
+    }
+
+    private static boolean isSimulatedActor(CurrentUser user) {
+        return user.actorId().startsWith("SIMULATED-");
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

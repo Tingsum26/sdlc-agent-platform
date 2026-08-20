@@ -36,7 +36,7 @@ const STAGES: Array<{ type: string; artifactType: string; label: string }> = [
   { type: "IMPLEMENTATION", artifactType: "DELIVERY_REPORT", label: "implementation" },
   { type: "TEST_GENERATION", artifactType: "TEST_REPORT", label: "generated tests" },
   { type: "PR_REVIEW", artifactType: "PR_REVIEW_REPORT", label: "PR review" },
-  { type: "MANUAL_E2E", artifactType: "MANUAL_E2E_REPORT", label: "manual E2E" },
+  { type: "MANUAL_E2E", artifactType: "MANUAL_E2E_REPORT", label: "manual E2E simulation" },
 ];
 
 /**
@@ -70,7 +70,7 @@ export async function runFictionalSdlc(
   const json = async <T>(path: string, init?: RequestInit): Promise<T> => {
     const response = await fetcher(`${base}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", "X-Demo-User": "PRINCIPAL-EMP-100" },
+      headers: { "Content-Type": "application/json", "X-Demo-User": "SIMULATED-M7-RUNNER" },
     });
     if (!response.ok) throw new Error(`fictional-sdlc: ${path} -> ${response.status}`);
     return response.json() as Promise<T>;
@@ -120,7 +120,13 @@ export async function runFictionalSdlc(
       method: "POST", body: JSON.stringify({
         artifactId: `ART-${runId}-${stage.type}`,
         type: stage.artifactType,
-        sections: [{ key: "summary", title: stage.label, body: `Fictional ${stage.label} report with evidence.` }],
+        sections: [{
+          key: "summary",
+          title: stage.label,
+          body: stage.type === "MANUAL_E2E"
+            ? "SIMULATED_PASS marker only; no QA execution or manual evidence is persisted."
+            : `Fictional ${stage.label} report with workflow evidence.`,
+        }],
       }),
     });
     artifactIds.push(artifact.artifactId);
@@ -151,8 +157,8 @@ export async function runFictionalSdlc(
       const ci = await json<{ taskId: string; status: string; version: number }>(`/tasks/${created.taskId}/ci`, {
         method: "POST", body: JSON.stringify({
           expectedVersion: taskVersion,
-          state: "PASSED",
-          buildFingerprint: `m7-fake-build-${stage.type}`,
+          state: "SIMULATED_PASS",
+          buildFingerprint: `m7-simulated-build-${stage.type}`,
         }),
       });
       taskVersion = ci.version;
@@ -162,17 +168,15 @@ export async function runFictionalSdlc(
         const manual = await json<{ status: string }>(`/tasks/${created.taskId}/manual-e2e`, {
           method: "POST", body: JSON.stringify({
             expectedVersion: taskVersion,
-            caseId: `E2E-M7-${runId}`,
-            result: "PASS",
-            actorRole: "QA",
-            executedAt: new Date().toISOString(),
-            buildFingerprint: `m7-fake-build-${stage.type}`,
-            actualResult: "Fictional manual E2E passed",
-            evidenceOrWaiver: "fictional-evidence",
+            result: "SIMULATED_PASS",
+            actorRole: "SIMULATED_RUNNER",
           }),
         });
         terminalStatus = manual.status;
-        steps.push({ label: "manual E2E passed", detail: `E2E-M7-${runId}` });
+        steps.push({
+          label: "simulated manual E2E transition",
+          detail: "SIMULATED_PASS · state transition only",
+        });
       }
     }
     if (terminalStatus !== "COMPLETED") {
@@ -192,7 +196,10 @@ export async function runFictionalSdlc(
         method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, revision: input.targetCommit }),
       });
       ticketVersion = ci.ticket.version;
-      steps.push({ label: "CI passed", detail: ci.state });
+      steps.push({
+        label: "simulated ticket CI transition",
+        detail: `SIMULATED_PASS · deterministic fake adapter returned ${ci.state}`,
+      });
     }
   }
   await advanceRepoTask("MERGED");
@@ -240,7 +247,21 @@ export async function runFictionalSdlc(
         : passedThrough("WAITING_FOR_CI", "COMPLETED") && !states.includes("WAITING_FOR_MANUAL_E2E");
     if (!valid) throw new Error(`fictional-sdlc: persisted terminal evidence is invalid for ${task.type}`);
   }
-  steps.push({ label: "stage terminal policy", detail: "approval-only 2 · CI-only 3 · manual E2E 1" });
+  const manualTask = persistedTasks.find((task) => task.type === "MANUAL_E2E");
+  const simulatedManualTransition = manualTask && (taskAuditsById.get(manualTask.taskId) ?? []).some((event) =>
+    event.previousStatus === "WAITING_FOR_MANUAL_E2E" && event.newStatus === "COMPLETED"
+      && event.actorId === "SIMULATED-M7-RUNNER");
+  if (!simulatedManualTransition) {
+    throw new Error("fictional-sdlc: simulated manual transition audit is missing");
+  }
+  steps.push({
+    label: "stage terminal policy",
+    detail: "approval-only 2 · CI-only 3 · simulated manual gate 1",
+  });
+  steps.push({
+    label: "simulation evidence boundary",
+    detail: "SIMULATED_PASS · no QA execution or manual evidence persisted",
+  });
   steps.push({ label: "persisted epic state", detail: `${resume.epic.epicId} · ${resume.epic.status}` });
   steps.push({ label: "persisted ticket state", detail: `${persistedTicket.ticketId} · ${persistedTicket.status}` });
   steps.push({ label: "persisted repo task state", detail: `${persistedRepoTask.repoTaskId} · ${persistedRepoTask.status}` });

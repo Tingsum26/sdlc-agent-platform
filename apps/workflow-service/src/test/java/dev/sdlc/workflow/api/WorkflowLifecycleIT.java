@@ -8,6 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.sdlc.workflow.task.TaskType;
+import dev.sdlc.workflow.task.TaskStatus;
+import dev.sdlc.workflow.task.WorkflowScope;
+import dev.sdlc.workflow.task.WorkflowTask;
+import dev.sdlc.workflow.task.WorkflowTaskRepository;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -23,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("fake")
 class WorkflowLifecycleIT {
     @Autowired MockMvc mvc;
+    @Autowired WorkflowTaskRepository taskRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
@@ -117,6 +123,89 @@ class WorkflowLifecycleIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(6))
                 .andExpect(jsonPath("$[5].actorId").value("ci-reader"))
                 .andExpect(jsonPath("$[5].newStatus").value("COMPLETED"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TaskType.class, names = {
+            "REQUIREMENT_ANALYSIS", "DESIGN", "DELIVERY_COORDINATION", "ONBOARDING_SYNC" })
+    void explicitlyCompletesApprovalOnlyTasksStrandedOnTheLegacyManualGate(TaskType taskType) throws Exception {
+        String taskId = "TASK-LEGACY-MANUAL-" + taskType;
+        Instant now = Instant.parse("2026-08-16T00:00:00Z");
+        taskRepository.save(new WorkflowTask(taskId, taskType, TaskStatus.WAITING_FOR_MANUAL_E2E,
+                new WorkflowScope("LEGACY-" + taskType, "REPO_A", "legacy-ref"),
+                "legacy-manual-" + taskType, "legacy-user", null, 5, now, now));
+
+        mvc.perform(post("/api/v1/tasks/{id}/compatibility-complete", taskId)
+                .header("X-Demo-User", "migration-operator")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":5}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        mvc.perform(get("/api/v1/tasks/{id}/audit", taskId).header("X-Demo-User", "migration-operator"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].action").value("LEGACY_STAGE_COMPLETED"))
+                .andExpect(jsonPath("$[0].actorId").value("migration-operator"));
+    }
+
+    @Test
+    void compatibilityCompletionCannotReplaceARealManualE2eResult() throws Exception {
+        Instant now = Instant.parse("2026-08-16T00:00:00Z");
+        taskRepository.save(new WorkflowTask("TASK-REAL-MANUAL", TaskType.MANUAL_E2E,
+                TaskStatus.WAITING_FOR_MANUAL_E2E,
+                new WorkflowScope("REAL-MANUAL", "REPO_A", "real-ref"),
+                "real-manual", "qa-user", null, 5, now, now));
+
+        mvc.perform(post("/api/v1/tasks/TASK-REAL-MANUAL/compatibility-complete")
+                .header("X-Demo-User", "migration-operator")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":5}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void simulatedPassUsesASimulatedActorAndCarriesNoQaExecutionEvidence() throws Exception {
+        Instant now = Instant.parse("2026-08-16T00:00:00Z");
+        taskRepository.save(new WorkflowTask("TASK-SIMULATED-MANUAL", TaskType.MANUAL_E2E,
+                TaskStatus.WAITING_FOR_CI,
+                new WorkflowScope("SIMULATED-MANUAL", "REPO_A", "simulated-ref"),
+                "simulated-manual", "SIMULATED-M7-RUNNER", null, 4, now, now));
+
+        mvc.perform(post("/api/v1/tasks/TASK-SIMULATED-MANUAL/ci")
+                .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                    {"expectedVersion":4,"state":"SIMULATED_PASS","buildFingerprint":"m7-simulated-build"}
+                    """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WAITING_FOR_MANUAL_E2E"));
+
+        mvc.perform(post("/api/v1/tasks/TASK-SIMULATED-MANUAL/manual-e2e")
+                .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                    {"expectedVersion":5,"result":"SIMULATED_PASS","actorRole":"SIMULATED_RUNNER"}
+                    """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        mvc.perform(get("/api/v1/tasks/TASK-SIMULATED-MANUAL/audit")
+                .header("X-Demo-User", "SIMULATED-M7-RUNNER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].actorId").value("SIMULATED-M7-RUNNER"))
+                .andExpect(jsonPath("$[1].actorId").value("SIMULATED-M7-RUNNER"));
+    }
+
+    @Test
+    void rejectsSimulatedPassThatClaimsQaEvidence() throws Exception {
+        Instant now = Instant.parse("2026-08-16T00:00:00Z");
+        taskRepository.save(new WorkflowTask("TASK-SIMULATED-CLAIM", TaskType.MANUAL_E2E,
+                TaskStatus.WAITING_FOR_MANUAL_E2E,
+                new WorkflowScope("SIMULATED-CLAIM", "REPO_A", "simulated-claim-ref"),
+                "simulated-claim", "SIMULATED-M7-RUNNER", null, 5, now, now));
+
+        mvc.perform(post("/api/v1/tasks/TASK-SIMULATED-CLAIM/manual-e2e")
+                .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                    {"expectedVersion":5,"result":"SIMULATED_PASS","actorRole":"SIMULATED_RUNNER","actualResult":"QA passed","evidenceOrWaiver":"fake evidence"}
+                    """))
+                .andExpect(status().isBadRequest());
     }
 
     private JsonNode json(String value) throws Exception { return mapper.readTree(value); }
