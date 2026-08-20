@@ -18,6 +18,8 @@ const sourceCopyMutation = vi.hoisted(() => ({
   sourceRoot: "",
   afterCopy: undefined as (() => void) | undefined,
   triggered: false,
+  renameFailure: undefined as Error | undefined,
+  renameCalls: 0,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -32,6 +34,11 @@ vi.mock("node:fs/promises", async (importOriginal) => {
         sourceCopyMutation.afterCopy = undefined;
         mutation();
       }
+    },
+    rename: async (...args: Parameters<typeof actual.rename>) => {
+      sourceCopyMutation.renameCalls++;
+      if (sourceCopyMutation.renameFailure) throw sourceCopyMutation.renameFailure;
+      return actual.rename(...args);
     },
   };
 });
@@ -67,6 +74,8 @@ beforeEach(() => {
   sourceCopyMutation.sourceRoot = "";
   sourceCopyMutation.afterCopy = undefined;
   sourceCopyMutation.triggered = false;
+  sourceCopyMutation.renameFailure = undefined;
+  sourceCopyMutation.renameCalls = 0;
 });
 
 // The extension context's globalState must actually retain written values so a
@@ -164,7 +173,7 @@ describe("customization bundle installer", () => {
     expect(existsSync(join(storageRoot, "customizations", "symlinked-skill"))).toBe(false);
   });
 
-  it("rejects a manifest directory symlink before reading its linked manifest", async () => {
+  it("rejects invalid newly staged manifest content without activating a destination", async () => {
     const sourceRoot = createSourceBundle("symlinked-manifest", []);
     const manifests = join(sourceRoot, "central", "manifests");
     const outside = join(sourceRoot, "outside-manifests");
@@ -177,6 +186,7 @@ describe("customization bundle installer", () => {
 
     await expect(installCustomizationBundle(createStatefulContext(storageRoot))).rejects.toThrow(/symbolic link|symlink/i);
     expect(existsSync(join(storageRoot, "customizations", "symlinked-manifest"))).toBe(false);
+    expect(writtenSetting("chat", "agentFilesLocations")).toBeUndefined();
   });
 
   it("installs from the validated staging copy when the selected source changes after staging", async () => {
@@ -197,6 +207,22 @@ describe("customization bundle installer", () => {
 
     expect(sourceCopyMutation.triggered).toBe(true);
     expect(readFileSync(join(storageRoot, "customizations", "staged-source", "agents", "a.agent.md"), "utf8")).toBe("a");
+  });
+
+  it("keeps and activates an existing verified bundle version without attempting a replacement rename", async () => {
+    const sourceRoot = createSourceBundle("immutable-version", []);
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-existing-version-dest-"));
+    const existingRoot = join(storageRoot, "customizations", "immutable-version");
+    mkdirSync(existingRoot, { recursive: true });
+    writeFileSync(join(existingRoot, "published-marker.txt"), "keep this published bundle");
+    sourceCopyMutation.renameFailure = new Error("forced rename failure");
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+
+    await installCustomizationBundle(createStatefulContext(storageRoot));
+
+    expect(sourceCopyMutation.renameCalls).toBe(0);
+    expect(readFileSync(join(existingRoot, "published-marker.txt"), "utf8")).toBe("keep this published bundle");
+    expect(writtenSetting("chat", "agentFilesLocations")).toEqual({ [join(existingRoot, "agents")]: true });
   });
 
   it("uses Node to invoke the installed no-op hook shim without shell redirection", () => {

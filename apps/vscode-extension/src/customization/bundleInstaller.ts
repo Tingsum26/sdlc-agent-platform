@@ -29,17 +29,32 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
   const stagedRoot = join(sourceStaging, "bundle");
   let candidate: string | undefined;
   let destination: string | undefined;
-  let replacementInProgress = false;
+  let destinationCreatedByThisAttempt = false;
 
   try {
-    // Copy the untrusted selection once without dereferencing links. All later
-    // parsing and copying use this extension-owned snapshot, closing the gap
-    // between validation and use of the user-selected filesystem tree.
+    // The selected source is untrusted. Copy it once without dereferencing
+    // links; all later parsing and copying use this extension-owned snapshot,
+    // closing the gap between validation and use of that filesystem tree.
+    // globalStorage is trusted against same-user writers: such a writer can
+    // already alter VS Code settings directly. We still check the final bundle
+    // immediately before activation to catch accidental local corruption.
     await cp(sourceRoot, stagedRoot, { recursive: true, dereference: false });
     await rejectBundleSymlinks(stagedRoot);
     const manifest = loadAndValidateBundle(stagedRoot, manifestPath);
     const customizationsRoot = join(storageRoot, "customizations");
     await mkdir(customizationsRoot, { recursive: true });
+    destination = join(customizationsRoot, manifest.bundleVersion);
+    if (existsSync(destination)) {
+      // Published versions are immutable. Preserve the already published copy
+      // rather than deleting it for a conflicting reinstallation attempt.
+      await rejectBundleSymlinks(destination);
+      await activateBundleLocations(context, destination);
+      const installed = context.globalState.get<InstalledBundle[]>(stateKey, []).filter((entry) => entry.version !== manifest.bundleVersion);
+      installed.unshift({ version: manifest.bundleVersion, root: destination, installedAt: new Date().toISOString() });
+      await context.globalState.update(stateKey, installed.slice(0, 5));
+      void vscode.window.showInformationMessage(`Activated SDLC customization bundle ${manifest.bundleVersion}. Verify it in Chat Customizations diagnostics.`);
+      return;
+    }
     candidate = await mkdtemp(join(customizationsRoot, ".bundle-install-"));
     const agentsRoot = join(candidate, "agents");
     const skillsRoot = join(candidate, "skills");
@@ -66,13 +81,11 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
     }
     await rejectBundleSymlinks(candidate);
 
-    destination = join(customizationsRoot, manifest.bundleVersion);
-    replacementInProgress = true;
-    await rm(destination, { recursive: true, force: true });
     await rename(candidate, destination);
     candidate = undefined;
+    destinationCreatedByThisAttempt = true;
     await rejectBundleSymlinks(destination);
-    replacementInProgress = false;
+    destinationCreatedByThisAttempt = false;
     await activateBundleLocations(context, destination);
 
     const installed = context.globalState.get<InstalledBundle[]>(stateKey, []).filter((entry) => entry.version !== manifest.bundleVersion);
@@ -81,7 +94,7 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
     void vscode.window.showInformationMessage(`Activated SDLC customization bundle ${manifest.bundleVersion}. Verify it in Chat Customizations diagnostics.`);
   } catch (error) {
     if (candidate) await rm(candidate, { recursive: true, force: true });
-    if (replacementInProgress && destination) await rm(destination, { recursive: true, force: true });
+    if (destinationCreatedByThisAttempt && destination) await rm(destination, { recursive: true, force: true });
     throw error;
   } finally {
     await rm(sourceStaging, { recursive: true, force: true });
