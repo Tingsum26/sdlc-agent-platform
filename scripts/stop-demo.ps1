@@ -14,20 +14,69 @@ if ($state.repoRoot -ne $repoRoot) {
     throw 'Demo state belongs to a different repository path; refusing to stop processes.'
 }
 
-function Get-DescendantProcessIds([int]$ParentId) {
-    $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction SilentlyContinue)
-    foreach ($child in $children) {
-        Get-DescendantProcessIds -ParentId $child.ProcessId
-        $child.ProcessId
+function Get-ProcessIdentity([int]$ProcessId) {
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $process) {
+        return $null
+    }
+
+    return [PSCustomObject]@{
+        id = $process.Id
+        startedAt = $process.StartTime.ToUniversalTime()
     }
 }
 
-function Wait-ForProcessExit([int[]]$ProcessIds, [int]$TimeoutSeconds = 10) {
+function Test-ProcessIdentity($Identity) {
+    $current = Get-ProcessIdentity -ProcessId ([int]$Identity.id)
+    if ($null -eq $current) {
+        return $false
+    }
+
+    return [Math]::Abs(($current.startedAt - ([DateTime]$Identity.startedAt).ToUniversalTime()).TotalSeconds) -le 5
+}
+
+function Get-DescendantProcessIdentities([int]$ParentId) {
+    $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction SilentlyContinue)
+    foreach ($child in $children) {
+        $identity = Get-ProcessIdentity -ProcessId $child.ProcessId
+        if ($null -eq $identity) { continue }
+        Get-DescendantProcessIdentities -ParentId $identity.id
+        $identity
+    }
+}
+
+function Stop-ProcessIfIdentityMatches($Identity) {
+    if (Test-ProcessIdentity -Identity $Identity) {
+        Stop-Process -Id ([int]$Identity.id) -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-IdentityKey($Identity) {
+    return "$($Identity.id):$(([DateTime]$Identity.startedAt).ToUniversalTime().Ticks)"
+}
+
+function Stop-ProcessTreeSafely($RootIdentity, [int]$TimeoutSeconds = 10) {
+    $observedDescendants = @{}
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
-        $remaining = @($ProcessIds | Select-Object -Unique | Where-Object {
-            $null -ne (Get-Process -Id $_ -ErrorAction SilentlyContinue)
-        })
+        $rootCurrent = Get-ProcessIdentity -ProcessId ([int]$RootIdentity.id)
+        if ($null -eq $rootCurrent -or (Test-ProcessIdentity -Identity $RootIdentity)) {
+            foreach ($descendant in @(Get-DescendantProcessIdentities -ParentId ([int]$RootIdentity.id))) {
+                $observedDescendants[(Get-IdentityKey -Identity $descendant)] = $descendant
+            }
+        } else {
+            Write-Warning "PID $($RootIdentity.id) was reused while stopping its process tree; no new descendants were inspected."
+        }
+
+        foreach ($descendant in @($observedDescendants.Values)) {
+            Stop-ProcessIfIdentityMatches -Identity $descendant
+        }
+        Stop-ProcessIfIdentityMatches -Identity $RootIdentity
+
+        $remaining = @($observedDescendants.Values | Where-Object { Test-ProcessIdentity -Identity $_ })
+        if (Test-ProcessIdentity -Identity $RootIdentity) {
+            $remaining += $RootIdentity
+        }
         if ($remaining.Count -eq 0) {
             return
         }
@@ -35,26 +84,27 @@ function Wait-ForProcessExit([int[]]$ProcessIds, [int]$TimeoutSeconds = 10) {
         Start-Sleep -Milliseconds 100
     } while ((Get-Date) -lt $deadline)
 
-    $remaining = @($ProcessIds | Select-Object -Unique | Where-Object {
-        $null -ne (Get-Process -Id $_ -ErrorAction SilentlyContinue)
-    })
+    $remaining = @($observedDescendants.Values | Where-Object { Test-ProcessIdentity -Identity $_ })
+    if (Test-ProcessIdentity -Identity $RootIdentity) {
+        $remaining += $RootIdentity
+    }
     if ($remaining.Count -gt 0) {
-        throw "Demo processes did not exit before timeout: $($remaining -join ', '). State was retained for diagnosis."
+        throw "Demo processes did not exit before timeout: $($remaining.id -join ', '). State was retained for diagnosis."
     }
 }
 
 foreach ($entry in $state.processes) {
     $process = Get-Process -Id ([int]$entry.pid) -ErrorAction SilentlyContinue
     if ($null -eq $process) { continue }
-    $recorded = ([DateTime]$entry.startedAt).ToUniversalTime()
-    if ([Math]::Abs(($process.StartTime.ToUniversalTime() - $recorded).TotalSeconds) -gt 5) {
+    $recorded = [PSCustomObject]@{
+        id = $process.Id
+        startedAt = ([DateTime]$entry.startedAt).ToUniversalTime()
+    }
+    if (-not (Test-ProcessIdentity -Identity $recorded)) {
         Write-Warning "PID $($entry.pid) was reused; it was not stopped."
         continue
     }
-    $descendants = @(Get-DescendantProcessIds -ParentId $process.Id)
-    foreach ($id in $descendants) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
-    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-    Wait-ForProcessExit -ProcessIds @($descendants + $process.Id)
+    Stop-ProcessTreeSafely -RootIdentity $recorded
     Write-Output "Stopped $($entry.name) (PID $($entry.pid))."
 }
 
