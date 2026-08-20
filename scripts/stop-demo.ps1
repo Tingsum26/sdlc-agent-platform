@@ -22,6 +22,27 @@ function Get-DescendantProcessIds([int]$ParentId) {
     }
 }
 
+function Wait-ForProcessExit([int[]]$ProcessIds, [int]$TimeoutSeconds = 10) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $remaining = @($ProcessIds | Select-Object -Unique | Where-Object {
+            $null -ne (Get-Process -Id $_ -ErrorAction SilentlyContinue)
+        })
+        if ($remaining.Count -eq 0) {
+            return
+        }
+
+        Start-Sleep -Milliseconds 100
+    } while ((Get-Date) -lt $deadline)
+
+    $remaining = @($ProcessIds | Select-Object -Unique | Where-Object {
+        $null -ne (Get-Process -Id $_ -ErrorAction SilentlyContinue)
+    })
+    if ($remaining.Count -gt 0) {
+        throw "Demo processes did not exit before timeout: $($remaining -join ', '). State was retained for diagnosis."
+    }
+}
+
 foreach ($entry in $state.processes) {
     $process = Get-Process -Id ([int]$entry.pid) -ErrorAction SilentlyContinue
     if ($null -eq $process) { continue }
@@ -33,6 +54,7 @@ foreach ($entry in $state.processes) {
     $descendants = @(Get-DescendantProcessIds -ParentId $process.Id)
     foreach ($id in $descendants) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    Wait-ForProcessExit -ProcessIds @($descendants + $process.Id)
     Write-Output "Stopped $($entry.name) (PID $($entry.pid))."
 }
 

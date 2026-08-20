@@ -27,8 +27,9 @@ try {
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $testState 'processes.json') -Encoding utf8
 
     & (Join-Path $testScripts 'stop-demo.ps1') | Out-Null
-    if (Get-Process -Id $sleeper.Id -ErrorAction SilentlyContinue) {
-        throw 'stop-demo.ps1 did not stop the process recorded with a UTC start time.'
+    $processAfterStopReturns = Get-Process -Id $sleeper.Id -ErrorAction SilentlyContinue
+    if ($null -ne $processAfterStopReturns) {
+        throw 'stop-demo.ps1 returned before the UTC-identified process had exited.'
     }
 
     Write-Output 'stop-demo UTC process identity test passed.'
