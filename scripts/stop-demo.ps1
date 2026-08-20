@@ -15,24 +15,41 @@ if ($state.repoRoot -ne $repoRoot) {
 }
 
 function Get-ProcessIdentity([int]$ProcessId) {
-    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-    if ($null -eq $process) {
-        return $null
-    }
+    $process = $null
+    try {
+        $process = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+        if ($process.HasExited) {
+            $process.Dispose()
+            return $null
+        }
 
-    return [PSCustomObject]@{
-        id = $process.Id
-        startedAt = $process.StartTime.ToUniversalTime()
+        return [PSCustomObject]@{
+            id = $process.Id
+            startedAt = $process.StartTime.ToUniversalTime()
+            handle = $process
+        }
+    } catch {
+        if ($null -ne $process) {
+            $process.Dispose()
+        }
+        return $null
     }
 }
 
 function Test-ProcessIdentity($Identity) {
-    $current = Get-ProcessIdentity -ProcessId ([int]$Identity.id)
-    if ($null -eq $current) {
+    if ($null -eq $Identity -or $null -eq $Identity.handle) {
         return $false
     }
 
-    return [Math]::Abs(($current.startedAt - ([DateTime]$Identity.startedAt).ToUniversalTime()).TotalSeconds) -le 5
+    try {
+        if ($Identity.handle.HasExited) {
+            return $false
+        }
+
+        return [Math]::Abs(($Identity.handle.StartTime.ToUniversalTime() - ([DateTime]$Identity.startedAt).ToUniversalTime()).TotalSeconds) -le 5
+    } catch {
+        return $false
+    }
 }
 
 function Get-DescendantProcessIdentities([int]$ParentId) {
@@ -47,7 +64,11 @@ function Get-DescendantProcessIdentities([int]$ParentId) {
 
 function Stop-ProcessIfIdentityMatches($Identity) {
     if (Test-ProcessIdentity -Identity $Identity) {
-        Stop-Process -Id ([int]$Identity.id) -Force -ErrorAction SilentlyContinue
+        try {
+            $Identity.handle.Kill()
+        } catch {
+            # The bound process may have exited between identity verification and termination.
+        }
     }
 }
 
@@ -55,53 +76,88 @@ function Get-IdentityKey($Identity) {
     return "$($Identity.id):$(([DateTime]$Identity.startedAt).ToUniversalTime().Ticks)"
 }
 
+function Test-RootPidCanBeRescanned($RootIdentity) {
+    $current = Get-ProcessIdentity -ProcessId ([int]$RootIdentity.id)
+    if ($null -eq $current) {
+        return $true
+    }
+
+    try {
+        return [Math]::Abs(($current.startedAt - ([DateTime]$RootIdentity.startedAt).ToUniversalTime()).TotalSeconds) -le 5
+    } finally {
+        if ($current.handle -is [System.IDisposable]) {
+            $current.handle.Dispose()
+        }
+    }
+}
+
+function Dispose-ProcessIdentity($Identity) {
+    if ($null -ne $Identity -and $Identity.handle -is [System.IDisposable]) {
+        $Identity.handle.Dispose()
+    }
+}
+
 function Stop-ProcessTreeSafely($RootIdentity, [int]$TimeoutSeconds = 10) {
     $observedDescendants = @{}
+    $quiescentRescans = 0
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    do {
-        $rootCurrent = Get-ProcessIdentity -ProcessId ([int]$RootIdentity.id)
-        if ($null -eq $rootCurrent -or (Test-ProcessIdentity -Identity $RootIdentity)) {
-            foreach ($descendant in @(Get-DescendantProcessIdentities -ParentId ([int]$RootIdentity.id))) {
-                $observedDescendants[(Get-IdentityKey -Identity $descendant)] = $descendant
+    try {
+        do {
+            $rootStillRunning = Test-ProcessIdentity -Identity $RootIdentity
+            if ($rootStillRunning -or (Test-RootPidCanBeRescanned -RootIdentity $RootIdentity)) {
+                $rescannedDescendants = @(Get-DescendantProcessIdentities -ParentId ([int]$RootIdentity.id))
+                foreach ($descendant in $rescannedDescendants) {
+                    $observedDescendants[(Get-IdentityKey -Identity $descendant)] = $descendant
+                }
+                if (-not $rootStillRunning -and $rescannedDescendants.Count -eq 0) {
+                    $quiescentRescans++
+                } else {
+                    $quiescentRescans = 0
+                }
+            } else {
+                throw "PID $($RootIdentity.id) was reused before its process tree became quiescent. State was retained for diagnosis."
             }
-        } else {
-            Write-Warning "PID $($RootIdentity.id) was reused while stopping its process tree; no new descendants were inspected."
-        }
 
-        foreach ($descendant in @($observedDescendants.Values)) {
-            Stop-ProcessIfIdentityMatches -Identity $descendant
-        }
-        Stop-ProcessIfIdentityMatches -Identity $RootIdentity
+            foreach ($descendant in @($observedDescendants.Values)) {
+                Stop-ProcessIfIdentityMatches -Identity $descendant
+            }
+            Stop-ProcessIfIdentityMatches -Identity $RootIdentity
+
+            $remaining = @($observedDescendants.Values | Where-Object { Test-ProcessIdentity -Identity $_ })
+            if (Test-ProcessIdentity -Identity $RootIdentity) {
+                $remaining += $RootIdentity
+            }
+            if ($remaining.Count -eq 0 -and $quiescentRescans -ge 2) {
+                return
+            }
+
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
 
         $remaining = @($observedDescendants.Values | Where-Object { Test-ProcessIdentity -Identity $_ })
         if (Test-ProcessIdentity -Identity $RootIdentity) {
             $remaining += $RootIdentity
         }
-        if ($remaining.Count -eq 0) {
-            return
+        throw "Demo processes did not become quiescent before timeout: $($remaining.id -join ', '). State was retained for diagnosis."
+    } finally {
+        foreach ($descendant in @($observedDescendants.Values)) {
+            Dispose-ProcessIdentity -Identity $descendant
         }
-
-        Start-Sleep -Milliseconds 100
-    } while ((Get-Date) -lt $deadline)
-
-    $remaining = @($observedDescendants.Values | Where-Object { Test-ProcessIdentity -Identity $_ })
-    if (Test-ProcessIdentity -Identity $RootIdentity) {
-        $remaining += $RootIdentity
-    }
-    if ($remaining.Count -gt 0) {
-        throw "Demo processes did not exit before timeout: $($remaining.id -join ', '). State was retained for diagnosis."
+        Dispose-ProcessIdentity -Identity $RootIdentity
     }
 }
 
 foreach ($entry in $state.processes) {
-    $process = Get-Process -Id ([int]$entry.pid) -ErrorAction SilentlyContinue
+    $process = Get-ProcessIdentity -ProcessId ([int]$entry.pid)
     if ($null -eq $process) { continue }
     $recorded = [PSCustomObject]@{
-        id = $process.Id
+        id = $process.id
         startedAt = ([DateTime]$entry.startedAt).ToUniversalTime()
+        handle = $process.handle
     }
     if (-not (Test-ProcessIdentity -Identity $recorded)) {
         Write-Warning "PID $($entry.pid) was reused; it was not stopped."
+        Dispose-ProcessIdentity -Identity $recorded
         continue
     }
     Stop-ProcessTreeSafely -RootIdentity $recorded
