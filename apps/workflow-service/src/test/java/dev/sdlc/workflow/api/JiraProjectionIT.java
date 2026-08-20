@@ -61,11 +61,23 @@ class JiraProjectionIT {
                             """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("JIRA_ARTIFACT_SYNC_PENDING"))
-                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("JIRA-SAFE")))
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("Approved SDLC artifact")))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("REQUIREMENT_REPORT")))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("APPROVED")))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Approved requirement scope"))))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("ARTIFACT_BODY_MUST_NOT_APPEAR"))));
+    }
+
+    @Test
+    void neverPublishesAStandaloneCredentialShapedTicketIdentifier() throws Exception {
+        String credentialShapedTicketId = "ghp_0123456789abcdefghijklmnopqrstuv";
+        createApprovedArtifact(credentialShapedTicketId, "ART-CREDENTIAL-TICKET", "Approved requirement scope");
+
+        mvc.perform(jiraDraft(credentialShapedTicketId, "ART-CREDENTIAL-TICKET", 1))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString(credentialShapedTicketId))))
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("Approved SDLC artifact")));
     }
 
     @Test
