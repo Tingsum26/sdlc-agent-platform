@@ -47,13 +47,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = () => new WorkflowClient(config().get<string>("workflowServiceUrl", "http://127.0.0.1:8080"),
     fetch, config().get<string>("demoActorId") || undefined);
   const epicSelection = new EpicSelectionStore();
+  const scrumMasterProvider = new ScrumMasterProvider(client(), epicSelection);
+  const epicProvider = new EpicProvider(client(), epicSelection);
+  const ticketProvider = new TicketProvider(client(), epicSelection);
   // Every view provider implements the tree contract and its own refresh();
   // the intersection makes the refresh fan-out below type-safe.
   const viewProviders: Array<vscode.TreeDataProvider<vscode.TreeItem> & { refresh(): Promise<void> }> = [
     new MyWorkProvider(client()),
-    new ScrumMasterProvider(client(), epicSelection),
-    new EpicProvider(client(), epicSelection),
-    new TicketProvider(client(), epicSelection),
+    scrumMasterProvider,
+    epicProvider,
+    ticketProvider,
     new IdentityPodProvider(client()),
     new CustomizationProvider(context.globalState),
     new McpCenterProvider(mcpCatalog),
@@ -66,7 +69,8 @@ export function activate(context: vscode.ExtensionContext): void {
   for (let index = 0; index < taskViewIds.length; index += 1) {
     context.subscriptions.push(vscode.window.registerTreeDataProvider(taskViewIds[index]!, viewProviders[index]!));
   }
-  context.subscriptions.push(vscode.window.registerTreeDataProvider("sdlc.diagnostics", readinessProvider));
+  context.subscriptions.push(vscode.window.registerTreeDataProvider("sdlc.diagnostics", readinessProvider),
+    epicSelection, scrumMasterProvider, epicProvider, ticketProvider);
 
   // Per-view refresh fan-out: every provider refreshes independently and a
   // failure in one view never blocks the others. Each provider's refresh()

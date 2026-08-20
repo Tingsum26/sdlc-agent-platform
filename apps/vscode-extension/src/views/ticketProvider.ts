@@ -15,24 +15,32 @@ class TicketItem extends vscode.TreeItem {
  * Ticket view: the selected epic's tickets, each expandable to its repo tasks
  * (loaded on demand via listRepoTasks).
  */
-export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem>, vscode.Disposable {
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.changed.event;
   private state: ViewStateWithFreshness<TicketSummary[]> = toViewState({ kind: "loading" });
   private needsEpicSelection = false;
 
+  private readonly selectionListener: vscode.Disposable;
+
   constructor(private readonly client: WorkflowViewsClient, private readonly selection: EpicSelection) {
-    this.selection.onDidChange(() => { void this.refresh(); });
+    this.selectionListener = this.selection.onDidChange(() => { void this.refresh(); });
   }
 
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
 
+  dispose(): void {
+    this.selectionListener.dispose();
+    this.changed.dispose();
+  }
+
   async refresh(): Promise<void> {
+    const epicId = this.selection.selectedEpicId();
     try {
-      const epicId = this.selection.selectedEpicId();
       if (!epicId) {
         this.needsEpicSelection = true;
         this.state = toViewState({ kind: "data", data: [], at: Date.now() });
+        this.changed.fire();
         return;
       }
       this.needsEpicSelection = false;
@@ -40,6 +48,7 @@ export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
       if (this.selection.selectedEpicId() !== epicId) return;
       this.state = toViewState({ kind: "data", data: tickets, at: Date.now() });
     } catch (error) {
+      if (this.selection.selectedEpicId() !== epicId) return;
       this.state = toViewState({ kind: "error", message: safeMessage(error) });
     }
     this.changed.fire();

@@ -5,7 +5,7 @@ import type { EpicSelection } from "./types.js";
  * Extension-scoped live Epic selection. It deliberately keeps no fixture
  * fallback: dependent views show an accessible prompt until an Epic exists.
  */
-export class EpicSelectionStore implements EpicSelection {
+export class EpicSelectionStore implements EpicSelection, vscode.Disposable {
   private selected: string | undefined;
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChange = this.changed.event;
@@ -17,4 +17,6 @@ export class EpicSelectionStore implements EpicSelection {
     this.selected = epicId;
     this.changed.fire();
   }
+
+  dispose(): void { this.changed.dispose(); }
 }

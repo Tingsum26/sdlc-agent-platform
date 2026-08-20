@@ -4,7 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // emitter helper must be created through vi.hoisted (same pattern as
 // bundleInstaller.test.ts).
 const { makeEventEmitter } = vi.hoisted(() => ({
-  makeEventEmitter: () => ({ event: vi.fn(), fire: vi.fn() }),
+  makeEventEmitter: () => {
+    const listeners = new Set<(value: void) => unknown>();
+    return {
+      event: vi.fn((listener: (value: void) => unknown) => {
+        listeners.add(listener);
+        return { dispose: () => listeners.delete(listener) };
+      }),
+      fire: vi.fn(() => { for (const listener of listeners) listener(); }),
+      dispose: vi.fn(() => listeners.clear()),
+    };
+  },
 }));
 
 vi.mock("vscode", () => ({
@@ -52,6 +62,22 @@ describe("view providers", () => {
     expect(client.getEpicResume).not.toHaveBeenCalled();
   });
 
+  it("fires a tree refresh when Ticket and Scrum views enter the no-selection state", async () => {
+    const selection = new EpicSelectionStore();
+    const client = { listTickets: vi.fn(), getEpicResume: vi.fn() };
+    const ticketProvider = new TicketProvider(client as never, selection);
+    const scrumProvider = new ScrumMasterProvider(client as never, selection);
+    const ticketChanged = vi.fn();
+    const scrumChanged = vi.fn();
+    ticketProvider.onDidChangeTreeData(ticketChanged);
+    scrumProvider.onDidChangeTreeData(scrumChanged);
+
+    await Promise.all([ticketProvider.refresh(), scrumProvider.refresh()]);
+
+    expect(ticketChanged).toHaveBeenCalledOnce();
+    expect(scrumChanged).toHaveBeenCalledOnce();
+  });
+
   it("selects the first fetched epic and uses that live id in ticket and scrum queries", async () => {
     const selection = new EpicSelectionStore();
     const firstEpic = { epicId: "EPIC-LIVE-7", title: "Live account opening", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 3 };
@@ -95,11 +121,55 @@ describe("view providers", () => {
 
     const firstRefresh = provider.refresh();
     selection.select("EPIC-SECOND");
-    await provider.refresh();
+    await Promise.resolve();
+    await Promise.resolve();
     resolveFirst!([{ ticketId: "FIRST-TICKET", epicId: "EPIC-FIRST", channel: "API", status: "PR_OPEN", pendingChangeConfirmation: false, version: 1 }]);
     await firstRefresh;
 
     expect(String((provider.getChildren() as vscode.TreeItem[])[0]!.label)).toContain("SECOND-TICKET");
+  });
+
+  it("does not replace current Ticket or Scrum state with a stale rejection", async () => {
+    const selection = new EpicSelectionStore();
+    selection.select("EPIC-FIRST");
+    let rejectTickets: ((reason?: unknown) => void) | undefined;
+    let rejectResume: ((reason?: unknown) => void) | undefined;
+    const pendingTickets = new Promise<never>((_resolve, reject) => { rejectTickets = reject; });
+    const pendingResume = new Promise<never>((_resolve, reject) => { rejectResume = reject; });
+    const secondEpic = { epicId: "EPIC-SECOND", title: "Second", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 2 };
+    const client = {
+      listTickets: vi.fn().mockReturnValueOnce(pendingTickets).mockResolvedValueOnce([]),
+      getEpicResume: vi.fn().mockReturnValueOnce(pendingResume).mockResolvedValueOnce({ epic: secondEpic, tickets: [], auditTrail: [] }),
+    };
+    const ticketProvider = new TicketProvider(client as never, selection);
+    const scrumProvider = new ScrumMasterProvider(client as never, selection);
+
+    const firstTicketRefresh = ticketProvider.refresh();
+    const firstScrumRefresh = scrumProvider.refresh();
+    selection.select("EPIC-SECOND");
+    await Promise.resolve();
+    await Promise.resolve();
+    rejectTickets!(new Error("first ticket request failed"));
+    rejectResume!(new Error("first resume request failed"));
+    await Promise.all([firstTicketRefresh, firstScrumRefresh]);
+
+    expect(String((ticketProvider.getChildren() as vscode.TreeItem[])[0]!.label)).toBe("No tickets");
+    expect(String((scrumProvider.getChildren() as vscode.TreeItem[])[0]!.label)).toBe("No next actions");
+  });
+
+  it("disposes selection listeners when scoped providers are disposed", async () => {
+    const selection = new EpicSelectionStore();
+    const client = { listTickets: vi.fn(), getEpicResume: vi.fn() };
+    const ticketProvider = new TicketProvider(client as never, selection);
+    const scrumProvider = new ScrumMasterProvider(client as never, selection);
+
+    ticketProvider.dispose();
+    scrumProvider.dispose();
+    selection.select("EPIC-AFTER-DISPOSE");
+    await Promise.resolve();
+
+    expect(client.listTickets).not.toHaveBeenCalled();
+    expect(client.getEpicResume).not.toHaveBeenCalled();
   });
 
   it("ticket view nests repo tasks under tickets", async () => {

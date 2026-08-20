@@ -5,7 +5,7 @@ import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./tr
 import type { EpicSelection, ViewStateWithFreshness, WorkflowViewsClient } from "./types.js";
 
 /** Epic view: the journey epics with their lifecycle status. */
-export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem>, vscode.Disposable {
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.changed.event;
   private state: ViewStateWithFreshness<EpicSummary[]> = toViewState({ kind: "loading" });
@@ -13,6 +13,8 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   constructor(private readonly client: WorkflowViewsClient, private readonly selection: EpicSelection) {}
 
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
+
+  dispose(): void { this.changed.dispose(); }
 
   async refresh(): Promise<void> {
     try {
