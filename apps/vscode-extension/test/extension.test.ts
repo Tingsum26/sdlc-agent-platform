@@ -31,6 +31,7 @@ import { McpCenterProvider } from "../src/views/mcpCenterProvider.js";
 import { MyWorkProvider } from "../src/views/myWorkProvider.js";
 import { ScrumMasterProvider } from "../src/views/scrumMasterProvider.js";
 import { TicketProvider } from "../src/views/ticketProvider.js";
+import { EpicSelectionStore } from "../src/views/epicSelection.js";
 
 describe("VSIX static boundaries", () => {
   it("declares exactly the 8 M6 views and no legacy ids", () => {
@@ -102,9 +103,11 @@ describe("per-view refresh isolation", () => {
       getPodMembers: vi.fn().mockRejectedValue(new Error("pod members unavailable")),
     };
     const myWork = new MyWorkProvider(client as never);
-    const scrumMaster = new ScrumMasterProvider(client as never);
-    const epicView = new EpicProvider(client as never);
-    const ticketView = new TicketProvider(client as never);
+    const selection = new EpicSelectionStore();
+    selection.select(epic.epicId);
+    const scrumMaster = new ScrumMasterProvider(client as never, selection);
+    const epicView = new EpicProvider(client as never, selection);
+    const ticketView = new TicketProvider(client as never, selection);
     const identity = new IdentityPodProvider(client as never);
     const customization = new CustomizationProvider({ get: vi.fn().mockReturnValue([]) } as never);
     const mcpCenter = new McpCenterProvider([]);

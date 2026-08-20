@@ -44,6 +44,7 @@
     },
     "commands": [
       { "command": "sdlc.refreshTasks", "title": "SDLC: Refresh Tasks" },
+      { "command": "sdlc.selectEpic", "title": "SDLC: Select Epic" },
       { "command": "sdlc.openTask", "title": "SDLC: Open Task" },
       { "command": "sdlc.openReport", "title": "SDLC: Open HTML Report" },
       { "command": "sdlc.openJourneyReport", "title": "SDLC: Open Journey Readiness Report" },

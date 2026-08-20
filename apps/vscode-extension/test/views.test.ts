@@ -22,6 +22,7 @@ import { TicketProvider } from "../src/views/ticketProvider.js";
 import { IdentityPodProvider } from "../src/views/identityPodProvider.js";
 import { CustomizationProvider } from "../src/views/customizationProvider.js";
 import { McpCenterProvider } from "../src/views/mcpCenterProvider.js";
+import { EpicSelectionStore } from "../src/views/epicSelection.js";
 
 const task = { taskId: "TASK-1", type: "REQUIREMENT_ANALYSIS", status: "WAITING_FOR_LOCAL_COPILOT", scope: { ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567" }, version: 0, updatedAt: "2026-08-18T00:00:00Z" };
 
@@ -37,12 +38,78 @@ describe("view providers", () => {
     expect(items[0]!.label).toContain("DEMO-123");
   });
 
+  it("ticket and scrum views ask the user to select an epic instead of querying a fixture id", async () => {
+    const selection = new EpicSelectionStore();
+    const client = { listTickets: vi.fn(), getEpicResume: vi.fn() };
+    const ticketProvider = new TicketProvider(client as never, selection);
+    const scrumProvider = new ScrumMasterProvider(client as never, selection);
+
+    await Promise.all([ticketProvider.refresh(), scrumProvider.refresh()]);
+
+    expect(String((ticketProvider.getChildren() as vscode.TreeItem[])[0]!.label)).toBe("Select an epic in Epic View");
+    expect(String((scrumProvider.getChildren() as vscode.TreeItem[])[0]!.label)).toBe("Select an epic in Epic View");
+    expect(client.listTickets).not.toHaveBeenCalled();
+    expect(client.getEpicResume).not.toHaveBeenCalled();
+  });
+
+  it("selects the first fetched epic and uses that live id in ticket and scrum queries", async () => {
+    const selection = new EpicSelectionStore();
+    const firstEpic = { epicId: "EPIC-LIVE-7", title: "Live account opening", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 3 };
+    const client = {
+      listEpics: vi.fn().mockResolvedValue([firstEpic]),
+      listTickets: vi.fn().mockResolvedValue([]),
+      getEpicResume: vi.fn().mockResolvedValue({ epic: firstEpic, tickets: [], auditTrail: [] }),
+    };
+    const epicProvider = new EpicProvider(client as never, selection);
+    const ticketProvider = new TicketProvider(client as never, selection);
+    const scrumProvider = new ScrumMasterProvider(client as never, selection);
+
+    await epicProvider.refresh();
+    await Promise.all([ticketProvider.refresh(), scrumProvider.refresh()]);
+
+    expect(selection.selectedEpicId()).toBe("EPIC-LIVE-7");
+    expect(client.listTickets).toHaveBeenCalledWith("EPIC-LIVE-7");
+    expect(client.getEpicResume).toHaveBeenCalledWith("EPIC-LIVE-7");
+  });
+
+  it("keeps an explicit epic selection when a later epic refresh returns a different first row", async () => {
+    const selection = new EpicSelectionStore();
+    const selected = { epicId: "EPIC-SELECTED", title: "Chosen", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 3 };
+    const client = { listEpics: vi.fn().mockResolvedValue([{ epicId: "EPIC-OTHER", title: "Other", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 3 }]) };
+    selection.select(selected.epicId);
+    const provider = new EpicProvider(client as never, selection);
+
+    await provider.refresh();
+
+    expect(selection.selectedEpicId()).toBe(selected.epicId);
+  });
+
+  it("does not replace the current ticket view with a stale response after switching epics", async () => {
+    const selection = new EpicSelectionStore();
+    selection.select("EPIC-FIRST");
+    let resolveFirst: ((tickets: Array<{ ticketId: string; epicId: string; channel: string; status: string; pendingChangeConfirmation: boolean; version: number }>) => void) | undefined;
+    const firstResponse = new Promise<Array<{ ticketId: string; epicId: string; channel: string; status: string; pendingChangeConfirmation: boolean; version: number }>>((resolve) => { resolveFirst = resolve; });
+    const secondTicket = { ticketId: "SECOND-TICKET", epicId: "EPIC-SECOND", channel: "WEB", status: "IN_PROGRESS", pendingChangeConfirmation: false, version: 2 };
+    const client = { listTickets: vi.fn().mockReturnValueOnce(firstResponse).mockResolvedValueOnce([secondTicket]) };
+    const provider = new TicketProvider(client as never, selection);
+
+    const firstRefresh = provider.refresh();
+    selection.select("EPIC-SECOND");
+    await provider.refresh();
+    resolveFirst!([{ ticketId: "FIRST-TICKET", epicId: "EPIC-FIRST", channel: "API", status: "PR_OPEN", pendingChangeConfirmation: false, version: 1 }]);
+    await firstRefresh;
+
+    expect(String((provider.getChildren() as vscode.TreeItem[])[0]!.label)).toContain("SECOND-TICKET");
+  });
+
   it("ticket view nests repo tasks under tickets", async () => {
+    const selection = new EpicSelectionStore();
+    selection.select("EPIC-LIVE-7");
     const client = {
       listTickets: vi.fn().mockResolvedValue([{ ticketId: "M2-API-1", epicId: "EPIC-M2-1", channel: "API", status: "PR_OPEN", pendingChangeConfirmation: false, version: 5 }]),
       listRepoTasks: vi.fn().mockResolvedValue([{ repoTaskId: "REPO-TASK-1", ticketId: "M2-API-1", repositoryAlias: "REPO_A", status: "MERGED", version: 2 }]),
     };
-    const provider = new TicketProvider(client as never);
+    const provider = new TicketProvider(client as never, selection);
     await provider.refresh();
     const ticketItem = provider.getChildren() as vscode.TreeItem[];
     expect(ticketItem.length).toBe(1);
@@ -63,7 +130,7 @@ describe("view providers", () => {
 
   it("epic view lists epics with status and freshness text", async () => {
     const client = { listEpics: vi.fn().mockResolvedValue([{ epicId: "EPIC-M2-1", title: "Account opening", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 3 }]) };
-    const provider = new EpicProvider(client as never);
+    const provider = new EpicProvider(client as never, new EpicSelectionStore());
     await provider.refresh();
     const items = provider.getChildren() as vscode.TreeItem[];
     expect(items[0]!.label).toContain("EPIC-M2-1");
@@ -71,7 +138,9 @@ describe("view providers", () => {
     expect(items[0]!.accessibilityInformation!.label).toMatch(/Freshness (LIVE|DELAYED|STALE|OFFLINE)/);
   });
 
-  it("scrum master shows the first epic's next actions", async () => {
+  it("scrum master shows the selected epic's next actions", async () => {
+    const selection = new EpicSelectionStore();
+    selection.select("EPIC-LIVE-7");
     const client = {
       getEpicResume: vi.fn().mockResolvedValue({
         epic: { epicId: "EPIC-M2-1", title: "Account opening", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 3 },
@@ -79,12 +148,12 @@ describe("view providers", () => {
         auditTrail: [],
       }),
     };
-    const provider = new ScrumMasterProvider(client as never);
+    const provider = new ScrumMasterProvider(client as never, selection);
     await provider.refresh();
     const items = provider.getChildren() as vscode.TreeItem[];
     expect(items[0]!.label).toContain("M2-API-1");
     expect(items[0]!.description).toMatch(/^Open the PR · (LIVE|DELAYED|STALE|OFFLINE)$/);
-    expect(client.getEpicResume).toHaveBeenCalledWith("EPIC-M2-1");
+    expect(client.getEpicResume).toHaveBeenCalledWith("EPIC-LIVE-7");
   });
 
   it("customization view lists installed bundle versions plus commands", async () => {
@@ -123,11 +192,13 @@ describe("view providers", () => {
       getIdentity: vi.fn().mockResolvedValue({ employeeId: "EMP-100", displayLabel: "Fictional Scrum Master", source: "ADMIN_BINDING" }),
       getPodMembers: vi.fn().mockResolvedValue([{ principalId: "P-1", employeeId: "EMP-201", displayLabel: "Fictional Developer", role: "DEVELOPER", onboardingStatus: "ONBOARDED" }]),
     };
+    const selection = new EpicSelectionStore();
+    selection.select(epic.epicId);
     const providers: Array<{ refresh(): Promise<void>; getChildren(): vscode.TreeItem[] | Thenable<vscode.TreeItem[]> }> = [
       new MyWorkProvider(client as never),
-      new ScrumMasterProvider(client as never),
-      new EpicProvider(client as never),
-      new TicketProvider(client as never),
+      new ScrumMasterProvider(client as never, selection),
+      new EpicProvider(client as never, selection),
+      new TicketProvider(client as never, selection),
       new IdentityPodProvider(client as never),
       new CustomizationProvider({ get: vi.fn().mockReturnValue([{ version: "2.0.0", root: "/bundles", installedAt: "2026-08-18T00:00:00Z" }]) } as never),
       new McpCenterProvider([{ id: "workflow-mcp", name: "Workflow MCP", required: true, skills: ["start-ticket"] }]),

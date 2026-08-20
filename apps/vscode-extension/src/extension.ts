@@ -8,6 +8,7 @@ import { ExtensionLogger } from "./logging/logger.js";
 import { TaskPoller } from "./polling/taskPoller.js";
 import { CustomizationProvider } from "./views/customizationProvider.js";
 import { EpicProvider } from "./views/epicProvider.js";
+import { EpicSelectionStore } from "./views/epicSelection.js";
 import { IdentityPodProvider } from "./views/identityPodProvider.js";
 import { McpCenterProvider } from "./views/mcpCenterProvider.js";
 import { MyWorkProvider } from "./views/myWorkProvider.js";
@@ -45,13 +46,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const config = () => vscode.workspace.getConfiguration("sdlc");
   const client = () => new WorkflowClient(config().get<string>("workflowServiceUrl", "http://127.0.0.1:8080"),
     fetch, config().get<string>("demoActorId") || undefined);
+  const epicSelection = new EpicSelectionStore();
   // Every view provider implements the tree contract and its own refresh();
   // the intersection makes the refresh fan-out below type-safe.
   const viewProviders: Array<vscode.TreeDataProvider<vscode.TreeItem> & { refresh(): Promise<void> }> = [
     new MyWorkProvider(client()),
-    new ScrumMasterProvider(client()),
-    new EpicProvider(client()),
-    new TicketProvider(client()),
+    new ScrumMasterProvider(client(), epicSelection),
+    new EpicProvider(client(), epicSelection),
+    new TicketProvider(client(), epicSelection),
     new IdentityPodProvider(client()),
     new CustomizationProvider(context.globalState),
     new McpCenterProvider(mcpCatalog),
@@ -123,6 +125,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeWindowState((state) => { if (state.focused) void poller.onFocus(); }),
     vscode.commands.registerCommand("sdlc.refreshTasks", async () => {
       try { await refresh(); } catch (error) { logger.error("refresh_failed", { message: safeMessage(error) }); void vscode.window.showErrorMessage("SDLC refresh failed. Open Diagnostics for details."); }
+    }),
+    vscode.commands.registerCommand("sdlc.selectEpic", (epicId?: string) => {
+      if (typeof epicId === "string" && epicId.length > 0) epicSelection.select(epicId);
     }),
     vscode.commands.registerCommand("sdlc.openTask", async (taskId?: string) => {
       const selected = taskId ?? await chooseTask(tasks);

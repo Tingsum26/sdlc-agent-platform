@@ -10,7 +10,16 @@ import type { TicketProvider } from "../src/views/ticketProvider.js";
 // fan-out refresh. The vi.mock factory is hoisted above module scope, so the
 // shared helpers and the registration registry are created through vi.hoisted.
 const { makeEventEmitter, makeDisposable, makeOutputChannel, makeStatusBarItem, registry, configValues } = vi.hoisted(() => ({
-  makeEventEmitter: () => ({ event: vi.fn(), fire: vi.fn() }),
+  makeEventEmitter: () => {
+    const listeners = new Set<(value: void) => unknown>();
+    return {
+      event: vi.fn((listener: (value: void) => unknown) => {
+        listeners.add(listener);
+        return { dispose: () => listeners.delete(listener) };
+      }),
+      fire: vi.fn(() => { for (const listener of listeners) listener(); }),
+    };
+  },
   makeDisposable: () => ({ dispose: vi.fn() }),
   makeOutputChannel: () => ({ name: "Local Copilot SDLC", appendLine: vi.fn(), append: vi.fn(), show: vi.fn(), hide: vi.fn(), clear: vi.fn(), dispose: vi.fn() }),
   makeStatusBarItem: () => ({ command: "", text: "", tooltip: "", show: vi.fn(), hide: vi.fn(), dispose: vi.fn() }),
@@ -68,7 +77,9 @@ import { activate } from "../src/extension.js";
 
 const task = { taskId: "TASK-1", type: "REQUIREMENT_ANALYSIS", status: "WAITING_FOR_LOCAL_COPILOT", scope: { ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567" }, version: 0, updatedAt: "2026-08-18T00:00:00Z" };
 const epic = { epicId: "EPIC-M2-1", title: "Account opening", journeyId: "ACCOUNT_OPENING", status: "ACTIVE", version: 3 };
+const alternateEpic = { epicId: "EPIC-LIVE-2", title: "Card replacement", journeyId: "CARD_REPLACEMENT", status: "ACTIVE", version: 4 };
 const ticket = { ticketId: "M2-API-1", epicId: "EPIC-M2-1", channel: "API", status: "PR_OPEN", pendingChangeConfirmation: false, version: 5 };
+const alternateTicket = { ticketId: "LIVE-WEB-2", epicId: "EPIC-LIVE-2", channel: "WEB", status: "IN_PROGRESS", pendingChangeConfirmation: false, version: 6 };
 const repoTask = { repoTaskId: "REPO-TASK-1", ticketId: "M2-API-1", repositoryAlias: "REPO_A", status: "MERGED", version: 2 };
 const identity = { employeeId: "EMP-100", displayLabel: "Fictional Scrum Master", source: "ADMIN_BINDING" };
 const member = { principalId: "PRINCIPAL-EMP-201", employeeId: "EMP-201", displayLabel: "Fictional Developer", role: "DEVELOPER", onboardingStatus: "ONBOARDED" };
@@ -82,9 +93,11 @@ function jsonResponse(body: unknown): Response {
 /** Happy-path Workflow Service router: every endpoint the fan-out refresh touches. */
 async function routeWorkflow(url: string): Promise<Response> {
   if (url.endsWith("/api/v1/tasks")) return jsonResponse([task]);
-  if (url.endsWith("/api/v1/epics")) return jsonResponse([epic]);
+  if (url.endsWith("/api/v1/epics")) return jsonResponse([epic, alternateEpic]);
   if (url.endsWith("/api/v1/epics/EPIC-M2-1/resume")) return jsonResponse({ epic, tickets: [{ ticket, openTasks: [task], nextAction: "Open the PR" }], auditTrail: [] });
   if (url.endsWith("/api/v1/epics/EPIC-M2-1/tickets")) return jsonResponse([ticket]);
+  if (url.endsWith("/api/v1/epics/EPIC-LIVE-2/resume")) return jsonResponse({ epic: alternateEpic, tickets: [{ ticket: alternateTicket, openTasks: [], nextAction: "Review browser flow" }], auditTrail: [] });
+  if (url.endsWith("/api/v1/epics/EPIC-LIVE-2/tickets")) return jsonResponse([alternateTicket]);
   if (url.includes("/repo-tasks")) return jsonResponse([repoTask]);
   if (url.endsWith("/api/v1/internal-readiness/identity")) return jsonResponse(identity);
   if (url.endsWith("/api/v1/internal-readiness/integrations")) return jsonResponse([diagnostic]);
@@ -153,6 +166,7 @@ describe("extension activation E2E", () => {
     expect(new Set(providers.map(([, provider]) => provider)).size).toBe(8);
     expect(context.subscriptions.length).toBeGreaterThan(0);
     expect(registry.commands.has("sdlc.refreshTasks")).toBe(true);
+    expect(registry.commands.has("sdlc.selectEpic")).toBe(true);
 
     // The fan-out refresh went through the real WorkflowClient + mocked fetch.
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/v1/tasks"), expect.anything());
@@ -188,6 +202,27 @@ describe("extension activation E2E", () => {
     for (const row of rows) {
       expect(diagnostics.getTreeItem(row).accessibilityInformation).toBeDefined();
     }
+  });
+
+  it("selecting a live Epic refreshes Ticket and Scrum views without a fixture fallback", async () => {
+    const fetcher = happyFetcher();
+    vi.stubGlobal("fetch", fetcher);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    activate(mockContext());
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(labelsOf("sdlc.ticket")).toContain("M2-API-1 · PR_OPEN");
+    expect(labelsOf("sdlc.scrumMaster")).toContain("M2-API-1 · PR_OPEN");
+
+    registry.commands.get("sdlc.selectEpic")!("EPIC-LIVE-2");
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(labelsOf("sdlc.ticket")).toContain("LIVE-WEB-2 · IN_PROGRESS");
+    expect(labelsOf("sdlc.scrumMaster")).toContain("LIVE-WEB-2 · IN_PROGRESS");
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/v1/epics/EPIC-LIVE-2/tickets"), expect.anything());
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/v1/epics/EPIC-LIVE-2/resume"), expect.anything());
   });
 
   it("a failing pod-members endpoint does not break the other views or diagnostics", async () => {

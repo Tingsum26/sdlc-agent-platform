@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { EpicSummary } from "../api/workflowClient.js";
 import { toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
-import type { ViewStateWithFreshness, WorkflowViewsClient } from "./types.js";
+import type { EpicSelection, ViewStateWithFreshness, WorkflowViewsClient } from "./types.js";
 
 /** Epic view: the journey epics with their lifecycle status. */
 export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -10,7 +10,7 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   readonly onDidChangeTreeData = this.changed.event;
   private state: ViewStateWithFreshness<EpicSummary[]> = toViewState({ kind: "loading" });
 
-  constructor(private readonly client: WorkflowViewsClient) {}
+  constructor(private readonly client: WorkflowViewsClient, private readonly selection: EpicSelection) {}
 
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
 
@@ -18,6 +18,7 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     try {
       const epics = await this.client.listEpics();
       this.state = toViewState({ kind: "data", data: epics, at: Date.now() });
+      if (!this.selection.selectedEpicId() && epics[0]) this.selection.select(epics[0].epicId);
     } catch (error) {
       this.state = toViewState({ kind: "error", message: safeMessage(error) });
     }
@@ -37,6 +38,8 @@ export class EpicProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     item.description = `${epic.status} · ${freshness}`;
     item.tooltip = `Journey ${epic.journeyId}\nVersion ${epic.version}\nFreshness: ${freshness}`;
     item.iconPath = statusIcon(epic.status);
+    item.command = { command: "sdlc.selectEpic", title: "Select Epic", arguments: [epic.epicId] };
+    item.contextValue = "sdlc.epic";
     item.accessibilityInformation = { label: `${label}. Status ${epic.status}. Journey ${epic.journeyId}. Freshness ${freshness}.` };
     return item;
   }

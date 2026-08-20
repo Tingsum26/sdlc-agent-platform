@@ -2,24 +2,32 @@ import * as vscode from "vscode";
 import type { EpicResume } from "../api/workflowClient.js";
 import { toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
-import { FIRST_EPIC_ID, type ViewStateWithFreshness, type WorkflowViewsClient } from "./types.js";
+import { type EpicSelection, type ViewStateWithFreshness, type WorkflowViewsClient } from "./types.js";
 
 /**
- * Scrum Master view: next-action hints for the first epic's tickets from the
+ * Scrum Master view: next-action hints for the selected epic's tickets from the
  * epic resume, so the scrum master knows what to unblock first.
  */
 export class ScrumMasterProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.changed.event;
-  private state: ViewStateWithFreshness<EpicResume> = toViewState({ kind: "loading" });
+  private state: ViewStateWithFreshness<EpicResume | undefined> = toViewState({ kind: "loading" });
 
-  constructor(private readonly client: WorkflowViewsClient) {}
+  constructor(private readonly client: WorkflowViewsClient, private readonly selection: EpicSelection) {
+    this.selection.onDidChange(() => { void this.refresh(); });
+  }
 
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
 
   async refresh(): Promise<void> {
     try {
-      const resume = await this.client.getEpicResume(FIRST_EPIC_ID);
+      const epicId = this.selection.selectedEpicId();
+      if (!epicId) {
+        this.state = toViewState({ kind: "data", data: undefined, at: Date.now() });
+        return;
+      }
+      const resume = await this.client.getEpicResume(epicId);
+      if (this.selection.selectedEpicId() !== epicId) return;
       this.state = toViewState({ kind: "data", data: resume, at: Date.now() });
     } catch (error) {
       this.state = toViewState({ kind: "error", message: safeMessage(error) });
@@ -30,6 +38,7 @@ export class ScrumMasterProvider implements vscode.TreeDataProvider<vscode.TreeI
   getChildren(): vscode.TreeItem[] {
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
+    if (!this.state.data) return [emptyItem("Select an epic in Epic View")];
     const tickets = this.state.data.tickets;
     if (tickets.length === 0) return [emptyItem("No next actions")];
     return tickets.map((entry) => this.ticketItem(entry, this.state.freshness));

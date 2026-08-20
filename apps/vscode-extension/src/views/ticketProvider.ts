@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { RepoTaskSummary, TicketSummary } from "../api/workflowClient.js";
 import { toViewState, type Freshness } from "./viewState.js";
 import { emptyItem, errorItem, loadingItem, safeMessage, statusIcon } from "./treeItems.js";
-import { FIRST_EPIC_ID, type ViewStateWithFreshness, type WorkflowViewsClient } from "./types.js";
+import { type EpicSelection, type ViewStateWithFreshness, type WorkflowViewsClient } from "./types.js";
 
 /** A ticket row that knows its ticket id so getChildren can load its repo tasks. */
 class TicketItem extends vscode.TreeItem {
@@ -12,21 +12,32 @@ class TicketItem extends vscode.TreeItem {
 }
 
 /**
- * Ticket view: the first epic's tickets, each expandable to its repo tasks
+ * Ticket view: the selected epic's tickets, each expandable to its repo tasks
  * (loaded on demand via listRepoTasks).
  */
 export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.changed.event;
   private state: ViewStateWithFreshness<TicketSummary[]> = toViewState({ kind: "loading" });
+  private needsEpicSelection = false;
 
-  constructor(private readonly client: WorkflowViewsClient) {}
+  constructor(private readonly client: WorkflowViewsClient, private readonly selection: EpicSelection) {
+    this.selection.onDidChange(() => { void this.refresh(); });
+  }
 
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
 
   async refresh(): Promise<void> {
     try {
-      const tickets = await this.client.listTickets(FIRST_EPIC_ID);
+      const epicId = this.selection.selectedEpicId();
+      if (!epicId) {
+        this.needsEpicSelection = true;
+        this.state = toViewState({ kind: "data", data: [], at: Date.now() });
+        return;
+      }
+      this.needsEpicSelection = false;
+      const tickets = await this.client.listTickets(epicId);
+      if (this.selection.selectedEpicId() !== epicId) return;
       this.state = toViewState({ kind: "data", data: tickets, at: Date.now() });
     } catch (error) {
       this.state = toViewState({ kind: "error", message: safeMessage(error) });
@@ -42,6 +53,7 @@ export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
   private rootItems(): vscode.TreeItem[] {
     if (this.state.kind === "loading") return [loadingItem()];
     if (this.state.kind === "error") return [errorItem(this.state.message)];
+    if (this.needsEpicSelection) return [emptyItem("Select an epic in Epic View")];
     if (this.state.data.length === 0) return [emptyItem("No tickets")];
     return this.state.data.map((ticket) => this.ticketItem(ticket, this.state.freshness));
   }

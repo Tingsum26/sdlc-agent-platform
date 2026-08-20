@@ -8,6 +8,7 @@ import type {
   WorkflowTask,
 } from "../api/workflowClient.js";
 import type { Freshness, ViewState } from "./viewState.js";
+import type * as vscode from "vscode";
 
 /** A ViewState plus the freshness badge computed by toViewState. */
 export type ViewStateWithFreshness<T> = ViewState<T> & { freshness: Freshness };
@@ -53,8 +54,12 @@ export interface McpCatalogEntry {
   skills: string[];
 }
 
-/** Epic whose tickets drive the Scrum Master and Ticket views (M2 slice). */
-export const FIRST_EPIC_ID = "EPIC-M2-1";
+/** Shared live Epic context for the views whose data is scoped to one Epic. */
+export interface EpicSelection {
+  selectedEpicId(): string | undefined;
+  select(epicId: string): void;
+  onDidChange: vscode.Event<void>;
+}
 
 /** Journey whose pod members drive the Identity / Pod view. */
 export const ACCOUNT_OPENING_JOURNEY = "ACCOUNT_OPENING";
