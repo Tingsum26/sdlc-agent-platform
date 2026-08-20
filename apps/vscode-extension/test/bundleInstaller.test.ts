@@ -73,7 +73,7 @@ vi.mock("vscode", () => ({
 }));
 
 import * as vscode from "vscode";
-import { hookCommand, installCustomizationBundle, rollbackCustomizationBundle, skillInstallPath } from "../src/customization/bundleInstaller.js";
+import { hookCommand, installCustomizationBundle, resolveNodeRuntime, rollbackCustomizationBundle, skillInstallPath } from "../src/customization/bundleInstaller.js";
 
 beforeEach(() => {
   configUpdates.length = 0;
@@ -249,10 +249,17 @@ describe("customization bundle installer", () => {
     expect(command).not.toMatch(/[>&|;]/);
   });
 
-  it("uses Electron's Node mode when the extension host executable is Code", () => {
-    const command = hookCommand("C:\\bundle", "verify-stage-output", "C:\\Program Files\\Microsoft VS Code\\Code.exe");
-    expect(command).toContain(JSON.stringify("C:\\Program Files\\Microsoft VS Code\\Code.exe"));
-    expect(command).toContain("--ms-enable-electron-run-as-node");
+  it("resolves a real Node runtime when the extension host executable is Code", () => {
+    const tools = mkdtempSync(join(tmpdir(), "sdlc-node-runtime-"));
+    const node = join(tools, "node.exe");
+    writeFileSync(node, "fictional node executable");
+
+    const runtime = resolveNodeRuntime("C:\\Program Files\\Microsoft VS Code\\Code.exe", tools, "win32");
+    const command = hookCommand("C:\\bundle", "verify-stage-output", runtime);
+    expect(runtime).toBe(node);
+    expect(command).toContain(JSON.stringify(node));
+    expect(command).not.toContain("Code.exe");
+    expect(command).not.toContain("electron-run-as-node");
   });
 
   it("compensates every partial configuration and global-state activation write", async () => {

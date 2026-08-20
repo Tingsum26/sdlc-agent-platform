@@ -59,7 +59,7 @@
 | `pnpm e2e:public-mvp`, `e2e:m1`, `e2e:m2`, `e2e:m3`, `e2e:m4`, `e2e:m7` | PASS | each suite 1/1, launched separately with ports 8080/4173 clean | fictional loopback demo |
 | `powershell -File scripts/tests/build-bundle.test.ps1` + `bundle-lifecycle.test.ps1` | PASS | central bundle build and install/rollback lifecycle | no company release trust |
 | `powershell -File scripts/tests/stop-demo.test.ps1` | PASS | Windows PID-reuse, process-tree, and discovery-failure regression cases | Windows PowerShell process behavior |
-| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 6-file 17.65-KB `.vsix` | not signed/published internally |
+| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 6-file 17.84-KB `.vsix` | not signed/published internally |
 | `pnpm audit --audit-level low` | PASS | no known vulnerabilities | snapshot of registry advisory data at verification time |
 | start → health → stop → port release | PASS | Workflow `UP`, Web `200`, ports 8080/4173 released | Fake profile only |
 | TODO registry + static scans | PASS | registry tests 11/11; 10 IDs/19 canonical paths; marker scan 19; credential scan 0 | exact commands and exclusions in `docs/verification/m8-milestone-2026-08-20.md` |

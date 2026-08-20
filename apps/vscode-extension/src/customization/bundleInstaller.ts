@@ -1,5 +1,5 @@
 import { cp, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { accessSync, constants, existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import * as vscode from "vscode";
 import { loadAndValidateBundle, rejectBundleSymlinks, safeResolve } from "./bundleManifest.js";
@@ -165,9 +165,30 @@ async function activateBundleTransaction(
 // The exact command recorded for a validated hook entry. JSON string quoting is
 // accepted by both cmd.exe and POSIX shells, so bundle paths with spaces cannot
 // alter the command that invokes the installed Node no-op shim.
-export function hookCommand(root: string, action: string, runtime = process.execPath): string {
-  const electronNodeMode = /^node(?:\.exe)?$/i.test(basename(runtime)) ? "" : " --ms-enable-electron-run-as-node";
-  return `${JSON.stringify(runtime)}${electronNodeMode} ${JSON.stringify(join(root, "hooks", "run-hook.mjs"))} ${JSON.stringify(action)}`;
+export function resolveNodeRuntime(
+  executable = process.execPath,
+  pathValue = process.env.PATH ?? "",
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (/^node(?:\.exe)?$/i.test(basename(executable))) return executable;
+  const filename = platform === "win32" ? "node.exe" : "node";
+  const separator = platform === "win32" ? ";" : ":";
+  for (const rawDirectory of pathValue.split(separator)) {
+    const directory = rawDirectory.trim().replace(/^"|"$/g, "");
+    if (!directory) continue;
+    const candidate = join(directory, filename);
+    try {
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Continue to the next reviewed PATH entry.
+    }
+  }
+  throw new Error("A real Node runtime is required to activate customization hooks");
+}
+
+export function hookCommand(root: string, action: string, runtime = resolveNodeRuntime()): string {
+  return `${JSON.stringify(runtime)} ${JSON.stringify(join(root, "hooks", "run-hook.mjs"))} ${JSON.stringify(action)}`;
 }
 
 const hookEventNames = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"] as const;
@@ -198,9 +219,9 @@ async function readHookEntries(root: string): Promise<HookEvent[]> {
 // approved deterministic hook commands, and only then enable real hook
 // execution. The declared events are still recorded in chat.agent.hooks so the
 // activation surface is visible, but every command is a local no-op today.
-// The shipped Node shim is invoked through Node itself, including Electron's
-// explicit Node mode in an extension host; real actions must preserve this
-// platform-neutral invocation boundary.
+// The shipped Node shim is invoked through a real node/node.exe resolved from
+// the local PATH when the extension host executable is Electron/Code; real
+// actions must preserve this platform-neutral invocation boundary.
 function nextHookSettings(
   liveValue: Record<string, unknown>,
   recorded: Record<string, unknown>,
