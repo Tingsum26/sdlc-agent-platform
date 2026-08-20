@@ -6,6 +6,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import dev.sdlc.workflow.task.TaskType;
+import dev.sdlc.workflow.task.WorkflowScope;
+import dev.sdlc.workflow.task.WorkflowTaskService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +23,9 @@ class WorkflowApiIT {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private WorkflowTaskService tasks;
 
     @Test
     void createsTheRequestedWorkflowStageWhileDefaultingOldCallersToRequirementAnalysis() throws Exception {
@@ -36,6 +42,23 @@ class WorkflowApiIT {
                         .content("{\"ticketId\":\"TYPE-2\",\"repositoryAlias\":\"REPO_A\",\"targetCommit\":\"0123456789abcdef\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.type").value("REQUIREMENT_ANALYSIS"));
+    }
+
+    @Test
+    void retainsTheLegacyRequirementIdempotencyKeyForOmittedOrExplicitRequirementType() throws Exception {
+        tasks.createTask("TASK-LEGACY-1", TaskType.REQUIREMENT_ANALYSIS,
+                new WorkflowScope("LEGACY-1", "REPO_A", "0123456789abcdef"),
+                "ticket:LEGACY-1:0123456789abcdef", "PRINCIPAL-EMP-100", "legacy-seed");
+
+        for (String body : new String[] {
+                "{\"ticketId\":\"LEGACY-1\",\"repositoryAlias\":\"REPO_A\",\"targetCommit\":\"0123456789abcdef\"}",
+                "{\"ticketId\":\"LEGACY-1\",\"repositoryAlias\":\"REPO_A\",\"targetCommit\":\"0123456789abcdef\",\"type\":\"REQUIREMENT_ANALYSIS\"}" }) {
+            mvc.perform(post("/api/v1/workflows/from-ticket").header("X-Demo-User", "PRINCIPAL-EMP-100")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.taskId").value("TASK-LEGACY-1"))
+                    .andExpect(jsonPath("$.type").value("REQUIREMENT_ANALYSIS"));
+        }
     }
 
     @Test

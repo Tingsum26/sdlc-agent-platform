@@ -16,6 +16,8 @@ test("M7: fictional end-to-end SDLC completes with an audit trail and report", a
   await expect(page.getByText("implementation artifact submitted")).toBeVisible();
   await expect(page.getByText("generated tests artifact submitted")).toBeVisible();
   await expect(page.getByText("manual E2E passed")).toHaveCount(4);
+  await expect(page.getByText("persisted stage types")).toBeVisible();
+  await expect(page.getByText("REQUIREMENT_ANALYSIS, DESIGN, IMPLEMENTATION, TEST_GENERATION")).toBeVisible();
   await expect(page.getByText("repo task merged")).toBeVisible();
   await expect(page.getByText("ticket release evidence recorded")).toBeVisible();
   await expect(page.getByTitle("SDLC stage report")).toBeVisible();

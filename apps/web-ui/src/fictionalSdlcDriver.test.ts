@@ -4,6 +4,8 @@ import { runFictionalSdlc, type SdlcStepEvent } from "./fictionalSdlcDriver";
 describe("fictional SDLC driver", () => {
   it("sequences the full path and returns an audit trail", async () => {
     const calls: string[] = [];
+    const epicIds: string[] = [];
+    const ticketIds: string[] = [];
     let fromTicketCount = 0;
     let repoTaskVersion = 0;
     const fetchMock = vi.fn<typeof fetch>(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -11,13 +13,15 @@ describe("fictional SDLC driver", () => {
       calls.push(path);
       const body = () => JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       if (path.endsWith("/epics")) {
-        return json({ epicId: "EPIC-M7-1", title: "Fictional M7 epic", journeyId: "ACCOUNT_OPENING", status: "CREATED", version: 0 });
+        epicIds.push(String(body().epicId));
+        return json({ epicId: body().epicId, title: "Fictional M7 epic", journeyId: "ACCOUNT_OPENING", status: "CREATED", version: 0 });
       }
       if (path.endsWith("/activate")) {
         return json({ epicId: "EPIC-M7-1", status: "ACTIVE", version: 1 });
       }
       if (path.endsWith("/tickets")) {
-        return json({ ticketId: "M7-API-1", epicId: "EPIC-M7-1", channel: "API", status: "PLANNED", version: 0 });
+        ticketIds.push(String(body().ticketId));
+        return json({ ticketId: body().ticketId, epicId: "EPIC-M7", channel: "API", status: "PLANNED", version: 0 });
       }
       if (path.endsWith("/repo-tasks")) {
         return json({ repoTaskId: "REPO-TASK-M7-1", status: "PLANNED", version: 0 });
@@ -42,6 +46,11 @@ describe("fictional SDLC driver", () => {
           version: 0,
           scope: { ticketId: scope.ticketId, repositoryAlias: scope.repositoryAlias, targetCommit: scope.targetCommit },
         });
+      }
+      if (path.endsWith("/tasks")) {
+        return json(["REQUIREMENT_ANALYSIS", "DESIGN", "IMPLEMENTATION", "TEST_GENERATION"].map((type, index) => ({
+          taskId: `TASK-M7-${fromTicketCount - 3 + index}`, type,
+        })));
       }
       const taskMatch = path.match(/\/tasks\/([^/]+)\/([\w-]+)$/);
       if (taskMatch) {
@@ -79,8 +88,20 @@ describe("fictional SDLC driver", () => {
     expect(labels).toContain("repo task merged");
     expect(labels).toContain("ticket release evidence recorded");
     expect(calls.filter((path) => path.endsWith("/from-ticket"))).toHaveLength(4);
+    const stageBodies = fetchMock.mock.calls.filter(([path]) => String(path).endsWith("/from-ticket"))
+      .map(([, init]) => (JSON.parse(String(init?.body)) as { type: string }).type);
+    expect(stageBodies).toEqual(["REQUIREMENT_ANALYSIS", "DESIGN", "IMPLEMENTATION", "TEST_GENERATION"]);
     expect(calls.some((path) => path.includes("/repo-tasks/REPO-TASK-M7-1/advance"))).toBe(true);
     expect(result.auditTrail.length).toBeGreaterThan(0);
+
+    await runFictionalSdlc(fetchMock as unknown as typeof fetch, {
+      ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567",
+    });
+    expect(epicIds).toHaveLength(2);
+    expect(new Set(epicIds).size).toBe(2);
+    expect(ticketIds).toHaveLength(2);
+    expect(new Set(ticketIds).size).toBe(2);
+    expect(ticketIds.every((ticketId) => ticketId.startsWith("DEMO-123-M7-"))).toBe(true);
   });
 });
 

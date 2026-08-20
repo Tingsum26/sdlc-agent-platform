@@ -7,6 +7,8 @@ export interface FictionalSdlcResult {
   steps: SdlcStepEvent[];
   auditTrail: SdlcStepEvent[];
   artifactIds: string[];
+  ticketId: string;
+  stageTypes: string[];
 }
 
 export interface FictionalSdlcInput {
@@ -46,6 +48,10 @@ export async function runFictionalSdlc(
   const base = "/api/v1";
   const steps: SdlcStepEvent[] = [];
   const artifactIds: string[] = [];
+  const runId = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
+  const epicId = `EPIC-M7-${runId}`;
+  const ticketId = `${input.ticketId}-M7-${runId}`;
+  const createdTaskIds: string[] = [];
   const json = async <T>(path: string, init?: RequestInit): Promise<T> => {
     const response = await fetcher(`${base}${path}`, {
       ...init,
@@ -55,11 +61,11 @@ export async function runFictionalSdlc(
     return response.json() as Promise<T>;
   };
 
-  steps.push({ label: "epic created", detail: "EPIC-M7-1 · Fictional M7 epic" });
-  await json("/epics", { method: "POST", body: JSON.stringify({ epicId: "EPIC-M7-1", title: "Fictional M7 epic", journeyId: "ACCOUNT_OPENING" }) });
-  await json("/epics/EPIC-M7-1/activate", { method: "POST", body: JSON.stringify({ expectedVersion: 0 }) });
-  await json("/epics/EPIC-M7-1/tickets", { method: "POST", body: JSON.stringify({ ticketId: "M7-API-1", channel: "API" }) });
-  const repoTask = await json<{ repoTaskId: string; version: number }>("/tickets/M7-API-1/repo-tasks", {
+  steps.push({ label: "epic created", detail: `${epicId} · Fictional M7 epic` });
+  await json("/epics", { method: "POST", body: JSON.stringify({ epicId, title: "Fictional M7 epic", journeyId: "ACCOUNT_OPENING" }) });
+  await json(`/epics/${epicId}/activate`, { method: "POST", body: JSON.stringify({ expectedVersion: 0 }) });
+  await json(`/epics/${epicId}/tickets`, { method: "POST", body: JSON.stringify({ ticketId, channel: "API" }) });
+  const repoTask = await json<{ repoTaskId: string; version: number }>(`/tickets/${ticketId}/repo-tasks`, {
     method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, baseCommit: input.targetCommit }),
   });
   steps.push({ label: "repo task created", detail: repoTask.repoTaskId });
@@ -75,9 +81,10 @@ export async function runFictionalSdlc(
   for (const stage of STAGES) {
     const created = await json<{ taskId: string; version: number }>("/workflows/from-ticket", {
       method: "POST",
-      body: JSON.stringify({ ticketId: "M7-API-1", repositoryAlias: input.repositoryAlias,
+      body: JSON.stringify({ ticketId, repositoryAlias: input.repositoryAlias,
         targetCommit: input.targetCommit, type: stage.type }),
     });
+    createdTaskIds.push(created.taskId);
     steps.push({ label: "task created", detail: created.taskId });
 
     let taskVersion = created.version;
@@ -88,7 +95,7 @@ export async function runFictionalSdlc(
 
     const artifact = await json<{ artifactId: string; version: number }>(`/tasks/${created.taskId}/results`, {
       method: "POST", body: JSON.stringify({
-        artifactId: `ART-${stage.type}`,
+        artifactId: `ART-${runId}-${stage.type}`,
         type: stage.artifactType,
         sections: [{ key: "summary", title: stage.label, body: `Fictional ${stage.label} report with evidence.` }],
       }),
@@ -128,7 +135,7 @@ export async function runFictionalSdlc(
     await json(`/tasks/${created.taskId}/manual-e2e`, {
       method: "POST", body: JSON.stringify({
         expectedVersion: taskVersion,
-        caseId: "E2E-M7-1",
+        caseId: `E2E-M7-${runId}`,
         result: "PASS",
         actorRole: "QA",
         executedAt: new Date().toISOString(),
@@ -142,7 +149,7 @@ export async function runFictionalSdlc(
 
   let ticketVersion = 0;
   const advanceTicket = async (target: string) => {
-    const ticket = await json<{ version: number }>("/tickets/M7-API-1/advance", {
+    const ticket = await json<{ version: number }>(`/tickets/${ticketId}/advance`, {
       method: "POST", body: JSON.stringify({ expectedVersion: ticketVersion, target }),
     });
     ticketVersion = ticket.version;
@@ -151,7 +158,7 @@ export async function runFictionalSdlc(
     await advanceTicket(target);
   }
   await advanceRepoTask("PR_OPEN");
-  const ci = await json<{ ticket: { version: number }; state: string }>("/tickets/M7-API-1/ci", {
+  const ci = await json<{ ticket: { version: number }; state: string }>(`/tickets/${ticketId}/ci`, {
     method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, revision: input.targetCommit }),
   });
   ticketVersion = ci.ticket.version;
@@ -161,7 +168,13 @@ export async function runFictionalSdlc(
   for (const target of ["MERGED", "RELEASED", "FLAG_ENABLED", "E2E_VERIFIED"]) {
     await advanceTicket(target);
   }
-  steps.push({ label: "ticket release evidence recorded", detail: "M7-API-1 · E2E_VERIFIED" });
+  const tasks = await json<Array<{ taskId: string; type: string }>>("/tasks");
+  const stageTypes = createdTaskIds.map((taskId) => tasks.find((task) => task.taskId === taskId)?.type ?? "MISSING");
+  if (stageTypes.join(",") !== STAGES.map((stage) => stage.type).join(",")) {
+    throw new Error("fictional-sdlc: persisted stage types do not match requested stages");
+  }
+  steps.push({ label: "persisted stage types", detail: stageTypes.join(", ") });
+  steps.push({ label: "ticket release evidence recorded", detail: `${ticketId} · E2E_VERIFIED` });
 
-  return { steps, auditTrail: steps, artifactIds };
+  return { steps, auditTrail: steps, artifactIds, ticketId, stageTypes };
 }
