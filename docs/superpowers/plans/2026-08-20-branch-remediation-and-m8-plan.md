@@ -193,3 +193,19 @@ The user selected Inline execution previously and asked to continue. Execute Tas
 - [ ] Change the browser scenario to run the fictional M7 SDLC flow, wait for its completed audit evidence, then invoke `Draft Jira comment from approved M7 artifact`.
 - [ ] Assert the resulting draft/published Jira status remains derived from `REQ-APPROVED`, and retain the existing M2 Repo Task/Jenkins CI assertions.
 - [ ] Run the M3 scenario in a clean server lifecycle, then commit the focused test-contract repair.
+
+## Final remediation wave: whole-branch review findings
+
+**Scope:** Correct all Critical/Important findings from final review `f2f2871..1f996bd` in one coherent fix wave, with tests before behavioral changes. Do not push. Do not loosen the public constraints.
+
+- [ ] Resolve a real Node runtime for installed VSIX hooks (Electron/extension-host compatible), and prove it with an extension-host-style executable test.
+- [ ] Make bundle activation transactional across global location settings, installer state, and hook settings; compensate partial updates and test every write boundary.
+- [ ] Make VSIX initial, periodic, and focus refresh independent of the demo-only actor setting; present authentication/offline results rather than silently disabling refresh.
+- [ ] Make freshness reflect elapsed time after data observation and preserve last known data across failed refreshes, with an observable delayed/stale refresh path.
+- [ ] Include repository identity in new workflow-task idempotency keys, retain compatible legacy matching only for the same repository scope, and test two repositories sharing a ref.
+- [ ] Derive Jira summaries only from fixed server-controlled metadata; never publish artifact-authored title/body text. Add credential-bearing title regression coverage.
+- [ ] Make M7 lifecycle order truthful: transition Ticket/Repo Task with appropriate stage work, add real PR-review/manual-E2E stage work when those types exist, and return/assert persisted service audit/state evidence instead of client labels.
+- [ ] Make Windows descendant identification temporal as well as PID-parent based so an old child of a reused parent PID is never terminated; test the regression.
+- [ ] Enforce strict internal-TODO registry field types, ID syntax, marker path types, and malformed-marker detection while excluding only explicit template placeholders.
+- [ ] Regenerate the public delivery manifest's actual MCP tool, agent, and VSIX-view inventory and explain any remaining partial status accurately.
+- [ ] Run focused regression suites, then all affected public verification suites; commit the remediation wave for one scoped final re-review.
