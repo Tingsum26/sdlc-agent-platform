@@ -2,7 +2,7 @@ import { cp, mkdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import * as vscode from "vscode";
-import { loadAndValidateBundle, safeResolve } from "./bundleManifest.js";
+import { loadAndValidateBundle, rejectBundleSymlinks, safeResolve } from "./bundleManifest.js";
 
 interface InstalledBundle { version: string; root: string; installedAt: string }
 const stateKey = "sdlc.installedCustomizationBundles";
@@ -24,6 +24,7 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
   const sourceRoot = selected[0].fsPath;
   const manifestPath = "central/manifests/bundle-manifest.json";
   const manifest = loadAndValidateBundle(sourceRoot, manifestPath);
+  await rejectBundleSymlinks(sourceRoot);
   const destination = join(context.globalStorageUri.fsPath, "customizations", manifest.bundleVersion);
   const agentsRoot = join(destination, "agents");
   const skillsRoot = join(destination, "skills");
@@ -34,7 +35,7 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
   for (const path of manifest.skills) {
     const target = join(skillsRoot, skillInstallPath(path));
     await mkdir(dirname(target), { recursive: true });
-    await cp(safeResolve(sourceRoot, path), target, { recursive: true, force: true, dereference: true });
+    await cp(safeResolve(sourceRoot, path), target, { recursive: true, force: true });
   }
   for (const path of manifest.instructions.filter((value) => value.endsWith(".instructions.md"))) {
     await cp(safeResolve(sourceRoot, path), join(instructionsRoot, basename(path)), { force: true });
@@ -46,9 +47,7 @@ export async function installCustomizationBundle(context: vscode.ExtensionContex
     if (!existsSync(sourceDir)) continue;
     const targetDir = join(destination, dir);
     await mkdir(dirname(targetDir), { recursive: true });
-    // dereference: true copies symlink targets instead of the links themselves,
-    // so symlinks inside shipped dirs cannot escape the bundle.
-    await cp(sourceDir, targetDir, { recursive: true, force: true, dereference: true });
+    await cp(sourceDir, targetDir, { recursive: true, force: true });
   }
   await activateBundleLocations(context, destination);
 
@@ -84,10 +83,11 @@ async function activateBundleLocations(context: vscode.ExtensionContext, root: s
   await activateHooks(context, root);
 }
 
-// The exact command recorded for a validated hook entry. Byte-for-byte stable:
-// tests and the activation surface treat this shape as a deliberate contract.
-export function hookCommand(action: string): string {
-  return `echo ${action} >/dev/null && exit 0`;
+// The exact command recorded for a validated hook entry. JSON string quoting is
+// accepted by both cmd.exe and POSIX shells, so bundle paths with spaces cannot
+// alter the command that invokes the installed Node no-op shim.
+export function hookCommand(root: string, action: string): string {
+  return `${JSON.stringify(process.execPath)} ${JSON.stringify(join(root, "hooks", "run-hook.mjs"))} ${JSON.stringify(action)}`;
 }
 
 const hookEventNames = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"] as const;
@@ -138,8 +138,8 @@ async function activateHooks(context: vscode.ExtensionContext, root: string): Pr
 
   const nextRecorded: Record<string, unknown> = {};
   for (const { event, action } of await readHookEntries(root)) {
-    hookSettings[event] = hookCommand(action);
-    nextRecorded[event] = hookCommand(action);
+    hookSettings[event] = hookCommand(root, action);
+    nextRecorded[event] = hookCommand(root, action);
   }
 
   await chat.update("hooks", hookSettings, vscode.ConfigurationTarget.Global);

@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { lstat, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 export interface BundleManifest {
@@ -46,6 +47,22 @@ export function safeResolve(root: string, relativePath: string): string {
   const target = resolve(root, relativePath);
   if (target !== root && !target.startsWith(`${root}${sep}`)) throw new Error("Unsafe bundle path traversal");
   return target;
+}
+
+// Bundle sources are untrusted until installed. Lexical path resolution alone
+// cannot contain a symlink that points outside the selected directory, so
+// reject all links before the installer creates any destination content.
+export async function rejectBundleSymlinks(root: string): Promise<void> {
+  const pending = [resolve(root)];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    const status = await lstat(current);
+    if (status.isSymbolicLink()) throw new Error(`Bundle contains a symbolic link: ${current}`);
+    if (!status.isDirectory()) continue;
+    for (const entry of await readdir(current, { withFileTypes: true })) {
+      pending.push(join(current, entry.name));
+    }
+  }
 }
 
 function summarizeBundle(safeRoot: string, manifestFile: string, bundleId: string): BundleManifest {

@@ -1,8 +1,8 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadAndValidateBundle } from "../src/customization/bundleManifest.js";
+import { loadAndValidateBundle, rejectBundleSymlinks } from "../src/customization/bundleManifest.js";
 
 describe("customization bundle manifest", () => {
   it("accepts a versioned inventory and resolves only files inside the bundle", () => {
@@ -24,6 +24,18 @@ describe("customization bundle manifest", () => {
       schemaVersion: "1.0", bundleVersion: "1.0.0", agents: ["../escape.agent.md"], skills: [], instructions: [], token: "bad",
     }));
     expect(() => loadAndValidateBundle(root, "manifest.json")).toThrow(/unsafe|secret/i);
+  });
+
+  it("rejects symbolic links anywhere in a selected bundle source", async () => {
+    const root = mkdtempSync(join(tmpdir(), "sdlc-bundle-symlink-"));
+    const skillDir = join(root, "central", "skills", "workflow", "start-ticket");
+    mkdirSync(skillDir, { recursive: true });
+    const outside = join(root, "outside");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "outside.md"), "outside bundle boundary");
+    symlinkSync(outside, join(skillDir, "linked"), "junction");
+
+    await expect(rejectBundleSymlinks(root)).rejects.toThrow(/symbolic link|symlink/i);
   });
 
   it("derives file lists from sibling central directories for a 2.0 summary manifest", () => {

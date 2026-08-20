@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,6 +77,7 @@ function createSourceBundle(bundleId: string, events: Array<{ event: string; act
   writeFileSync(join(sourceRoot, "central", "instructions", "i.instructions.md"), "i");
   writeFileSync(join(sourceRoot, "central", "skills", "workflow", "start-ticket", "SKILL.md"), "s");
   writeFileSync(join(sourceRoot, "central", "hooks", "hooks-manifest.json"), JSON.stringify({ schemaVersion: "1.0", events }));
+  writeFileSync(join(sourceRoot, "central", "hooks", "run-hook.mjs"), "process.exit(0);\n");
   writeFileSync(join(sourceRoot, "central", "mcp", "profiles.json"), JSON.stringify({ schemaVersion: "1.0", profiles: {} }));
   writeFileSync(join(sourceRoot, "central", "manifests", "bundle-manifest.json"), JSON.stringify({
     bundleId, schemaVersion: "2.0", agents: 1, skills: 1, instructions: 1, policies: 0, templates: 1, hooks: 1, profiles: 1,
@@ -125,6 +126,29 @@ describe("customization bundle installer", () => {
     expect(() => skillInstallPath("central/skills/../../evil/SKILL.md")).toThrow(/unsafe/i);
   });
 
+  it("rejects a selected bundle with a skill symlink before creating destination content", async () => {
+    const sourceRoot = createSourceBundle("symlinked-skill", []);
+    const outside = join(sourceRoot, "outside-skill");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "outside.md"), "outside bundle boundary");
+    symlinkSync(outside, join(sourceRoot, "central", "skills", "workflow", "start-ticket", "linked"), "junction");
+    const storageRoot = mkdtempSync(join(tmpdir(), "sdlc-symlink-dest-"));
+    vi.mocked(vscode.window.showOpenDialog).mockResolvedValue([{ fsPath: sourceRoot } as vscode.Uri]);
+
+    await expect(installCustomizationBundle(createStatefulContext(storageRoot))).rejects.toThrow(/symbolic link|symlink/i);
+    expect(existsSync(join(storageRoot, "customizations", "symlinked-skill"))).toBe(false);
+  });
+
+  it("uses Node to invoke the installed no-op hook shim without shell redirection", () => {
+    const root = join("C:", "installed bundle");
+    const command = hookCommand(root, "verify-stage-output");
+
+    expect(command).toContain("node");
+    expect(command).toContain(JSON.stringify(join(root, "hooks", "run-hook.mjs")));
+    expect(command).toContain("verify-stage-output");
+    expect(command).not.toMatch(/[>&|;]/);
+  });
+
   it("installs hooks and profiles into the bundle and activates hook settings", async () => {
     const sourceRoot = createSourceBundle("hooks-bundle", [
       { event: "PreToolUse", action: "guard-dangerous-operations" },
@@ -138,7 +162,7 @@ describe("customization bundle installer", () => {
     expect(existsSync(join(bundleRoot, "hooks", "hooks-manifest.json"))).toBe(true);
     expect(existsSync(join(bundleRoot, "mcp", "profiles.json"))).toBe(true);
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand("guard-dangerous-operations"),
+      PreToolUse: hookCommand(bundleRoot, "guard-dangerous-operations"),
     });
   });
 
@@ -157,12 +181,13 @@ describe("customization bundle installer", () => {
     vi.mocked(vscode.window.showOpenDialog).mockResolvedValueOnce([{ fsPath: v2Root } as vscode.Uri]);
     await installCustomizationBundle(context);
     await installCustomizationBundle(context);
+    const v1RootPath = join(storageRoot, "customizations", "hooks-bundle-v1");
 
     // v2 recomputes the installer-managed hooks from the live config: the Stop
     // entry recorded by v1 is dropped (v2 does not declare it) and PreToolUse
     // points at v2's action.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand("guard-v2"),
+      PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-v2"), "guard-v2"),
     });
 
     vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items) => items[0]);
@@ -171,12 +196,11 @@ describe("customization bundle installer", () => {
     // Rolling back to v1 re-applies v1's hook settings, including the Stop
     // entry that v2's manifest does not declare.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand("guard-dangerous-operations"),
-      Stop: hookCommand("verify-stage-output"),
+      PreToolUse: hookCommand(v1RootPath, "guard-dangerous-operations"),
+      Stop: hookCommand(v1RootPath, "verify-stage-output"),
     });
 
     // The location settings are re-applied for the rolled-back root as well.
-    const v1RootPath = join(storageRoot, "customizations", "hooks-bundle-v1");
     expect(writtenSetting("chat", "agentFilesLocations")).toEqual({ [join(v1RootPath, "agents")]: true });
     expect(writtenSetting("chat", "agentSkillsLocations")).toEqual({ [join(v1RootPath, "skills")]: true });
     expect(writtenSetting("chat", "instructionsFilesLocations")).toEqual({ [join(v1RootPath, "instructions")]: true });
@@ -194,11 +218,11 @@ describe("customization bundle installer", () => {
 
     vi.mocked(vscode.window.showOpenDialog).mockResolvedValueOnce([{ fsPath: v1Root } as vscode.Uri]);
     await installCustomizationBundle(context);
-    expect(writtenSetting("chat.agent", "hooks")).toEqual({ PreToolUse: hookCommand("guard-dangerous-operations") });
+    expect(writtenSetting("chat.agent", "hooks")).toEqual({ PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-empty-v1"), "guard-dangerous-operations") });
 
     // The user then adds their own entry directly to chat.agent.hooks.
     configState.set("chat.agent|hooks", {
-      PreToolUse: hookCommand("guard-dangerous-operations"),
+      PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-empty-v1"), "guard-dangerous-operations"),
       UserPromptSubmit: "echo user-managed-prompt >/dev/null && exit 0",
     });
 
@@ -234,7 +258,7 @@ describe("customization bundle installer", () => {
     // Only the valid entry is activated; unknown event names, invalid action
     // characters, and malformed entries are skipped without aborting.
     expect(writtenSetting("chat.agent", "hooks")).toEqual({
-      PreToolUse: hookCommand("guard-dangerous-operations"),
+      PreToolUse: hookCommand(join(storageRoot, "customizations", "hooks-bundle-validated"), "guard-dangerous-operations"),
     });
   });
 
