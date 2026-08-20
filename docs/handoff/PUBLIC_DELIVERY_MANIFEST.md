@@ -41,20 +41,20 @@
 
 ## 3. 公网已执行验证
 
+以下条目均在 2026-08-21 M8 验证中重新执行；旧里程碑统计不再作为当前交付结论。
+
 | 命令/场景 | 结果 | 数量/摘要 | 限制 |
 |---|---|---|---|
-| `.\mvnw.cmd verify` | PASS | 37 unit + 12 integration = 49 tests | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
-| `pnpm test` | PASS | 49 tests: Contracts 22, MCP 8, UI 8, VSIX 9, Web 2 | deterministic public adapters only |
-| `pnpm build` | PASS | Contracts, MCP, UI, VSIX and production Web bundle | public build only |
-| `pnpm e2e:public-mvp` | PASS | one full seven-audit-event browser scenario | fictional loopback demo |
-| `pnpm exec playwright test e2e/internal-shaped-simulation.spec.ts` | PASS | identity, Pod, assignment, five diagnostics, Journey and HTML | fictional loopback demo |
-| `.\scripts\tests\stop-demo.test.ps1` | PASS | UTC process identity regression | Windows PowerShell process behavior |
-| `pnpm --filter sdlc-workbench package` | PASS | `.vsix` generated | not signed/published internally |
-| `pnpm audit --audit-level low` | PASS | no known npm vulnerabilities | snapshot of registry advisory data at verification time |
+| `./mvnw.cmd -q verify` | PASS | 117 tests in 40 Surefire reports; 0 failures, 0 skipped | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
+| `pnpm install --frozen-lockfile` + `pnpm test` | PASS | 111 tests: Contracts 34, Workflow MCP 12, VSIX 51, shared UI 8, Web UI 6 | deterministic public adapters only |
+| `pnpm build` + `pnpm lint` | PASS | all five runnable workspaces built; no failing lint script | public build only |
+| `pnpm e2e:public-mvp`, `e2e:m1`, `e2e:m2`, `e2e:m3`, `e2e:m4`, `e2e:m7` | PASS | each suite 1/1, launched separately with ports 8080/4173 clean | fictional loopback demo |
+| `powershell -File scripts/tests/build-bundle.test.ps1` + `bundle-lifecycle.test.ps1` | PASS | central bundle build and install/rollback lifecycle | no company release trust |
+| `powershell -File scripts/tests/stop-demo.test.ps1` | PASS | Windows PID-reuse, process-tree, and discovery-failure regression cases | Windows PowerShell process behavior |
+| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 6-file 17.27-KB `.vsix` | not signed/published internally |
+| `pnpm audit --audit-level low` | PASS | no known vulnerabilities | snapshot of registry advisory data at verification time |
 | start → health → stop → port release | PASS | Workflow `UP`, Web `200`, ports 8080/4173 released | Fake profile only |
-| no-prohibited-infrastructure/secret scan | PASS | no Docker/local DB/object store/cloud-agent dependency | not a company security scan |
-| M8 fresh public gate | PASS | 2026-08-21: Maven 117/117; Node 111/111; public + M1/M2/M3/M4/M7 browser suites 1/1 each; registry 10 IDs/19 paths | fictional loopback and fake profile only; see `docs/verification/m8-milestone-2026-08-20.md` |
-| M8 registry/VSIX/lifecycle checks | PASS | registry tests 7/7; bundle tests; Windows stop lifecycle; VSIX package; health `UP`, Web `200`, ports released | no company endpoint, credentials, policy, or live VS Code session |
+| TODO registry + static scans | PASS | registry tests 7/7; 10 IDs/19 canonical paths; marker scan 19; credential scan 0 | exact commands and exclusions in `docs/verification/m8-milestone-2026-08-20.md` |
 
 ## 4. Mock 与假设
 

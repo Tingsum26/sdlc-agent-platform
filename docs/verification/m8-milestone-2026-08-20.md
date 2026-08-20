@@ -39,9 +39,28 @@ were confirmed free before each invocation.
 | VSIX package | `pnpm --filter sdlc-workbench package` | PASS — typecheck/build/package; 6-file 17.27-KB VSIX |
 | Registry unit tests | `node --test scripts/tests/internalTodoRegistry.test.mjs` | PASS — 7/7 |
 | Registry CLI | `pnpm verify:internal-todos` | PASS — 10 IDs and 19 canonical source marker paths |
-| Canonical marker scan | `rg` restricted to public source trees | PASS — 19 markers, agreeing with the registry |
-| Credential-pattern scan | `rg` excluding generated/dependency/test-result paths | PASS — 0 AWS/GitHub/Slack/private-key pattern matches |
+| Canonical marker scan | Exact PowerShell/ripgrep command below | PASS — 19 markers, agreeing with the registry |
+| Credential-pattern scan | Exact PowerShell/ripgrep command below | PASS — 0 AWS/GitHub/Slack/private-key pattern matches |
 | Demo lifecycle | `start-demo.ps1` → health/Web HTTP → `stop-demo.ps1` | PASS — health `UP`, Web `200`, then no listeners on 8080/4173 |
+
+The two static scans were rerun after the document review with exactly these
+commands. The first scans only public source roots and excludes generated,
+documentation, and scanner-fixture paths. The second scans the full worktree
+while excluding VCS, dependency, generated, and test-report paths.
+
+```powershell
+$markerPattern = 'TODO\(INTERNAL\):\s*INTERNAL-(?:[A-Z0-9]+-)*\d{3}'
+$markers = @(rg -n --glob '!node_modules/**' --glob '!target/**' --glob '!dist/**' --glob '!docs/**' --glob '!scripts/tests/**' $markerPattern apps packages central)
+Write-Host "canonical-marker-hits=$($markers.Count)"
+if ($markers.Count -ne 19) { $markers; exit 1 }
+
+$credentialPattern = '(AKIA[0-9A-Z]{16}|gh[pous]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----)'
+$credentials = @(rg -n --hidden --glob '!.git/**' --glob '!node_modules/**' --glob '!target/**' --glob '!dist/**' --glob '!test-results/**' --glob '!playwright-report/**' $credentialPattern .)
+Write-Host "credential-pattern-hits=$($credentials.Count)"
+if ($credentials.Count -ne 0) { $credentials; exit 1 }
+```
+
+Observed result: `canonical-marker-hits=19`; `credential-pattern-hits=0`.
 
 The pnpm commands emit a known configuration warning that the root
 `package.json` `pnpm.overrides` field is no longer read by this pnpm version.
