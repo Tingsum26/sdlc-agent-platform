@@ -53,13 +53,13 @@
 
 | 命令/场景 | 结果 | 数量/摘要 | 限制 |
 |---|---|---|---|
-| `./mvnw.cmd -q verify` | PASS | 119 tests in 40 Surefire reports; 0 failures, 0 skipped | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
-| `pnpm install --frozen-lockfile` + `pnpm test` | PASS | 116 tests: Contracts 34, Workflow MCP 12, VSIX 56, shared UI 8, Web UI 6 | deterministic public adapters only |
+| `./mvnw.cmd -q verify` | PASS | 163 tests in 41 Surefire reports; 0 failures, 0 errors, 0 skipped | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
+| `pnpm install --frozen-lockfile` + `pnpm test` | PASS | 119 tests: Contracts 35, Workflow MCP 12, VSIX 58, shared UI 8, Web UI 6 | deterministic public adapters only |
 | `pnpm build` + `pnpm lint` | PASS | all five runnable workspaces built; no failing lint script | public build only |
 | `pnpm e2e:public-mvp`, `e2e:m1`, `e2e:m2`, `e2e:m3`, `e2e:m4`, `e2e:m7` | PASS | each suite 1/1, launched separately with ports 8080/4173 clean | fictional loopback demo |
 | `powershell -File scripts/tests/build-bundle.test.ps1` + `bundle-lifecycle.test.ps1` | PASS | central bundle build and install/rollback lifecycle | no company release trust |
 | `powershell -File scripts/tests/stop-demo.test.ps1` | PASS | Windows PID-reuse, process-tree, and discovery-failure regression cases | Windows PowerShell process behavior |
-| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 6-file 17.84-KB `.vsix` | not signed/published internally |
+| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 6-file 18.01-KB `.vsix` | not signed/published internally |
 | `pnpm audit --audit-level low` | PASS | no known vulnerabilities | snapshot of registry advisory data at verification time |
 | start → health → stop → port release | PASS | Workflow `UP`, Web `200`, ports 8080/4173 released | Fake profile only |
 | TODO registry + static scans | PASS | registry tests 11/11; 10 IDs/19 canonical paths; marker scan 19; credential scan 0 | exact commands and exclusions in `docs/verification/m8-milestone-2026-08-20.md` |
@@ -104,6 +104,7 @@
 | R-05 | Real code graph unavailable | Journey relationships unknown | explicit onboarding blocker | pilot scanner/Understand Anything locally |
 | R-06 | Large evidence store absent | screenshots/video not stored | evidence reference/waiver and Jira concise summary | approve provider later; S3 is post-MVP |
 | R-07 | LLM Wiki excluded | no synthesized wiki memory | source-first onboarding + classified knowledge plan | separately approve provenance/ACL experiment |
+| R-08 | `SIMULATED_PASS` provenance is session-scoped | no real QA/release/company proof or cross-restart provenance | visible simulated classification and fake-runtime tests | obtain internal evidence IDs from actual systems and retain them in managed Mongo |
 
 ## 8. 内网执行入口
 

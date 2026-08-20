@@ -21,9 +21,9 @@ were confirmed free before each invocation.
 
 | Gate | Command | Result |
 |---|---|---|
-| Java full suite | `./mvnw.cmd -q verify` | PASS — 40 Surefire reports, 117 tests, 0 failures, 0 skipped |
+| Java full suite | `./mvnw.cmd -q verify` | PASS — 41 Surefire reports, 163 tests, 0 failures, 0 errors, 0 skipped |
 | Frozen dependency install | `pnpm install --frozen-lockfile` | PASS — lockfile current |
-| Node tests | `pnpm test` | PASS — 111 tests: contracts 34, Workflow MCP 12, VSIX 51, shared UI 8, Web UI 6 |
+| Node tests | `pnpm test` | PASS — 119 tests: contracts 35, Workflow MCP 12, VSIX 58, shared UI 8, Web UI 6 |
 | Node builds | `pnpm build` | PASS — all five runnable workspaces built |
 | Node lint gate | `pnpm lint` | PASS — no workspace supplies a failing lint script |
 | Dependency advisory scan | `pnpm audit --audit-level low` | PASS — no known vulnerabilities at this run |
@@ -36,8 +36,8 @@ were confirmed free before each invocation.
 | Central bundle build | `powershell -File scripts/tests/build-bundle.test.ps1` | PASS |
 | Central bundle lifecycle | `powershell -File scripts/tests/bundle-lifecycle.test.ps1` | PASS |
 | Windows stop lifecycle | `powershell -File scripts/tests/stop-demo.test.ps1` | PASS — PID-reuse, process-tree, and discovery-failure cases |
-| VSIX package | `pnpm --filter sdlc-workbench package` | PASS — typecheck/build/package; 6-file 17.27-KB VSIX |
-| Registry unit tests | `node --test scripts/tests/internalTodoRegistry.test.mjs` | PASS — 7/7 |
+| VSIX package | `pnpm --filter sdlc-workbench package` | PASS — typecheck/build/package; 6-file 18.01-KB VSIX |
+| Registry unit tests | `node --test scripts/tests/internalTodoRegistry.test.mjs` | PASS — 11/11 |
 | Registry CLI | `pnpm verify:internal-todos` | PASS — 10 IDs and 19 canonical source marker paths |
 | Canonical marker scan | Exact PowerShell/ripgrep command below | PASS — 19 markers, agreeing with the registry |
 | Credential-pattern scan | Exact PowerShell/ripgrep command below | PASS — 0 AWS/GitHub/Slack/private-key pattern matches |
@@ -76,6 +76,12 @@ scenarios while asserting the publisher does not fail the workflow.
   correctness and regression coverage
 - `d63dd0f` — M3 E2E now establishes an approved artifact before requesting
   the server-derived Jira projection
+- `3abc013` — public vertical-slice E2E follows the type-aware,
+  approval-only requirement-analysis policy
+- `397cb6e` — credential-redaction test fixture remains behaviorally covered
+  without creating a scanner-shaped token literal
+- `221ac26` — Windows shutdown follows descendants from a verified live root
+  identity
 
 ## Explicit non-completion boundary
 
@@ -91,3 +97,7 @@ completion of the approved target platform.
 - Company SSO/GHES/Jira/Confluence/Jenkins/Splunk/Copilot policy, production
   release controls, real Journey onboarding, and their evidence remain internal
   work represented by the registered IDs and handoff materials.
+- Public `SIMULATED_PASS` provenance is session-scoped: it identifies only a
+  deterministic fictional run in the current fake-runtime process. It is not
+  evidence of a human QA execution, a release, company connectivity, or
+  provenance that survives/reconciles after a fake-runtime restart.
