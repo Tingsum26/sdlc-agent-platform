@@ -4,7 +4,7 @@
   "title": "Workflow Task v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "taskId", "type", "status", "scope", "version", "createdAt", "updatedAt"],
+  "required": ["schemaVersion", "taskId", "type", "status", "evidenceClassification", "scope", "version", "createdAt", "updatedAt"],
   "properties": {
     "schemaVersion": { "const": "1.0" },
     "taskId": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$" },
@@ -34,6 +34,7 @@
         "CANCELLED"
       ]
     },
+    "evidenceClassification": { "enum": ["REAL", "SIMULATED_PASS"] },
     "scope": {
       "type": "object",
       "additionalProperties": false,

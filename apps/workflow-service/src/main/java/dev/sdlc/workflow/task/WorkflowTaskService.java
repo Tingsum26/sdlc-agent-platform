@@ -1,5 +1,6 @@
 package dev.sdlc.workflow.task;
 
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,6 +44,19 @@ public final class WorkflowTaskService {
             String compatibleLegacyKey,
             String actorId,
             String correlationId) {
+        return createTask(taskId, type, scope, idempotencyKey, compatibleLegacyKey,
+                EvidenceClassification.REAL, actorId, correlationId);
+    }
+
+    public synchronized WorkflowTask createTask(
+            String taskId,
+            TaskType type,
+            WorkflowScope scope,
+            String idempotencyKey,
+            String compatibleLegacyKey,
+            EvidenceClassification evidenceClassification,
+            String actorId,
+            String correlationId) {
         WorkflowTask existing = tasks.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (existing == null && compatibleLegacyKey != null) {
             existing = tasks.findByIdempotencyKey(compatibleLegacyKey)
@@ -53,7 +67,7 @@ public final class WorkflowTaskService {
         if (existing != null) return existing;
         Instant now = clock.instant();
         WorkflowTask task = new WorkflowTask(taskId, type, TaskStatus.WAITING_FOR_LOCAL_COPILOT,
-                scope, idempotencyKey, null, null, 0, now, now);
+                evidenceClassification, scope, idempotencyKey, null, null, 0, now, now);
         tasks.save(task);
         audit(task, actorId, "TASK_CREATED", null, task.status(), correlationId);
         return task;
@@ -195,6 +209,6 @@ public final class WorkflowTaskService {
             String correlationId) {
         long sequence = auditEvents.findByTaskId(task.taskId()).size() + 1L;
         auditEvents.append(new AuditEvent(UUID.randomUUID().toString(), task.taskId(), sequence, actorId,
-                action, previous, next, task.version(), clock.instant(), correlationId));
+                action, task.evidenceClassification(), previous, next, task.version(), clock.instant(), correlationId));
     }
 }

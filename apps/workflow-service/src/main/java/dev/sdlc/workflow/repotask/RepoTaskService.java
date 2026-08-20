@@ -39,14 +39,15 @@ public final class RepoTaskService {
 
     public synchronized RepoTask create(String ticketId, String repositoryAlias, String baseCommit, String actorId,
             String correlationId) {
-        tickets.ticket(ticketId);
+        var ticket = tickets.ticket(ticketId);
         String repoTaskId = "REPO-TASK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
         Instant now = clock.instant();
         RepoTask repoTask = new RepoTask(repoTaskId, ticketId, repositoryAlias, baseCommit,
-                RepoTaskStatus.PLANNED, 0, now, now);
+                RepoTaskStatus.PLANNED, ticket.evidenceClassification(), 0, now, now);
         repoTasks.save(repoTask);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), ticketId, "TICKET", "REPO_TASK_CREATED",
-                "repoTask=" + repoTaskId + " repo=" + repositoryAlias, actorId, now, correlationId));
+                "repoTask=" + repoTaskId + " repo=" + repositoryAlias, repoTask.evidenceClassification(),
+                actorId, now, correlationId));
         return repoTask;
     }
 
@@ -60,7 +61,7 @@ public final class RepoTaskService {
         repoTasks.save(changed);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), repoTask.ticketId(), "TICKET",
                 "REPO_TASK_TRANSITIONED", "repoTask=" + repoTaskId + " " + repoTask.status() + "->" + target,
-                actorId, clock.instant(), correlationId));
+                repoTask.evidenceClassification(), actorId, clock.instant(), correlationId));
         return changed;
     }
 

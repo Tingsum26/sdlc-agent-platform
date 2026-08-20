@@ -6,7 +6,7 @@ test("M3: Jira comment draft-publish and simulated Jenkins CI reach the ticket v
   await page.getByRole("button", { name: "Run fictional end-to-end SDLC" }).click();
   const m7AuditTrail = page.getByRole("list", { name: "M7 audit trail" });
   await expect(m7AuditTrail).toBeVisible();
-  await expect(m7AuditTrail.getByText("ticket release evidence recorded")).toBeVisible();
+  await expect(m7AuditTrail.getByText("simulated release-state path recorded")).toBeVisible();
 
   await page.getByRole("button", { name: "Create EPIC-M2-1" }).click();
   await page.getByRole("button", { name: "Activate epic" }).click();

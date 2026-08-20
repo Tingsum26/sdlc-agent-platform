@@ -10,6 +10,7 @@ import dev.sdlc.workflow.change.EpicChangeRequest;
 import dev.sdlc.workflow.dependency.Dependency;
 import dev.sdlc.workflow.dependency.DependencyService;
 import dev.sdlc.workflow.epic.Channel;
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import dev.sdlc.workflow.epic.EpicWorkflow;
 import dev.sdlc.workflow.epic.EpicWorkflowService;
 import dev.sdlc.workflow.integration.CiState;
@@ -118,8 +119,14 @@ public class EpicController {
     ResponseEntity<TicketWorkflow> attachTicket(@PathVariable String epicId,
             @Valid @RequestBody AttachTicketRequest body, HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
+        EvidenceClassification evidenceClassification = body.evidenceClassification() == null
+                ? EvidenceClassification.REAL : body.evidenceClassification();
+        if (evidenceClassification == EvidenceClassification.SIMULATED_PASS
+                && !user.actorId().startsWith("SIMULATED-")) {
+            throw new IllegalArgumentException("SIMULATED_PASS classification requires a simulated actor");
+        }
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(tickets.create(epicId, body.ticketId(), body.channel(), user.actorId(),
+                .body(tickets.create(epicId, body.ticketId(), body.channel(), evidenceClassification, user.actorId(),
                         CorrelationIdFilter.from(request)));
     }
 
@@ -205,7 +212,7 @@ public class EpicController {
                 user.actorId(), correlationId);
         splunkAudit.ciStatus(ticketId, body.repositoryAlias(), status.state().name(), correlationId);
         return Map.of("ticket", advanced, "status", advanced.status().name(), "state", status.state().name(),
-                "detailsUrl", status.detailsUrl());
+                "evidenceClassification", advanced.evidenceClassification().name(), "detailsUrl", status.detailsUrl());
     }
 
     @PostMapping("/tickets/{ticketId}/repo-tasks")
@@ -221,6 +228,13 @@ public class EpicController {
     List<RepoTask> repoTasks(@PathVariable String ticketId, HttpServletRequest request) {
         CurrentUser.require(request);
         return repoTasks.listByTicket(ticketId);
+    }
+
+    @GetMapping("/tickets/{ticketId}/audit")
+    List<DomainAuditEvent> ticketAudit(@PathVariable String ticketId, HttpServletRequest request) {
+        CurrentUser.require(request);
+        tickets.ticket(ticketId);
+        return audits.findByAggregateId(ticketId);
     }
 
     @PostMapping("/repo-tasks/{repoTaskId}/advance")
@@ -347,7 +361,8 @@ public class EpicController {
     public record VersionRequest(@Min(0) long expectedVersion) {
     }
 
-    public record AttachTicketRequest(@NotBlank String ticketId, @NotNull Channel channel) {
+    public record AttachTicketRequest(@NotBlank String ticketId, @NotNull Channel channel,
+            EvidenceClassification evidenceClassification) {
     }
 
     public record AdvanceRequest(@Min(0) long expectedVersion, @NotNull TicketDeliveryStatus target) {

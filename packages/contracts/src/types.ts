@@ -12,6 +12,7 @@ export const taskStatuses = [
 ] as const;
 
 export type TaskStatus = (typeof taskStatuses)[number];
+export type EvidenceClassification = "REAL" | "SIMULATED_PASS";
 
 export interface WorkflowScope {
   ticketId: string;
@@ -24,6 +25,7 @@ export interface WorkflowTask {
   taskId: string;
   type: string;
   status: TaskStatus;
+  evidenceClassification: EvidenceClassification;
   scope: WorkflowScope;
   assigneeId?: string | null;
   leaseExpiresAt?: string | null;
@@ -123,6 +125,7 @@ export interface TicketWorkflow {
   epicId: string;
   channel: Channel;
   status: TicketDeliveryStatus;
+  evidenceClassification: EvidenceClassification;
   pendingChangeConfirmation: boolean;
   version: number;
   createdAt: string;
@@ -135,6 +138,7 @@ export interface RepoTask {
   repositoryAlias: string;
   baseCommit: string;
   status: RepoTaskStatus;
+  evidenceClassification: EvidenceClassification;
   version: number;
   createdAt: string;
   updatedAt: string;

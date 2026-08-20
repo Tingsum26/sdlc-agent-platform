@@ -6,6 +6,7 @@ import dev.sdlc.workflow.conflict.WorkflowConflictException;
 import dev.sdlc.workflow.dependency.DependencyRepository;
 import dev.sdlc.workflow.dependency.DependencyStatus;
 import dev.sdlc.workflow.epic.Channel;
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import dev.sdlc.workflow.epic.EpicStatus;
 import dev.sdlc.workflow.epic.EpicWorkflowRepository;
 import java.time.Clock;
@@ -58,6 +59,11 @@ public final class TicketWorkflowService {
     }
 
     public synchronized TicketWorkflow create(String epicId, String ticketId, Channel channel, String actorId, String correlationId) {
+        return create(epicId, ticketId, channel, EvidenceClassification.REAL, actorId, correlationId);
+    }
+
+    public synchronized TicketWorkflow create(String epicId, String ticketId, Channel channel,
+            EvidenceClassification evidenceClassification, String actorId, String correlationId) {
         requireText(ticketId, "ticketId");
         epics.findById(epicId).orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicId));
         if (epics.findById(epicId).orElseThrow().status() != EpicStatus.ACTIVE) {
@@ -68,10 +74,10 @@ public final class TicketWorkflowService {
         }
         Instant now = clock.instant();
         TicketWorkflow ticket = new TicketWorkflow(ticketId, epicId, channel,
-                TicketDeliveryStatus.PLANNED, false, 0, now, now);
+                TicketDeliveryStatus.PLANNED, evidenceClassification, false, 0, now, now);
         tickets.save(ticket);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), epicId, "EPIC", "TICKET_CREATED",
-                "ticket=" + ticketId + " channel=" + channel, actorId, now, correlationId));
+                "ticket=" + ticketId + " channel=" + channel, evidenceClassification, actorId, now, correlationId));
         return ticket;
     }
 
@@ -89,7 +95,7 @@ public final class TicketWorkflowService {
         tickets.save(changed);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), ticket.epicId(), "EPIC",
                 "TICKET_TRANSITIONED", "ticket=" + ticketId + " " + ticket.status() + "->" + target,
-                actorId, clock.instant(), correlationId));
+                ticket.evidenceClassification(), actorId, clock.instant(), correlationId));
         return changed;
     }
 
@@ -98,7 +104,8 @@ public final class TicketWorkflowService {
         TicketWorkflow flagged = ticket.withChangeFlag(true, clock.instant());
         tickets.save(flagged);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), ticket.epicId(), "EPIC",
-                "CHANGE_CONFIRMATION_REQUIRED", "ticket=" + ticketId, actorId, clock.instant(), correlationId));
+                "CHANGE_CONFIRMATION_REQUIRED", "ticket=" + ticketId, ticket.evidenceClassification(), actorId,
+                clock.instant(), correlationId));
         return flagged;
     }
 
@@ -107,7 +114,8 @@ public final class TicketWorkflowService {
         TicketWorkflow acked = ticket.withChangeFlag(false, clock.instant());
         tickets.save(acked);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), ticket.epicId(), "EPIC",
-                "CHANGE_CONFIRMED", "ticket=" + ticketId, actorId, clock.instant(), correlationId));
+                "CHANGE_CONFIRMED", "ticket=" + ticketId, ticket.evidenceClassification(), actorId,
+                clock.instant(), correlationId));
         return acked;
     }
 

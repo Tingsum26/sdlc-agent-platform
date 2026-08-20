@@ -6,6 +6,7 @@ import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactType;
 import dev.sdlc.workflow.approval.ApprovalService;
 import dev.sdlc.workflow.security.CurrentUser;
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import dev.sdlc.workflow.task.TaskStatus;
 import dev.sdlc.workflow.task.AuditEvent;
 import dev.sdlc.workflow.task.TaskType;
@@ -55,13 +56,16 @@ public class WorkflowTaskController {
         String taskId = "TASK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         WorkflowScope scope = new WorkflowScope(body.ticketId(), body.repositoryAlias(), body.targetCommit());
         TaskType type = body.type() == null ? TaskType.REQUIREMENT_ANALYSIS : body.type();
+        EvidenceClassification evidenceClassification = body.evidenceClassification() == null
+                ? EvidenceClassification.REAL : body.evidenceClassification();
+        requireClassificationActor(evidenceClassification, user);
         String idempotencyKey = "ticket:" + body.ticketId() + ":" + body.repositoryAlias()
                 + ":" + body.targetCommit() + ":" + type;
         String compatibleLegacyKey = type == TaskType.REQUIREMENT_ANALYSIS
                 ? "ticket:" + body.ticketId() + ":" + body.targetCommit()
                 : null;
         WorkflowTask task = tasks.createTask(taskId, type, scope, idempotencyKey, compatibleLegacyKey,
-                user.actorId(), CorrelationIdFilter.from(request));
+                evidenceClassification, user.actorId(), CorrelationIdFilter.from(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowTaskResponse.from(task));
     }
 
@@ -117,6 +121,9 @@ public class WorkflowTaskController {
             @Valid @RequestBody CiResultRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
+        WorkflowTask task = tasks.getTask(taskId);
+        requireMatchingPassClassification(task.evidenceClassification(), body.state() == CiResult.PASSED,
+                body.state() == CiResult.SIMULATED_PASS);
         if (body.state() == CiResult.SIMULATED_PASS && !isSimulatedActor(user)) {
             throw new IllegalArgumentException("SIMULATED_PASS requires a simulated actor");
         }
@@ -134,6 +141,9 @@ public class WorkflowTaskController {
             @Valid @RequestBody ManualE2eRequest body,
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
+        WorkflowTask task = tasks.getTask(taskId);
+        requireMatchingPassClassification(task.evidenceClassification(), body.result() == ManualResult.PASS,
+                body.result() == ManualResult.SIMULATED_PASS);
         validateManualResult(body, user);
         TaskStatus target = switch (body.result()) {
             case PASS, SIMULATED_PASS -> TaskStatus.COMPLETED;
@@ -181,7 +191,8 @@ public class WorkflowTaskController {
             @NotBlank String ticketId,
             @NotBlank String repositoryAlias,
             @NotBlank String targetCommit,
-            TaskType type) {
+            TaskType type,
+            EvidenceClassification evidenceClassification) {
     }
 
     public record ClaimTaskRequest(long expectedVersion, @Min(1) @Max(120) int leaseMinutes) {
@@ -243,6 +254,20 @@ public class WorkflowTaskController {
 
     private static boolean isSimulatedActor(CurrentUser user) {
         return user.actorId().startsWith("SIMULATED-");
+    }
+
+    private static void requireClassificationActor(EvidenceClassification classification, CurrentUser user) {
+        if (classification == EvidenceClassification.SIMULATED_PASS && !isSimulatedActor(user)) {
+            throw new IllegalArgumentException("SIMULATED_PASS classification requires a simulated actor");
+        }
+    }
+
+    private static void requireMatchingPassClassification(EvidenceClassification classification,
+            boolean realPass, boolean simulatedPass) {
+        if ((simulatedPass && classification != EvidenceClassification.SIMULATED_PASS)
+                || (realPass && classification == EvidenceClassification.SIMULATED_PASS)) {
+            throw new IllegalArgumentException("Result must match the task evidence classification");
+        }
     }
 
     private static boolean hasText(String value) {

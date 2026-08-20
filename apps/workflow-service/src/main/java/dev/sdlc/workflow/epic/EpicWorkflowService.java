@@ -3,6 +3,7 @@ package dev.sdlc.workflow.epic;
 import dev.sdlc.workflow.audit.DomainAuditEvent;
 import dev.sdlc.workflow.audit.DomainAuditEventRepository;
 import dev.sdlc.workflow.conflict.WorkflowConflictException;
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +32,7 @@ public final class EpicWorkflowService {
         EpicWorkflow epic = new EpicWorkflow(epicId, title, journeyId, EpicStatus.CREATED, 0, now, now);
         epics.save(epic);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), epicId, "EPIC", "EPIC_CREATED",
-                "title=" + title, actorId, now, correlationId));
+                "title=" + title, classificationFor(actorId), actorId, now, correlationId));
         return epic;
     }
 
@@ -43,7 +44,7 @@ public final class EpicWorkflowService {
         EpicWorkflow activated = epic.transitionedTo(EpicStatus.ACTIVE, clock.instant());
         epics.save(activated);
         audits.append(new DomainAuditEvent(UUID.randomUUID().toString(), epicId, "EPIC", "EPIC_ACTIVATED",
-                null, actorId, clock.instant(), correlationId));
+                null, classificationFor(actorId), actorId, clock.instant(), correlationId));
         return activated;
     }
 
@@ -67,5 +68,10 @@ public final class EpicWorkflowService {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
         }
+    }
+
+    private static EvidenceClassification classificationFor(String actorId) {
+        return actorId.startsWith("SIMULATED-")
+                ? EvidenceClassification.SIMULATED_PASS : EvidenceClassification.REAL;
     }
 }

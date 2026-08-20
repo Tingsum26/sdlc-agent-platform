@@ -27,6 +27,65 @@ class EpicWorkflowIT {
     private final ObjectMapper json = new ObjectMapper();
 
     @Test
+    void persistsAndReturnsSimulatedEvidenceClassificationAcrossM7AggregatesAndAudits() throws Exception {
+        mvc.perform(post("/api/v1/epics")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"epicId\":\"EPIC-SIM-EVIDENCE\",\"title\":\"Simulation\",\"journeyId\":\"ACCOUNT_OPENING\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/epics/{id}/activate", "EPIC-SIM-EVIDENCE")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":0}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/epics/{id}/tickets", "EPIC-SIM-EVIDENCE")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"SIM-TICKET-1\",\"channel\":\"API\",\"evidenceClassification\":\"SIMULATED_PASS\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.evidenceClassification").value("SIMULATED_PASS"));
+
+        mvc.perform(post("/api/v1/tickets/{id}/repo-tasks", "SIM-TICKET-1")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"repositoryAlias\":\"REPO_A\",\"baseCommit\":\"0123456789abcdef\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.evidenceClassification").value("SIMULATED_PASS"));
+
+        String task = mvc.perform(post("/api/v1/workflows/from-ticket")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ticketId\":\"SIM-TICKET-1\",\"repositoryAlias\":\"REPO_A\","+
+                                "\"targetCommit\":\"0123456789abcdef\",\"type\":\"MANUAL_E2E\","+
+                                "\"evidenceClassification\":\"SIMULATED_PASS\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.evidenceClassification").value("SIMULATED_PASS"))
+                .andReturn().getResponse().getContentAsString();
+        String taskId = json.readTree(task).path("taskId").asText();
+
+        mvc.perform(get("/api/v1/tasks/{id}/audit", taskId)
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].evidenceClassification").value("SIMULATED_PASS"));
+        mvc.perform(get("/api/v1/tickets/{id}/repo-tasks", "SIM-TICKET-1")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].evidenceClassification").value("SIMULATED_PASS"));
+        mvc.perform(get("/api/v1/tickets/{id}/audit", "SIM-TICKET-1")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].evidenceClassification").value("SIMULATED_PASS"));
+        mvc.perform(get("/api/v1/epics/{id}/resume", "EPIC-SIM-EVIDENCE")
+                        .header("X-Demo-User", "SIMULATED-M7-RUNNER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tickets[0].ticket.evidenceClassification").value("SIMULATED_PASS"))
+                .andExpect(jsonPath("$.tickets[0].openTasks[0].evidenceClassification").value("SIMULATED_PASS"))
+                .andExpect(jsonPath("$.auditTrail[?(@.action=='TICKET_CREATED')].evidenceClassification")
+                        .value("SIMULATED_PASS"));
+    }
+
+    @Test
     void walksTheFullEpicScenarioWithChangeAndSkip() throws Exception {
         mvc.perform(post("/api/v1/epics")
                         .header("X-Demo-User", "PRINCIPAL-EMP-100")

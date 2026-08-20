@@ -21,13 +21,17 @@ test("M7: fictional end-to-end SDLC completes with an audit trail and report", a
   await expect(page.getByText("simulated manual E2E transition")).toHaveCount(1);
   await expect(page.getByText("simulation evidence boundary")).toBeVisible();
   await expect(page.getByText("SIMULATED_PASS · no QA execution or manual evidence persisted")).toBeVisible();
+  await expect(page.getByText("persisted evidence classification")).toBeVisible();
+  await expect(page.getByText("SIMULATED_PASS across ticket, repo task, tasks, and audits")).toBeVisible();
   await expect(page.getByText("stage terminal policy")).toBeVisible();
   await expect(page.getByText("approval-only 2 · CI-only 3 · simulated manual gate 1")).toBeVisible();
   await expect(page.getByText("simulated ticket CI transition")).toBeVisible();
   await expect(page.getByText("persisted stage types")).toBeVisible();
   await expect(page.getByText("REQUIREMENT_ANALYSIS, DESIGN, IMPLEMENTATION, TEST_GENERATION, PR_REVIEW, MANUAL_E2E")).toBeVisible();
   await expect(page.getByText("repo task merged")).toBeVisible();
-  await expect(page.getByText("ticket release evidence recorded")).toBeVisible();
+  await expect(page.getByText("ticket release evidence recorded")).toHaveCount(0);
+  await expect(page.getByText("simulated release-state path recorded")).toBeVisible();
+  await expect(page.getByText("SIMULATED_PASS · E2E_VERIFIED is workflow state, not QA or release evidence")).toBeVisible();
   await expect(page.getByText("persisted epic state")).toBeVisible();
   await expect(page.getByText("persisted ticket state")).toBeVisible();
   await expect(page.getByText("persisted repo task state")).toBeVisible();

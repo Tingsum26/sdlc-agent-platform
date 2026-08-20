@@ -10,10 +10,12 @@ export interface FictionalSdlcResult {
   ticketId: string;
   stageTypes: string[];
   epic: { epicId: string; status: string; version?: number };
-  ticket: { ticketId: string; status: string; version: number };
-  repoTask: { repoTaskId: string; status: string; version: number };
-  tasks: Array<{ taskId: string; type: string; status: string }>;
+  ticket: { ticketId: string; status: string; evidenceClassification: EvidenceClassification; version: number };
+  repoTask: { repoTaskId: string; status: string; evidenceClassification: EvidenceClassification; version: number };
+  tasks: Array<{ taskId: string; type: string; status: string; evidenceClassification: EvidenceClassification }>;
 }
+
+type EvidenceClassification = "REAL" | "SIMULATED_PASS";
 
 interface TaskAuditEvent {
   action: string;
@@ -22,6 +24,7 @@ interface TaskAuditEvent {
   actorId?: string;
   previousStatus?: string;
   newStatus?: string;
+  evidenceClassification: EvidenceClassification;
 }
 
 export interface FictionalSdlcInput {
@@ -79,7 +82,9 @@ export async function runFictionalSdlc(
   steps.push({ label: "epic created", detail: `${epicId} · Fictional M7 epic` });
   await json("/epics", { method: "POST", body: JSON.stringify({ epicId, title: "Fictional M7 epic", journeyId: "ACCOUNT_OPENING" }) });
   await json(`/epics/${epicId}/activate`, { method: "POST", body: JSON.stringify({ expectedVersion: 0 }) });
-  await json(`/epics/${epicId}/tickets`, { method: "POST", body: JSON.stringify({ ticketId, channel: "API" }) });
+  await json(`/epics/${epicId}/tickets`, { method: "POST", body: JSON.stringify({
+    ticketId, channel: "API", evidenceClassification: "SIMULATED_PASS",
+  }) });
   const repoTask = await json<{ repoTaskId: string; version: number }>(`/tickets/${ticketId}/repo-tasks`, {
     method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, baseCommit: input.targetCommit }),
   });
@@ -105,7 +110,7 @@ export async function runFictionalSdlc(
     const created = await json<{ taskId: string; version: number }>("/workflows/from-ticket", {
       method: "POST",
       body: JSON.stringify({ ticketId, repositoryAlias: input.repositoryAlias,
-        targetCommit: input.targetCommit, type: stage.type }),
+        targetCommit: input.targetCommit, type: stage.type, evidenceClassification: "SIMULATED_PASS" }),
     });
     createdTaskIds.push(created.taskId);
     steps.push({ label: "task created", detail: created.taskId });
@@ -192,13 +197,18 @@ export async function runFictionalSdlc(
       await advanceRepoTask("PR_OPEN");
     }
     if (stage.type === "PR_REVIEW") {
-      const ci = await json<{ ticket: { version: number }; state: string }>(`/tickets/${ticketId}/ci`, {
+      const ci = await json<{
+        ticket: { version: number }; state: string; evidenceClassification: EvidenceClassification;
+      }>(`/tickets/${ticketId}/ci`, {
         method: "POST", body: JSON.stringify({ repositoryAlias: input.repositoryAlias, revision: input.targetCommit }),
       });
+      if (ci.evidenceClassification !== "SIMULATED_PASS") {
+        throw new Error("fictional-sdlc: ticket CI transition is not classified as SIMULATED_PASS");
+      }
       ticketVersion = ci.ticket.version;
       steps.push({
         label: "simulated ticket CI transition",
-        detail: `SIMULATED_PASS · deterministic fake adapter returned ${ci.state}`,
+        detail: `${ci.evidenceClassification} · deterministic fake adapter returned ${ci.state}`,
       });
     }
   }
@@ -207,21 +217,28 @@ export async function runFictionalSdlc(
   for (const target of ["MERGED", "RELEASED", "FLAG_ENABLED", "E2E_VERIFIED"]) {
     await advanceTicket(target);
   }
-  const tasks = await json<Array<{ taskId: string; type: string; status: string }>>("/tasks");
+  const tasks = await json<Array<{
+    taskId: string; type: string; status: string; evidenceClassification: EvidenceClassification;
+  }>>("/tasks");
   const stageTypes = createdTaskIds.map((taskId) => tasks.find((task) => task.taskId === taskId)?.type ?? "MISSING");
   if (stageTypes.join(",") !== STAGES.map((stage) => stage.type).join(",")) {
     throw new Error("fictional-sdlc: persisted stage types do not match requested stages");
   }
   steps.push({ label: "persisted stage types", detail: stageTypes.join(", ") });
-  steps.push({ label: "ticket release evidence recorded", detail: `${ticketId} · E2E_VERIFIED` });
+  steps.push({
+    label: "simulated release-state path recorded",
+    detail: "SIMULATED_PASS · E2E_VERIFIED is workflow state, not QA or release evidence",
+  });
 
   const resume = await json<{
     epic: { epicId: string; status: string; version?: number };
-    tickets: Array<{ ticket: { ticketId: string; status: string; version: number } }>;
-    auditTrail: Array<{ action: string; detail?: string }>;
+    tickets: Array<{ ticket: { ticketId: string; status: string; evidenceClassification: EvidenceClassification; version: number } }>;
+    auditTrail: TaskAuditEvent[];
   }>(`/epics/${epicId}/resume`);
   const persistedTicket = resume.tickets.find((entry) => entry.ticket.ticketId === ticketId)?.ticket;
-  const persistedRepoTasks = await json<Array<{ repoTaskId: string; status: string; version: number }>>(`/tickets/${ticketId}/repo-tasks`);
+  const persistedRepoTasks = await json<Array<{
+    repoTaskId: string; status: string; evidenceClassification: EvidenceClassification; version: number;
+  }>>(`/tickets/${ticketId}/repo-tasks`);
   const persistedRepoTask = persistedRepoTasks.find((entry) => entry.repoTaskId === repoTask.repoTaskId);
   const persistedTasks = createdTaskIds.map((taskId) => tasks.find((task) => task.taskId === taskId)).filter((task): task is NonNullable<typeof task> => Boolean(task));
   const taskAuditsById = new Map(await Promise.all(createdTaskIds.map(async (taskId) => [
@@ -229,9 +246,15 @@ export async function runFictionalSdlc(
     await json<TaskAuditEvent[]>(`/tasks/${taskId}/audit`),
   ] as const)));
   const taskAudit = [...taskAuditsById.values()].flat();
+  const ticketAudit = await json<TaskAuditEvent[]>(`/tickets/${ticketId}/audit`);
   if (resume.epic.status !== "ACTIVE" || !persistedTicket || persistedTicket.status !== "E2E_VERIFIED" || !persistedRepoTask || persistedRepoTask.status !== "MERGED"
       || persistedTasks.length !== STAGES.length || persistedTasks.some((task) => task.status !== "COMPLETED")) {
     throw new Error("fictional-sdlc: persisted lifecycle evidence is incomplete");
+  }
+  const classifiedEvidence = [persistedTicket, persistedRepoTask, ...persistedTasks,
+    ...resume.auditTrail, ...taskAudit, ...ticketAudit];
+  if (classifiedEvidence.some((item) => item.evidenceClassification !== "SIMULATED_PASS")) {
+    throw new Error("fictional-sdlc: persisted evidence classification is not SIMULATED_PASS");
   }
   for (const task of persistedTasks) {
     const states = (taskAuditsById.get(task.taskId) ?? []).map((event) => event.newStatus).filter(Boolean);
@@ -262,11 +285,12 @@ export async function runFictionalSdlc(
     label: "simulation evidence boundary",
     detail: "SIMULATED_PASS · no QA execution or manual evidence persisted",
   });
+  steps.push({ label: "persisted evidence classification", detail: "SIMULATED_PASS across ticket, repo task, tasks, and audits" });
   steps.push({ label: "persisted epic state", detail: `${resume.epic.epicId} · ${resume.epic.status}` });
   steps.push({ label: "persisted ticket state", detail: `${persistedTicket.ticketId} · ${persistedTicket.status}` });
   steps.push({ label: "persisted repo task state", detail: `${persistedRepoTask.repoTaskId} · ${persistedRepoTask.status}` });
-  steps.push({ label: "persisted service audit", detail: `${resume.auditTrail.length + taskAudit.length} events` });
+  steps.push({ label: "persisted service audit", detail: `${resume.auditTrail.length + taskAudit.length + ticketAudit.length} events` });
 
-  return { steps, auditTrail: [...resume.auditTrail, ...taskAudit], artifactIds, ticketId, stageTypes,
+  return { steps, auditTrail: [...resume.auditTrail, ...ticketAudit, ...taskAudit], artifactIds, ticketId, stageTypes,
     epic: resume.epic, ticket: persistedTicket, repoTask: persistedRepoTask, tasks: persistedTasks };
 }

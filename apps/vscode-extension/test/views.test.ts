@@ -34,18 +34,20 @@ import { CustomizationProvider } from "../src/views/customizationProvider.js";
 import { McpCenterProvider } from "../src/views/mcpCenterProvider.js";
 import { EpicSelectionStore } from "../src/views/epicSelection.js";
 
-const task = { taskId: "TASK-1", type: "REQUIREMENT_ANALYSIS", status: "WAITING_FOR_LOCAL_COPILOT", scope: { ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567" }, version: 0, updatedAt: "2026-08-18T00:00:00Z" };
+const task = { taskId: "TASK-1", type: "REQUIREMENT_ANALYSIS", status: "WAITING_FOR_LOCAL_COPILOT", evidenceClassification: "REAL", scope: { ticketId: "DEMO-123", repositoryAlias: "REPO_A", targetCommit: "0123456789abcdef0123456789abcdef01234567" }, version: 0, updatedAt: "2026-08-18T00:00:00Z" };
 
 describe("view providers", () => {
   afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
   it("my work shows only actionable tasks with freshness", async () => {
-    const client = { listTasks: vi.fn().mockResolvedValue([task]) };
+    const client = { listTasks: vi.fn().mockResolvedValue([{ ...task, evidenceClassification: "SIMULATED_PASS" }]) };
     const provider = new MyWorkProvider(client as never);
     await provider.refresh();
     const items = provider.getChildren() as vscode.TreeItem[];
     expect(items.length).toBe(1);
     expect(items[0]!.label).toContain("DEMO-123");
+    expect(items[0]!.description).toContain("SIMULATED_PASS");
+    expect(items[0]!.accessibilityInformation!.label).toContain("Simulated workflow evidence");
   });
 
   it("my work keeps last-known rows and visibly marks aged data after a failed refresh", async () => {
@@ -213,15 +215,17 @@ describe("view providers", () => {
     const selection = new EpicSelectionStore();
     selection.select("EPIC-LIVE-7");
     const client = {
-      listTickets: vi.fn().mockResolvedValue([{ ticketId: "M2-API-1", epicId: "EPIC-M2-1", channel: "API", status: "PR_OPEN", pendingChangeConfirmation: false, version: 5 }]),
-      listRepoTasks: vi.fn().mockResolvedValue([{ repoTaskId: "REPO-TASK-1", ticketId: "M2-API-1", repositoryAlias: "REPO_A", status: "MERGED", version: 2 }]),
+      listTickets: vi.fn().mockResolvedValue([{ ticketId: "M2-API-1", epicId: "EPIC-M2-1", channel: "API", status: "PR_OPEN", evidenceClassification: "SIMULATED_PASS", pendingChangeConfirmation: false, version: 5 }]),
+      listRepoTasks: vi.fn().mockResolvedValue([{ repoTaskId: "REPO-TASK-1", ticketId: "M2-API-1", repositoryAlias: "REPO_A", status: "MERGED", evidenceClassification: "SIMULATED_PASS", version: 2 }]),
     };
     const provider = new TicketProvider(client as never, selection);
     await provider.refresh();
     const ticketItem = provider.getChildren() as vscode.TreeItem[];
     expect(ticketItem.length).toBe(1);
+    expect(ticketItem[0]!.description).toContain("SIMULATED_PASS");
     const children = await provider.getChildren(ticketItem[0]);
     expect((children as vscode.TreeItem[])[0]!.label).toContain("REPO-TASK-1");
+    expect((children as vscode.TreeItem[])[0]!.description).toContain("SIMULATED_PASS");
   });
 
   it("identity view lists pod members", async () => {

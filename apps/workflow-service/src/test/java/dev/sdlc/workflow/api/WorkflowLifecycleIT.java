@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import dev.sdlc.workflow.task.TaskType;
 import dev.sdlc.workflow.task.TaskStatus;
 import dev.sdlc.workflow.task.WorkflowScope;
@@ -166,6 +167,7 @@ class WorkflowLifecycleIT {
         Instant now = Instant.parse("2026-08-16T00:00:00Z");
         taskRepository.save(new WorkflowTask("TASK-SIMULATED-MANUAL", TaskType.MANUAL_E2E,
                 TaskStatus.WAITING_FOR_CI,
+                EvidenceClassification.SIMULATED_PASS,
                 new WorkflowScope("SIMULATED-MANUAL", "REPO_A", "simulated-ref"),
                 "simulated-manual", "SIMULATED-M7-RUNNER", null, 4, now, now));
 
@@ -175,7 +177,8 @@ class WorkflowLifecycleIT {
                     {"expectedVersion":4,"state":"SIMULATED_PASS","buildFingerprint":"m7-simulated-build"}
                     """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("WAITING_FOR_MANUAL_E2E"));
+                .andExpect(jsonPath("$.status").value("WAITING_FOR_MANUAL_E2E"))
+                .andExpect(jsonPath("$.evidenceClassification").value("SIMULATED_PASS"));
 
         mvc.perform(post("/api/v1/tasks/TASK-SIMULATED-MANUAL/manual-e2e")
                 .header("X-Demo-User", "SIMULATED-M7-RUNNER")
@@ -183,13 +186,16 @@ class WorkflowLifecycleIT {
                     {"expectedVersion":5,"result":"SIMULATED_PASS","actorRole":"SIMULATED_RUNNER"}
                     """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.evidenceClassification").value("SIMULATED_PASS"));
 
         mvc.perform(get("/api/v1/tasks/TASK-SIMULATED-MANUAL/audit")
                 .header("X-Demo-User", "SIMULATED-M7-RUNNER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].actorId").value("SIMULATED-M7-RUNNER"))
-                .andExpect(jsonPath("$[1].actorId").value("SIMULATED-M7-RUNNER"));
+                .andExpect(jsonPath("$[1].actorId").value("SIMULATED-M7-RUNNER"))
+                .andExpect(jsonPath("$[0].evidenceClassification").value("SIMULATED_PASS"))
+                .andExpect(jsonPath("$[1].evidenceClassification").value("SIMULATED_PASS"));
     }
 
     @Test
@@ -197,6 +203,7 @@ class WorkflowLifecycleIT {
         Instant now = Instant.parse("2026-08-16T00:00:00Z");
         taskRepository.save(new WorkflowTask("TASK-SIMULATED-CLAIM", TaskType.MANUAL_E2E,
                 TaskStatus.WAITING_FOR_MANUAL_E2E,
+                EvidenceClassification.SIMULATED_PASS,
                 new WorkflowScope("SIMULATED-CLAIM", "REPO_A", "simulated-claim-ref"),
                 "simulated-claim", "SIMULATED-M7-RUNNER", null, 5, now, now));
 

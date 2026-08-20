@@ -11,14 +11,14 @@ describe("fictional SDLC driver", () => {
     const taskTypes = new Map<string, string>();
     const taskStatuses = new Map<string, string>();
     const taskAudits = new Map<string, Array<{
-      action: string; previousStatus: string; newStatus: string; actorId: string;
+      action: string; previousStatus: string; newStatus: string; actorId: string; evidenceClassification: string;
     }>>();
     const transitionTask = (taskId: string, next: string) => {
       const previous = taskStatuses.get(taskId) ?? "MISSING";
       taskStatuses.set(taskId, next);
       taskAudits.get(taskId)?.push({
         action: "TASK_TRANSITIONED", previousStatus: previous, newStatus: next,
-        actorId: "SIMULATED-M7-RUNNER",
+        actorId: "SIMULATED-M7-RUNNER", evidenceClassification: "SIMULATED_PASS",
       });
     };
     const fetchMock = vi.fn<typeof fetch>(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -33,25 +33,27 @@ describe("fictional SDLC driver", () => {
         return json({ epicId: "EPIC-M7-1", status: "ACTIVE", version: 1 });
       }
       if (path.endsWith("/tickets")) {
-        if (!init?.method || init.method === "GET") return json([{ ticketId: ticketIds.at(-1), status: "E2E_VERIFIED", version: 9 }]);
+        if (!init?.method || init.method === "GET") return json([{ ticketId: ticketIds.at(-1), status: "E2E_VERIFIED", evidenceClassification: "SIMULATED_PASS", version: 9 }]);
+        if (body().evidenceClassification !== "SIMULATED_PASS") return json({ title: "Simulation classification required" }, 400);
         ticketIds.push(String(body().ticketId));
-        return json({ ticketId: body().ticketId, epicId: "EPIC-M7", channel: "API", status: "PLANNED", version: 0 });
+        return json({ ticketId: body().ticketId, epicId: "EPIC-M7", channel: "API", status: "PLANNED", evidenceClassification: "SIMULATED_PASS", version: 0 });
       }
       if (path.endsWith("/repo-tasks")) {
-        if (!init?.method || init.method === "GET") return json([{ repoTaskId: "REPO-TASK-M7-1", status: "MERGED", version: 3 }]);
-        return json({ repoTaskId: "REPO-TASK-M7-1", status: "PLANNED", version: 0 });
+        if (!init?.method || init.method === "GET") return json([{ repoTaskId: "REPO-TASK-M7-1", status: "MERGED", evidenceClassification: "SIMULATED_PASS", version: 3 }]);
+        return json({ repoTaskId: "REPO-TASK-M7-1", status: "PLANNED", evidenceClassification: "SIMULATED_PASS", version: 0 });
       }
       if (path.includes("/repo-tasks/") && path.endsWith("/advance")) {
         repoTaskVersion += 1;
-        return json({ repoTaskId: "REPO-TASK-M7-1", status: body().target, version: repoTaskVersion });
+        return json({ repoTaskId: "REPO-TASK-M7-1", status: body().target, evidenceClassification: "SIMULATED_PASS", version: repoTaskVersion });
       }
       if (path.endsWith("/advance")) {
-        return json({ ticketId: "M7-API-1", status: body().target, version: 1 });
+        return json({ ticketId: "M7-API-1", status: body().target, evidenceClassification: "SIMULATED_PASS", version: 1 });
       }
       if (path.includes("/tickets/") && path.endsWith("/ci")) {
-        return json({ ticket: { ticketId: "M7-API-1", status: "CI_PASSED", version: 5 }, state: "PASSED" });
+        return json({ ticket: { ticketId: "M7-API-1", status: "CI_PASSED", evidenceClassification: "SIMULATED_PASS", version: 5 }, state: "PASSED", evidenceClassification: "SIMULATED_PASS" });
       }
       if (path.endsWith("/from-ticket")) {
+        if (body().evidenceClassification !== "SIMULATED_PASS") return json({ title: "Simulation classification required" }, 400);
         fromTicketCount += 1;
         const scope = body();
         const taskId = `TASK-M7-${fromTicketCount}`;
@@ -62,20 +64,24 @@ describe("fictional SDLC driver", () => {
           taskId,
           type: scope.type,
           status: "WAITING_FOR_LOCAL_COPILOT",
+          evidenceClassification: "SIMULATED_PASS",
           version: 0,
           scope: { ticketId: scope.ticketId, repositoryAlias: scope.repositoryAlias, targetCommit: scope.targetCommit },
         });
       }
       if (path.endsWith("/tasks")) {
         return json([...taskTypes.entries()].map(([taskId, type]) => ({
-          taskId, type, status: taskStatuses.get(taskId),
+          taskId, type, status: taskStatuses.get(taskId), evidenceClassification: "SIMULATED_PASS",
         })));
       }
       if (path.endsWith("/resume")) return json({
         epic: { epicId: epicIds.at(-1), status: "ACTIVE" },
-        tickets: [{ ticket: { ticketId: ticketIds.at(-1), status: "E2E_VERIFIED" }, openTasks: [] }],
-        auditTrail: [{ action: "TICKET_TRANSITIONED", detail: "FLAG_ENABLED->E2E_VERIFIED" }],
+        tickets: [{ ticket: { ticketId: ticketIds.at(-1), status: "E2E_VERIFIED", evidenceClassification: "SIMULATED_PASS" }, openTasks: [] }],
+        auditTrail: [{ action: "TICKET_TRANSITIONED", detail: "FLAG_ENABLED->E2E_VERIFIED", evidenceClassification: "SIMULATED_PASS" }],
       });
+      if (/\/tickets\/[^/]+\/audit$/.test(path)) return json([{
+        action: "REPO_TASK_TRANSITIONED", evidenceClassification: "SIMULATED_PASS",
+      }]);
       if (path.endsWith("/audit")) {
         const taskId = path.match(/\/tasks\/([^/]+)\/audit$/)?.[1] ?? "MISSING";
         return json(taskAudits.get(taskId) ?? []);
@@ -145,11 +151,13 @@ describe("fictional SDLC driver", () => {
     expect(labels).not.toContain("manual E2E passed");
     expect(labels.filter((label) => label === "simulated manual E2E transition")).toHaveLength(1);
     expect(labels).toContain("simulation evidence boundary");
+    expect(labels).toContain("persisted evidence classification");
     expect(labels).not.toContain("CI passed");
     expect(labels).toContain("simulated ticket CI transition");
     expect(labels).toContain("stage terminal policy");
     expect(labels).toContain("repo task merged");
-    expect(labels).toContain("ticket release evidence recorded");
+    expect(labels).not.toContain("ticket release evidence recorded");
+    expect(labels).toContain("simulated release-state path recorded");
     expect(calls.filter((path) => path.endsWith("/from-ticket"))).toHaveLength(6);
     const stageBodies = fetchMock.mock.calls.filter(([path]) => String(path).endsWith("/from-ticket"))
       .map(([, init]) => (JSON.parse(String(init?.body)) as { type: string }).type);
@@ -162,6 +170,10 @@ describe("fictional SDLC driver", () => {
     expect(result.repoTask.status).toBe("MERGED");
     expect(result.ticket.status).toBe("E2E_VERIFIED");
     expect(result.tasks.every((task) => task.status === "COMPLETED")).toBe(true);
+    expect(result.ticket.evidenceClassification).toBe("SIMULATED_PASS");
+    expect(result.repoTask.evidenceClassification).toBe("SIMULATED_PASS");
+    expect(result.tasks.every((task) => task.evidenceClassification === "SIMULATED_PASS")).toBe(true);
+    expect(result.auditTrail.every((event) => event.evidenceClassification === "SIMULATED_PASS")).toBe(true);
     expect(result.auditTrail.some((event) => event.actorId === "QA" || event.actorId === "qa-1")).toBe(false);
     expect(labels).toEqual(expect.arrayContaining([
       "persisted epic state", "persisted ticket state", "persisted repo task state", "persisted service audit",

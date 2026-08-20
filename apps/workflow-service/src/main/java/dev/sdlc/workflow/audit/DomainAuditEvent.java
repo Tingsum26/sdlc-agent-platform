@@ -1,5 +1,6 @@
 package dev.sdlc.workflow.audit;
 
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -9,6 +10,7 @@ public record DomainAuditEvent(
         String aggregateType,
         String action,
         String detail,
+        EvidenceClassification evidenceClassification,
         String actorId,
         Instant occurredAt,
         String correlationId) {
@@ -18,8 +20,15 @@ public record DomainAuditEvent(
         Objects.requireNonNull(aggregateId, "aggregateId");
         Objects.requireNonNull(aggregateType, "aggregateType");
         Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(evidenceClassification, "evidenceClassification");
         Objects.requireNonNull(actorId, "actorId");
         Objects.requireNonNull(occurredAt, "occurredAt");
         Objects.requireNonNull(correlationId, "correlationId");
+    }
+
+    public DomainAuditEvent(String eventId, String aggregateId, String aggregateType, String action,
+            String detail, String actorId, Instant occurredAt, String correlationId) {
+        this(eventId, aggregateId, aggregateType, action, detail, EvidenceClassification.REAL,
+                actorId, occurredAt, correlationId);
     }
 }

@@ -7,6 +7,7 @@ import dev.sdlc.workflow.artifact.ArtifactSection;
 import dev.sdlc.workflow.artifact.ArtifactType;
 import dev.sdlc.workflow.assignment.AssignmentReason;
 import dev.sdlc.workflow.assignment.TaskAssignment;
+import dev.sdlc.workflow.evidence.EvidenceClassification;
 import dev.sdlc.workflow.pod.PodMembership;
 import dev.sdlc.workflow.pod.PodRoster;
 import dev.sdlc.workflow.task.AuditEvent;
@@ -26,9 +27,11 @@ class MongoDocumentMappingTest {
     @Test
     void roundTripsAllSixMongoAggregatesWithoutLosingVersionOrHash() {
         WorkflowTask task = new WorkflowTask("TASK-1", TaskType.DESIGN, TaskStatus.WAITING_FOR_APPROVAL,
+                EvidenceClassification.SIMULATED_PASS,
                 new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
                 "idem-1", "PRINCIPAL-1", null, 7, NOW, NOW);
         AuditEvent audit = new AuditEvent("AUDIT-1", "TASK-1", 2, "PRINCIPAL-1", "APPROVED",
+                EvidenceClassification.SIMULATED_PASS,
                 TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.WAITING_FOR_CI, 7, NOW, "corr-1");
         ArtifactMetadata artifact = new ArtifactMetadata("ART-1", "TASK-1", ArtifactType.DESIGN_REPORT, 3,
                 "sha256:fictional", List.of(new ArtifactSection("summary", "Summary", "Safe body")),
@@ -47,5 +50,19 @@ class MongoDocumentMappingTest {
         assertEquals(roster, PodRosterDocument.fromDomain(roster).toDomain());
         assertEquals(assignment, TaskAssignmentDocument.fromDomain(assignment).toDomain());
         assertEquals("ART-1:3", ArtifactDocument.fromDomain(artifact).id());
+    }
+
+    @Test
+    void mapsLegacyDocumentsWithoutAClassificationToRealEvidence() {
+        WorkflowTaskDocument task = new WorkflowTaskDocument("TASK-LEGACY", TaskType.DESIGN,
+                TaskStatus.WAITING_FOR_APPROVAL, null,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "legacy-idem", null, null, 1, NOW, NOW);
+        AuditEventDocument audit = new AuditEventDocument("AUDIT-LEGACY", "TASK-LEGACY", 1,
+                "PRINCIPAL-1", "TASK_CREATED", null, null, TaskStatus.WAITING_FOR_APPROVAL,
+                1, NOW, "corr-legacy");
+
+        assertEquals(EvidenceClassification.REAL, task.toDomain().evidenceClassification());
+        assertEquals(EvidenceClassification.REAL, audit.toDomain().evidenceClassification());
     }
 }

@@ -19,6 +19,7 @@ const validTask = {
   taskId: "TASK-001",
   type: "REQUIREMENT_ANALYSIS",
   status: "WAITING_FOR_LOCAL_COPILOT",
+  evidenceClassification: "REAL",
   scope: {
     ticketId: "DEMO-123",
     repositoryAlias: "REPO_A",

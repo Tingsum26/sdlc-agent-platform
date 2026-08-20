@@ -72,10 +72,10 @@ export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem>,
   private ticketItem(ticket: TicketSummary, freshness: Freshness): TicketItem {
     const label = `${ticket.ticketId} · ${ticket.status}`;
     const item = new TicketItem(label, ticket.ticketId);
-    item.description = `${ticket.channel} · ${freshness}`;
-    item.tooltip = `Channel ${ticket.channel}\nVersion ${ticket.version}\nFreshness: ${freshness}`;
+    item.description = `${ticket.channel} · ${ticket.evidenceClassification} · ${freshness}`;
+    item.tooltip = `Channel ${ticket.channel}\nEvidence: ${ticket.evidenceClassification}\nVersion ${ticket.version}\nFreshness: ${freshness}`;
     item.iconPath = statusIcon(ticket.status);
-    item.accessibilityInformation = { label: `${label}. Channel ${ticket.channel}. Status ${ticket.status}. Freshness ${freshness}.` };
+    item.accessibilityInformation = { label: `${label}. Channel ${ticket.channel}. Evidence ${ticket.evidenceClassification}. Status ${ticket.status}. Freshness ${freshness}.` };
     return item;
   }
 
@@ -92,10 +92,10 @@ export class TicketProvider implements vscode.TreeDataProvider<vscode.TreeItem>,
   private repoTaskItem(task: RepoTaskSummary): vscode.TreeItem {
     const label = `${task.repoTaskId} · ${task.status}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = task.repositoryAlias;
-    item.tooltip = `Version ${task.version}`;
+    item.description = `${task.repositoryAlias} · ${task.evidenceClassification}`;
+    item.tooltip = `Evidence: ${task.evidenceClassification}\nVersion ${task.version}`;
     item.iconPath = statusIcon(task.status);
-    item.accessibilityInformation = { label: `${label}. ${task.repositoryAlias}. Status ${task.status}.` };
+    item.accessibilityInformation = { label: `${label}. ${task.repositoryAlias}. Evidence ${task.evidenceClassification}. Status ${task.status}.` };
     return item;
   }
 }
