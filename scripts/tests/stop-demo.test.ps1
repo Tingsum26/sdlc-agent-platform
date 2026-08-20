@@ -12,6 +12,8 @@ $pidReuseSleeper = $null
 $treeRoot = $null
 $treeChild = $null
 $discoveryFailureSleeper = $null
+$staleLineageSleeper = $null
+$staleLineageRoot = $null
 
 function Set-DemoProcessState($Entries) {
     @{
@@ -94,6 +96,41 @@ try {
     Assert-ProcessHasExited -ProcessId $treeRoot.Id -Description 'The tree root'
     Assert-ProcessHasExited -ProcessId $treeChild.Id -Description 'The spawned child'
 
+    $staleLineageSleeper = Start-Process -FilePath 'powershell.exe' `
+        -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') `
+        -WindowStyle Hidden -PassThru
+    $staleLineageRoot = Start-Process -FilePath 'powershell.exe' `
+        -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') `
+        -WindowStyle Hidden -PassThru
+    $persistedRootStartedAt = $staleLineageRoot.StartTime.ToUniversalTime().AddMilliseconds(-95)
+    if ($staleLineageSleeper.StartTime.ToUniversalTime() -lt $persistedRootStartedAt) {
+        throw 'The stale-lineage regression setup could not place the synthetic child inside the persisted root tolerance window.'
+    }
+    Set-DemoProcessState @{
+        name = 'stale-lineage-root'
+        pid = $staleLineageRoot.Id
+        startedAt = $persistedRootStartedAt.ToString('o')
+    }
+    function global:Get-CimInstance {
+        param(
+            [Parameter(Mandatory = $true)][string]$ClassName,
+            [Parameter(Mandatory = $true)][string]$Filter
+        )
+
+        if ($ClassName -eq 'Win32_Process' -and $Filter -eq "ParentProcessId=$($staleLineageRoot.Id)") {
+            return [PSCustomObject]@{ ProcessId = $staleLineageSleeper.Id }
+        }
+        return @()
+    }
+    try {
+        & (Join-Path $testScripts 'stop-demo.ps1') | Out-Null
+    } finally {
+        Remove-Item Function:global:Get-CimInstance -ErrorAction SilentlyContinue
+    }
+    Assert-ProcessHasExited -ProcessId $staleLineageRoot.Id -Description 'The verified live root'
+    if ($null -eq (Get-Process -Id $staleLineageSleeper.Id -ErrorAction SilentlyContinue)) {
+        throw 'stop-demo.ps1 terminated a stale child that only qualified against the persisted root timestamp.'
+    }
 
     $discoveryFailureSleeper = Start-Process -FilePath 'powershell.exe' `
         -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') `
@@ -139,8 +176,15 @@ try {
     if ($null -ne $discoveryFailureSleeper) {
         Stop-Process -Id $discoveryFailureSleeper.Id -Force -ErrorAction SilentlyContinue
     }
+    if ($null -ne $staleLineageSleeper) {
+        Stop-Process -Id $staleLineageSleeper.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $staleLineageRoot) {
+        Stop-Process -Id $staleLineageRoot.Id -Force -ErrorAction SilentlyContinue
+    }
     Remove-Item Env:SDLC_STOP_DEMO_TEST_FORCE_DESCENDANT_DISCOVERY_FAILURE -ErrorAction SilentlyContinue
     Remove-Item Env:SDLC_STOP_DEMO_CHILD_PID_FILE -ErrorAction SilentlyContinue
+    Remove-Item Function:global:Get-CimInstance -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
     }

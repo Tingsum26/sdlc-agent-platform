@@ -173,6 +173,10 @@ foreach ($entry in $state.processes) {
         Dispose-ProcessIdentity -Identity $recorded
         continue
     }
+    # `startedAt` from state is only an identity-verification hint. Descendant
+    # lineage must begin at the verified live root start time, otherwise a
+    # stale descendant from an earlier PID owner could qualify.
+    $recorded.startedAt = $recorded.handle.StartTime.ToUniversalTime()
     Stop-ProcessTreeSafely -RootIdentity $recorded
     Write-Output "Stopped $($entry.name) (PID $($entry.pid))."
 }
