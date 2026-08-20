@@ -69,6 +69,17 @@ class JiraProjectionIT {
     }
 
     @Test
+    void redactsCompoundSecretKeysFromAllowlistedArtifactTitles() throws Exception {
+        createApprovedArtifact("JIRA-COMPOUND-SECRET", "ART-COMPOUND-SECRET",
+                "Requirement client_secret=COMPOUND_SECRET_VALUE");
+
+        mvc.perform(jiraDraft("JIRA-COMPOUND-SECRET", "ART-COMPOUND-SECRET", 1))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("COMPOUND_SECRET_VALUE"))));
+    }
+
+    @Test
     void rejectsTheOldFreeTextOnlyApiShape() throws Exception {
         mvc.perform(post("/api/v1/jira-drafts")
                         .header("X-Demo-User", USER)

@@ -16,7 +16,7 @@ public final class JiraSummaryFactory {
     private static final Pattern URL = Pattern.compile("(?i)\\b(?:https?://|www\\.)\\S+");
     private static final Pattern EMAIL = Pattern.compile("(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b");
     private static final Pattern SECRET_VALUE = Pattern.compile(
-            "(?i)\\b(?:api[_-]?key|secret|token|password|passwd|authorization)\\s*[:=]\\s*\\S+");
+            "(?i)(?<![A-Z0-9])(?:[A-Z0-9]+[_-])*(?:api[_-]?key|secret|token|password|passwd|authorization|private[_-]?key)\\s*[:=]\\s*\\S+");
 
     public String create(TicketWorkflow ticket, ArtifactMetadata artifact) {
         String summary = "Ticket " + redact(ticket.ticketId())

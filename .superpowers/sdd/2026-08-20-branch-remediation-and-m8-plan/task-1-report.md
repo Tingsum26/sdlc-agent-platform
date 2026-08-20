@@ -58,3 +58,19 @@ This exited `0`. Its output includes expected best-effort fake Splunk transport 
 - Only Task 1 production/test files plus this report are included in the commit.
 - The old request shape is intentionally rejected at JSON deserialization, so a `summary` property cannot enter the controller or reach the Jira outbox.
 - The fake profile's intentionally unavailable Splunk scenario logs a warning in the preserved CI integration test. This was pre-existing best-effort behavior and is non-blocking.
+
+## Review fix round 1: compound secret-like keys
+
+### RED
+
+After adding `redactsCompoundSecretKeysFromAllowlistedArtifactTitles`, the focused command below exited `1` with `Tests run: 7, Failures: 1`:
+
+```powershell
+.\mvnw.cmd -q -pl apps/workflow-service test -Dtest=JiraProjectionIT
+```
+
+The response summary exposed `client_secret=COMPOUND_SECRET_VALUE`; the assertion correctly reported that the summary still contained `COMPOUND_SECRET_VALUE`.
+
+### GREEN
+
+The sanitizer now recognizes underscore/hyphen compound prefixes for the secret-like keys (including `client_secret`, `access_token`, and `private_key`). The same focused command exited `0` with all seven `JiraProjectionIT` tests passing. The fake-profile Splunk best-effort warning remains expected and non-failing.
