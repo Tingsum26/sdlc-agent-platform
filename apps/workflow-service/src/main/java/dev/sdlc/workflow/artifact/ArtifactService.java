@@ -49,7 +49,7 @@ public final class ArtifactService {
     public synchronized ArtifactMetadata markApproved(String artifactId, int version, String actorId) {
         ArtifactMetadata pending = beginApproval(artifactId, version, actorId);
         if (pending.approved()) return pending;
-        return commitApprovalInternal(artifactId, version, actorId, null);
+        return commitApprovalInternal(artifactId, version, actorId, null, null);
     }
 
     public synchronized ArtifactMetadata beginApproval(String artifactId, int version, String actorId) {
@@ -67,19 +67,29 @@ public final class ArtifactService {
     }
 
     public synchronized ArtifactMetadata commitApproval(
-            String artifactId, int version, String actorId, long approvedTaskVersion) {
-        return commitApprovalInternal(artifactId, version, actorId, approvedTaskVersion);
+            String artifactId,
+            int version,
+            String actorId,
+            long approvedTaskVersion,
+            String approvalCommitEventId) {
+        return commitApprovalInternal(
+                artifactId, version, actorId, approvedTaskVersion, approvalCommitEventId);
     }
 
     private ArtifactMetadata commitApprovalInternal(
-            String artifactId, int version, String actorId, Long approvedTaskVersion) {
+            String artifactId,
+            int version,
+            String actorId,
+            Long approvedTaskVersion,
+            String approvalCommitEventId) {
         ArtifactMetadata artifact = requireArtifact(artifactId, version);
         if (artifact.approved()) return artifact;
         if (artifact.approvalStatus() != ArtifactApprovalStatus.PENDING
                 || !actorId.equals(artifact.approvedBy())) {
             throw new IllegalStateException("Artifact approval is not pending for this actor");
         }
-        return store.save(artifact.commitApproval(clock.instant(), approvedTaskVersion));
+        return store.save(artifact.commitApproval(
+                clock.instant(), approvedTaskVersion, approvalCommitEventId));
     }
 
     public synchronized void restore(ArtifactMetadata artifact) {

@@ -4,6 +4,7 @@ import dev.sdlc.workflow.artifact.ArtifactMetadata;
 import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.TaskArtifactPolicy;
 import dev.sdlc.workflow.task.WorkflowTask;
+import dev.sdlc.workflow.task.WorkflowTaskCommit;
 import dev.sdlc.workflow.task.WorkflowTaskService;
 
 public final class ApprovalService {
@@ -33,9 +34,10 @@ public final class ApprovalService {
             if (pending.approved()) {
                 throw new IllegalStateException("Artifact was approved without a committed task transition");
             }
-            WorkflowTask advanced;
+            WorkflowTaskCommit commit;
             try {
-                advanced = tasks.transitionAfterApproval(taskId, expectedTaskVersion, actorId, correlationId);
+                commit = tasks.transitionAfterApprovalCommit(
+                        taskId, expectedTaskVersion, actorId, correlationId, artifactId, artifactVersion);
             } catch (RuntimeException exception) {
                 try {
                     artifacts.restore(artifact);
@@ -46,13 +48,14 @@ public final class ApprovalService {
                 }
                 throw exception;
             }
+            WorkflowTask advanced = commit.task();
             try {
                 ArtifactMetadata approved = artifacts.commitApproval(
-                        artifactId, artifactVersion, actorId, advanced.version());
+                        artifactId, artifactVersion, actorId, advanced.version(), commit.auditEvent().eventId());
                 return new ApprovalDecision(actorId, "APPROVED", approved.approvedAt(), approved, advanced);
             } catch (RuntimeException exception) {
                 try {
-                    tasks.compensateCommittedTransition(task, advanced);
+                    tasks.compensateCommittedTransition(task, commit);
                 } catch (RuntimeException recoveryFailure) {
                     exception.addSuppressed(recoveryFailure);
                 }

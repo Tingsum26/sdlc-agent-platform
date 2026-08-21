@@ -88,7 +88,8 @@ public final class WorkflowTaskService {
         Instant now = clock.instant();
         WorkflowTask task = new WorkflowTask(taskId, type, TaskStatus.WAITING_FOR_LOCAL_COPILOT,
                 evidenceClassification, scope, idempotencyKey, null, null, 0, now, now);
-        return persistWithAudit(null, task, actorId, "TASK_CREATED", null, task.status(), correlationId);
+        return persistWithAudit(null, task, actorId, "TASK_CREATED", null, task.status(), correlationId,
+                null, null).task();
     }
 
     private static boolean sameTaskIdentity(WorkflowTask task, TaskType type, WorkflowScope scope,
@@ -112,7 +113,7 @@ public final class WorkflowTaskService {
         Instant now = clock.instant();
         WorkflowTask claimed = task.claimedBy(actorId, now.plus(lease), now);
         return persistWithAudit(task, claimed, actorId, "TASK_CLAIMED",
-                task.status(), claimed.status(), correlationId);
+                task.status(), claimed.status(), correlationId, null, null).task();
     }
 
     public synchronized WorkflowTask skipTask(
@@ -128,7 +129,7 @@ public final class WorkflowTaskService {
         }
         WorkflowTask skipped = task.transitionedTo(TaskStatus.COMPLETED, clock.instant());
         return persistWithAudit(task, skipped, actorId, "TASK_SKIPPED",
-                task.status(), skipped.status(), correlationId);
+                task.status(), skipped.status(), correlationId, null, null).task();
     }
 
     public synchronized WorkflowTask transition(
@@ -138,14 +139,28 @@ public final class WorkflowTaskService {
             long expectedVersion,
             String actorId,
             String correlationId) {
+        return transitionCommit(taskId, expectedStatus, targetStatus, expectedVersion, actorId, correlationId,
+                null, null).task();
+    }
+
+    private WorkflowTaskCommit transitionCommit(
+            String taskId,
+            TaskStatus expectedStatus,
+            TaskStatus targetStatus,
+            long expectedVersion,
+            String actorId,
+            String correlationId,
+            String relatedArtifactId,
+            Integer relatedArtifactVersion) {
         WorkflowTask task = requireVersion(taskId, expectedVersion);
         if (task.status() != expectedStatus) {
-            throw new IllegalTaskTransitionException("Expected status " + expectedStatus + " but was " + task.status());
+            throw new IllegalTaskTransitionException(
+                    "Expected status " + expectedStatus + " but was " + task.status());
         }
         transitionPolicy.requireAllowed(task.type(), task.status(), targetStatus);
         WorkflowTask changed = task.transitionedTo(targetStatus, clock.instant());
         return persistWithAudit(task, changed, actorId, "TASK_TRANSITIONED",
-                task.status(), changed.status(), correlationId);
+                task.status(), changed.status(), correlationId, relatedArtifactId, relatedArtifactVersion);
     }
 
     public synchronized WorkflowTask validateTransition(
@@ -177,6 +192,22 @@ public final class WorkflowTaskService {
                 transitionPolicy.targetAfterApproval(task.type()), expectedVersion, actorId, correlationId);
     }
 
+    public synchronized WorkflowTaskCommit transitionAfterApprovalCommit(
+            String taskId,
+            long expectedVersion,
+            String actorId,
+            String correlationId,
+            String artifactId,
+            int artifactVersion) {
+        if (artifactId == null || artifactId.isBlank() || artifactVersion < 1) {
+            throw new IllegalArgumentException("Approval commit requires an artifact identity");
+        }
+        WorkflowTask task = requireVersion(taskId, expectedVersion);
+        return transitionCommit(taskId, TaskStatus.WAITING_FOR_APPROVAL,
+                transitionPolicy.targetAfterApproval(task.type()), expectedVersion, actorId, correlationId,
+                artifactId, artifactVersion);
+    }
+
     public synchronized WorkflowTask transitionAfterPassedCi(
             String taskId,
             long expectedVersion,
@@ -200,7 +231,7 @@ public final class WorkflowTaskService {
         }
         WorkflowTask changed = task.transitionedTo(TaskStatus.COMPLETED, clock.instant());
         return persistWithAudit(task, changed, actorId, "LEGACY_STAGE_COMPLETED",
-                task.status(), changed.status(), correlationId);
+                task.status(), changed.status(), correlationId, null, null).task();
     }
 
     public synchronized int releaseExpiredLeases(Instant now, String actorId, String correlationId) {
@@ -211,7 +242,7 @@ public final class WorkflowTaskService {
                     && task.leaseExpiresAt().isBefore(now)) {
                 WorkflowTask returned = task.released(now);
                 persistWithAudit(task, returned, actorId, "LEASE_EXPIRED",
-                        task.status(), returned.status(), correlationId);
+                        task.status(), returned.status(), correlationId, null, null);
                 released++;
             }
         }
@@ -240,15 +271,18 @@ public final class WorkflowTaskService {
         return task;
     }
 
-    public synchronized void compensateCommittedTransition(WorkflowTask previous, WorkflowTask committed) {
+    public synchronized void compensateCommittedTransition(WorkflowTask previous, WorkflowTaskCommit commit) {
+        WorkflowTask committed = commit.task();
         WorkflowTask current = requireVersion(committed.taskId(), committed.version());
         if (!current.equals(committed) || !previous.taskId().equals(committed.taskId())) {
             throw new StaleTaskVersionException("Workflow task changed before compensation");
         }
-        AuditEvent event = auditEvents.findByTaskId(committed.taskId()).stream()
-                .filter(candidate -> candidate.taskVersion() == committed.version())
-                .reduce((first, second) -> second)
-                .orElseThrow(() -> new IllegalStateException("Committed task transition has no audit event"));
+        AuditEvent event = commit.auditEvent();
+        boolean exactEventExists = auditEvents.findByTaskId(committed.taskId()).stream()
+                .anyMatch(candidate -> candidate.equals(event));
+        if (!exactEventExists) {
+            throw new IllegalStateException("Committed task transition has no exact audit event");
+        }
         RuntimeException recoveryFailure = null;
         try {
             auditEvents.delete(event.eventId());
@@ -270,8 +304,13 @@ public final class WorkflowTaskService {
      * Verifies the process-local approval commit fence used by Jira projection.
      * This is not a distributed transaction or a cross-process lock.
      */
-    public synchronized WorkflowTask requireCommittedApproval(String taskId, Long approvedTaskVersion) {
-        if (approvedTaskVersion == null) {
+    public synchronized WorkflowTask requireCommittedApproval(
+            String taskId,
+            Long approvedTaskVersion,
+            String artifactId,
+            int artifactVersion,
+            String approvalCommitEventId) {
+        if (approvedTaskVersion == null || approvalCommitEventId == null) {
             throw new IllegalStateException("Artifact approval is not bound to a task commit");
         }
         WorkflowTask task = getTask(taskId);
@@ -280,31 +319,42 @@ public final class WorkflowTaskService {
         }
         TaskStatus expectedTarget = transitionPolicy.targetAfterApproval(task.type());
         boolean committed = auditEvents.findByTaskId(taskId).stream().anyMatch(event ->
-                event.taskVersion() == approvedTaskVersion
+                event.eventId().equals(approvalCommitEventId)
+                        && event.action().equals("TASK_TRANSITIONED")
+                        && event.taskVersion() == approvedTaskVersion
                         && event.previousStatus() == TaskStatus.WAITING_FOR_APPROVAL
-                        && event.newStatus() == expectedTarget);
+                        && event.newStatus() == expectedTarget
+                        && artifactId.equals(event.relatedArtifactId())
+                        && Integer.valueOf(artifactVersion).equals(event.relatedArtifactVersion()));
         if (!committed) {
             throw new IllegalStateException("Artifact approval task transition is not committed");
         }
         return task;
     }
 
-    private WorkflowTask persistWithAudit(
+    private WorkflowTaskCommit persistWithAudit(
             WorkflowTask previous,
             WorkflowTask changed,
             String actorId,
             String action,
             TaskStatus previousStatus,
             TaskStatus nextStatus,
-            String correlationId) {
+            String correlationId,
+            String relatedArtifactId,
+            Integer relatedArtifactVersion) {
         long sequence = auditEvents.findByTaskId(changed.taskId()).size() + 1L;
         AuditEvent event = new AuditEvent(UUID.randomUUID().toString(), changed.taskId(), sequence, actorId,
                 action, changed.evidenceClassification(), previousStatus, nextStatus,
-                changed.version(), clock.instant(), correlationId);
-        tasks.save(changed);
+                changed.version(), clock.instant(), correlationId, relatedArtifactId, relatedArtifactVersion);
+        try {
+            tasks.save(changed);
+        } catch (RuntimeException failure) {
+            compensateUncertainTaskSave(previous, changed, failure);
+            throw failure;
+        }
         try {
             auditEvents.append(event);
-            return changed;
+            return new WorkflowTaskCommit(changed, event);
         } catch (RuntimeException failure) {
             RuntimeException recoveryFailure = null;
             try {
@@ -313,8 +363,7 @@ public final class WorkflowTaskService {
                 recoveryFailure = exception;
             }
             try {
-                if (previous == null) tasks.delete(changed.taskId(), changed.version());
-                else tasks.restore(previous, changed.version());
+                compensateUncertainTaskSave(previous, changed, failure);
             } catch (RuntimeException exception) {
                 if (recoveryFailure == null) recoveryFailure = exception;
                 else recoveryFailure.addSuppressed(exception);
@@ -326,6 +375,34 @@ public final class WorkflowTaskService {
                 throw incomplete;
             }
             throw failure;
+        }
+    }
+
+    /**
+     * Process-local uncertain-write recovery. The repository's conditional
+     * restore/delete prevents overwriting a different version, but this is not
+     * a distributed transaction or cross-instance lock.
+     */
+    private void compensateUncertainTaskSave(
+            WorkflowTask previous,
+            WorkflowTask attempted,
+            RuntimeException originalFailure) {
+        try {
+            WorkflowTask current = tasks.findById(attempted.taskId()).orElse(null);
+            if (previous == null && current == null || previous != null && previous.equals(current)) {
+                return;
+            }
+            if (!attempted.equals(current)) {
+                throw new StaleTaskVersionException(
+                        "Workflow task changed before uncertain-save compensation");
+            }
+            if (previous == null) tasks.delete(attempted.taskId(), attempted.version());
+            else tasks.restore(previous, attempted.version());
+        } catch (RuntimeException recoveryFailure) {
+            IllegalStateException incomplete = new IllegalStateException(
+                    "Workflow task save compensation was incomplete", originalFailure);
+            incomplete.addSuppressed(recoveryFailure);
+            throw incomplete;
         }
     }
 }

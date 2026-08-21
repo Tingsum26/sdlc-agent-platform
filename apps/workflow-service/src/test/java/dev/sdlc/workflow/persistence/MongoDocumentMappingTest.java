@@ -33,10 +33,10 @@ class MongoDocumentMappingTest {
                 "idem-1", "PRINCIPAL-1", null, 7, NOW, NOW);
         AuditEvent audit = new AuditEvent("AUDIT-1", "TASK-1", 2, "PRINCIPAL-1", "APPROVED",
                 EvidenceClassification.SIMULATED_PASS,
-                TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.WAITING_FOR_CI, 7, NOW, "corr-1");
+                TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.WAITING_FOR_CI, 7, NOW, "corr-1", "ART-1", 3);
         ArtifactMetadata artifact = new ArtifactMetadata("ART-1", "TASK-1", ArtifactType.DESIGN_REPORT, 3,
                 "sha256:fictional", List.of(new ArtifactSection("summary", "Summary", "Safe body")),
-                "PRINCIPAL-1", NOW, "ARCHITECT-1", NOW, ArtifactApprovalStatus.APPROVED, 7L);
+                "PRINCIPAL-1", NOW, "ARCHITECT-1", NOW, ArtifactApprovalStatus.APPROVED, 7L, "AUDIT-1");
         WebhookDelivery webhook = new WebhookDelivery("DELIVERY-1", "pull_request", NOW);
         PodRoster roster = new PodRoster("ACCOUNT_OPENING_DEMO", 4, List.of(new PodMembership(
                 "MEM-1", "EMP-1", "PRINCIPAL-1", "Fictional QA", "QA", "ACCOUNT_OPENING_DEMO",

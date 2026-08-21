@@ -13,7 +13,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public record ArtifactDocument(
         @Id String id, String artifactId, String taskId, ArtifactType type, int version, String contentHash,
         List<ArtifactSection> sections, String createdBy, Instant createdAt, String approvedBy, Instant approvedAt,
-        ArtifactApprovalStatus approvalStatus, Long approvedTaskVersion) {
+        ArtifactApprovalStatus approvalStatus, Long approvedTaskVersion, String approvalCommitEventId) {
     public ArtifactDocument {
         sections = List.copyOf(sections);
     }
@@ -22,7 +22,7 @@ public record ArtifactDocument(
         return new ArtifactDocument(artifact.artifactId() + ":" + artifact.version(), artifact.artifactId(),
                 artifact.taskId(), artifact.type(), artifact.version(), artifact.contentHash(), artifact.sections(),
                 artifact.createdBy(), artifact.createdAt(), artifact.approvedBy(), artifact.approvedAt(),
-                artifact.approvalStatus(), artifact.approvedTaskVersion());
+                artifact.approvalStatus(), artifact.approvedTaskVersion(), artifact.approvalCommitEventId());
     }
 
     public ArtifactMetadata toDomain() {
@@ -31,6 +31,7 @@ public record ArtifactDocument(
                 approvalStatus == null
                         ? (approvedAt == null ? ArtifactApprovalStatus.DRAFT : ArtifactApprovalStatus.APPROVED)
                         : approvalStatus,
-                approvedTaskVersion);
+                approvedTaskVersion,
+                approvalCommitEventId);
     }
 }

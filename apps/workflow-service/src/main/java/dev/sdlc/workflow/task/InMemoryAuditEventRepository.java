@@ -9,6 +9,9 @@ public final class InMemoryAuditEventRepository implements AuditEventRepository 
 
     @Override
     public synchronized AuditEvent append(AuditEvent event) {
+        if (events.stream().anyMatch(existing -> existing.eventId().equals(event.eventId()))) {
+            throw new IllegalStateException("Audit event ID cannot be reused");
+        }
         events.add(event);
         return event;
     }

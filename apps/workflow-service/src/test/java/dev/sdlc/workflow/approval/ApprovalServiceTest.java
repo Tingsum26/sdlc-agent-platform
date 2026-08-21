@@ -114,7 +114,7 @@ class ApprovalServiceTest {
     }
 
     @Test
-    void persistedApprovalCannotProjectWhenTaskCompensationSucceedsButArtifactRestoreFails() {
+    void orphanApprovalCannotReuseALaterArtifactsTaskVersionAndCommitEvent() {
         InMemoryAuditEventRepository audits = new InMemoryAuditEventRepository();
         PersistApprovalThenFailAndRejectRestoreStore store = new PersistApprovalThenFailAndRejectRestoreStore();
         ArtifactService artifacts = new ArtifactService(store, new ObjectMapper(), clock);
@@ -129,11 +129,27 @@ class ApprovalServiceTest {
 
         ArtifactMetadata orphanedApproval = artifacts.requireArtifact("ART-ATOMIC", 1);
         assertThat(orphanedApproval.approved()).isTrue();
-        assertThatThrownBy(() -> tasks.requireCommittedApproval(
-                orphanedApproval.taskId(), orphanedApproval.approvedTaskVersion()))
-                .isInstanceOf(IllegalStateException.class);
         assertThat(taskRepository.findById("TASK-ATOMIC").orElseThrow().status())
                 .isEqualTo(TaskStatus.WAITING_FOR_APPROVAL);
+
+        artifacts.create("ART-VALID", "TASK-ATOMIC", ArtifactType.DESIGN_REPORT,
+                List.of(new ArtifactSection("summary", "Summary", "Later valid content")), "author", null);
+        ApprovalDecision valid = service.approve(
+                "TASK-ATOMIC", "ART-VALID", 1, 3, "architect-2", "corr-valid");
+        assertThat(valid.artifact().approvedTaskVersion()).isEqualTo(orphanedApproval.approvedTaskVersion());
+        assertThat(valid.artifact().approvalCommitEventId())
+                .isNotEqualTo(orphanedApproval.approvalCommitEventId());
+
+        assertThatThrownBy(() -> tasks.requireCommittedApproval(
+                orphanedApproval.taskId(), orphanedApproval.approvedTaskVersion(),
+                orphanedApproval.artifactId(), orphanedApproval.version(),
+                orphanedApproval.approvalCommitEventId()))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(tasks.requireCommittedApproval(
+                valid.artifact().taskId(), valid.artifact().approvedTaskVersion(),
+                valid.artifact().artifactId(), valid.artifact().version(),
+                valid.artifact().approvalCommitEventId()))
+                .isEqualTo(valid.task());
     }
 
     private WorkflowTaskService workflowReadyForApproval(

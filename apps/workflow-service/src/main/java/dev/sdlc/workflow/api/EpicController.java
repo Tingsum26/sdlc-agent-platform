@@ -158,7 +158,8 @@ public class EpicController {
         TicketWorkflow ticket = tickets.ticket(body.ticketId());
         ArtifactMetadata artifact = artifacts.requireApprovedForProjection(body.artifactId(), body.artifactVersion());
         WorkflowTask task = workflowTasks.requireCommittedApproval(
-                artifact.taskId(), artifact.approvedTaskVersion());
+                artifact.taskId(), artifact.approvedTaskVersion(), artifact.artifactId(), artifact.version(),
+                artifact.approvalCommitEventId());
         if (!ticket.ticketId().equals(task.scope().ticketId())) {
             throw new IllegalArgumentException("Artifact task does not belong to ticket");
         }
