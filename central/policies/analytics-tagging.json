@@ -1,8 +1,0 @@
-{
-  "id": "analytics-tagging",
-  "version": 2,
-  "rule": "Analytics events must match ticket requirements and exclude PII; missing, misnamed, or untestable events are recorded as findings, never silent gaps.",
-  "when": { "event": "tagging-review" },
-  "effect": "REQUIRE_EVIDENCE",
-  "evidence": "tagging findings artifact with severity per finding"
-}

@@ -122,3 +122,8 @@
 - [x] 示例只使用虚构名称与数据。
 - [x] 日志、错误和测试制品使用脱敏/结构化契约。
 - [x] 依赖版本记录在 Maven/npm lockfiles；内网仍须完成许可证审批。
+
+## 5. 七仓终态（2026-08-22 M0–M7 完成）
+
+运行时代码已按 `seven-repo-split-baseline`（bf48e15）拆分至六个独立公开仓库，全部独立验证后推送：
+contracts 38457cf · service f69352a（123 单测+57 IT）· mcp f0bfa80（13）· customizations a029cd2（20 守护测试）· vscode-workbench 9f40c53（61+VSIX）· reference-demo 68862aa（14+build）。本仓保留 overview/docs/BOM/handoff，无运行时代码；内部 TODO registry 已随标记迁移（见 docs/handoff/internal-todo-relocation.md）。PARTIAL 缺口（13 Agents、完整 MCP 目录、8 视图模型等）与 INTERNAL-AUD-001 保持为登记在案的后续工作。

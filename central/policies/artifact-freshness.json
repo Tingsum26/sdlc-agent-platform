@@ -1,8 +1,0 @@
-{
-  "id": "artifact-freshness",
-  "version": 2,
-  "rule": "Onboarding and context artifacts that cannot be verified against the current source commit are marked KNOWN_GAP, never silently trusted.",
-  "when": { "event": "artifact-submit" },
-  "effect": "WARN",
-  "evidence": "source commit binding and KNOWN_GAP labels in the artifact"
-}

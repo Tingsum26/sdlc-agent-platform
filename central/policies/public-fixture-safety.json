@@ -1,8 +1,0 @@
-{
-  "id": "public-fixture-safety",
-  "version": 2,
-  "rule": "Public repositories contain fictitious data only; real values belong to TODO(INTERNAL) entries and never reach a public commit.",
-  "when": { "event": "commit" },
-  "effect": "BLOCK",
-  "evidence": "fixture and data-classification scan"
-}

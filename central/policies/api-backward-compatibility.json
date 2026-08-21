@@ -1,8 +1,0 @@
-{
-  "id": "api-backward-compatibility",
-  "version": 2,
-  "rule": "API changes default to backward compatible; breaking changes require a parallel version, compatibility adapter, or an explicit recorded exception.",
-  "when": { "event": "api-change" },
-  "effect": "BLOCK",
-  "evidence": "compatibility report artifact"
-}

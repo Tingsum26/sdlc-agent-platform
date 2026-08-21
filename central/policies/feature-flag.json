@@ -1,8 +1,0 @@
-{
-  "id": "feature-flag",
-  "version": 2,
-  "rule": "Feature flags must carry owner, default value, platforms, cohort, metrics, rollback, and expiry; old app versions keep the safe legacy path until the flag plan ends.",
-  "when": { "event": "flag-introduction" },
-  "effect": "BLOCK",
-  "evidence": "flag metadata in the implementation plan or PR description"
-}

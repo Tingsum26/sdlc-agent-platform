@@ -1,8 +1,0 @@
-{
-  "id": "native-release-compatibility",
-  "version": 2,
-  "rule": "iOS and Android changes ship on the unified native release train behind a feature flag; old app versions keep the safe legacy path until the flag plan ends.",
-  "when": { "event": "native-change" },
-  "effect": "BLOCK",
-  "evidence": "release-train window and flag lifecycle in the compatibility report"
-}

@@ -1,73 +1,71 @@
-# Local Copilot SDLC Platform
+# Local Copilot SDLC Platform — Overview, BOM & Handoff
 
-A public, no-container MVP for a human-controlled software delivery workflow whose only AI reasoning runs in an interactive VS Code GitHub Copilot session.
+This repository is the **overview / documentation / BOM / handoff** hub of the
+seven-public-repository Local Copilot SDLC platform. It intentionally contains
+**no runtime code**: all runnable artifacts live in the six repositories below,
+extracted from this repo at baseline tag `seven-repo-split-baseline`
+(`bf48e15`) and verified independently before the split cleanup (M7).
 
-> **Scope notice:** this repository currently contains a tested vertical-slice prototype. It is not the completed platform. The approved target is a seven-public-repository architecture; see `docs/superpowers/specs/2026-08-16-seven-repository-platform-design.md` and the corrected gap audit in `docs/reviews/2026-08-16-seven-repository-gap-audit.md`.
+## The seven repositories
 
-## What is implemented
+| Repository | Role | Version | Commit at split |
+|---|---|---|---|
+| [`sdlc-agent-platform`](https://github.com/Tingsum26/sdlc-agent-platform) (this repo) | overview, docs, BOM, handoff | 0.8.0 | `bf48e15` |
+| [`sdlc-workflow-contracts`](https://github.com/Tingsum26/sdlc-workflow-contracts) | versioned JSON Schemas + TypeScript contracts, `contracts.lock.json` | 0.1.0 | `38457cf` |
+| [`sdlc-workflow-service`](https://github.com/Tingsum26/sdlc-workflow-service) | Spring Boot workflow state machine, audit, freshness, Jira projection; no model client, no container dependency | 0.1.0 | `f69352a` |
+| [`sdlc-workflow-mcp`](https://github.com/Tingsum26/sdlc-workflow-mcp) | stdio Local Workflow MCP gateway (deterministic tools, safe errors, correlation IDs) | 0.1.0 | `f0bfa80` |
+| [`sdlc-copilot-customizations`](https://github.com/Tingsum26/sdlc-copilot-customizations) | central Agents/Skills/Instructions/Policies/Evals/Templates/Hooks/manifests + guardrail tests | 0.1.0 | `a029cd2` |
+| [`sdlc-vscode-workbench`](https://github.com/Tingsum26/sdlc-vscode-workbench) | UI-only VSIX workbench (no model API invoked), bundle install/rollback | 0.1.0 | `9f40c53` |
+| [`sdlc-reference-demo`](https://github.com/Tingsum26/sdlc-reference-demo) | fictional cross-channel reference demo (Web UI + shared UI + Playwright E2E) | 0.1.0 | `68862aa` |
 
-- Java 17 / Spring Boot Workflow Service with state/audit/artifacts, Mongo document adapters, enterprise identity/Pod assignment, bounded Jira/Confluence/GHES/Jenkins/Splunk adapters, cross-repository Journey analysis, safe HTML reports, and Fake public runtime.
-- Stateless Local Workflow MCP with twelve bounded tools, explicit Pod-import confirmation, cancellation, correlation IDs, safe errors, and structured stderr diagnostics.
-- Central Copilot Agents, Skills, always-on/file-scoped instructions, schemas, policies, MCP catalog, evals, and a versioned bundle manifest.
-- VSIX workbench with Developer, Scrum Master, My Work, Epic, Ticket, Repo Task, Customization, MCP, and Diagnostics views; task freshness polling; exact-version approval; safe HTML reports; bundle install/rollback; and no model API.
-- Shared accessible React report components and a public Web UI validated with UI/UX Pro Max guidance.
-- Browser E2E for both `DEMO-123 → MCP → report → approval → mock CI → manual E2E` and the fictional `EPIC-DEMO-1 → identity → Pod → assignment → five adapters → Journey HTML` flow.
+Compatibility rule: consumers pin `@sdlc` contracts by SemVer range;
+breaking changes require a major bump and a migration note
+(`contracts.lock.json` is maintained in `sdlc-workflow-contracts`).
+
+## Verification status at split
+
+Every destination repository was extracted from the verified monorepo state
+(Draft PR #1 head `bf48e15`, full M8 gate matrix green on 2026-08-22:
+Java 175 tests + 57 IT, Node 123 tests, 6 browser E2E suites, VSIX package,
+registry 10 IDs / 19 markers, credential scan 0 hits), then re-verified
+standalone:
+
+- contracts: vitest green (15 tests) + `contracts.lock.json`
+- service: `./mvnw verify` green — 123 unit + 57 failsafe IT, 0 failures
+- mcp: vitest green (13 tests)
+- copilot-customizations: guardrail ports green (20 tests)
+- vscode-workbench: vitest green (61 tests) + packaged VSIX
+- reference-demo: vitest green (14 tests) + production build
+
+The machine-validated internal-TODO registry moved with its markers:
+see `docs/handoff/internal-todo-relocation.md`.
 
 ## Hard boundaries
 
-- Workflow Service, MCP, VSIX, Web UI, tests, adapters, Jenkins/GitHub CI, and persistence contain no model client. The user starts and supervises Copilot Chat.
-- Public fixtures use `example.invalid`, `REPO_A`, `DEMO-123`, and fictional identities.
-- No Docker, Compose, local MongoDB, embedded database, Testcontainers, MinIO, S3, cloud agent, or Jenkins modification is required.
-- Public integration outcomes are labelled `SIMULATED_PASS`, `CONTRACT_PASS`, `INTERNAL_VALIDATION_REQUIRED`, or `BLOCKED`; simulated/contract results never imply company proof.
-- Company MongoDB, GHES, Jira, Confluence, Jenkins, Splunk, SSO, Teambook, real repositories/Journeys, and reviewer model availability require internal validation.
-- LLM Wiki, embeddings/vector search, cross-repository Journey onboarding, deterministic code-graph experimentation, and team-scale deployment are post-MVP work.
+- No model client anywhere in runtime code; the human runs and supervises
+  VS Code GitHub Copilot Chat.
+- Public fixtures are fictional (`example.invalid`, `REPO_A`, `DEMO-123`).
+- No Docker, Compose, local MongoDB, Testcontainers, MinIO/S3, cloud agents,
+  or Jenkins modification required or permitted.
+- Simulated outcomes are labelled `SIMULATED_PASS`, `CONTRACT_PASS`,
+  `INTERNAL_VALIDATION_REQUIRED`, or `BLOCKED`; they never imply company proof.
 
-## Prerequisites
+## Documentation map
 
-Java 17, Node.js 20.19 or newer, pnpm 10, VS Code 1.100 or newer, and GitHub Copilot Agent mode permitted by enterprise policy.
+- Approved seven-repository target & DoD: `docs/superpowers/specs/2026-08-16-seven-repository-platform-design.md`
+- Gap audit (PARTIAL areas vs target): `docs/reviews/2026-08-16-seven-repository-gap-audit.md`
+- Migration mapping (M0): `docs/architecture/seven-repository-migration-map.md`
+- Platform BOM: `docs/platform-bom.yaml`
+- Delivery manifest & handoff templates: `docs/handoff/PUBLIC_DELIVERY_MANIFEST.md`,
+  `docs/handoff/public-to-internal-handoff.md`,
+  `docs/handoff/internal-agent-completion-report-template.md`,
+  `docs/handoff/public-delivery-manifest-template.md`
+- Verification evidence M1–M8: `docs/verification/`
 
-## Verify
+## Known open items
 
-```powershell
-.\mvnw.cmd verify
-pnpm install --frozen-lockfile
-pnpm lint
-pnpm test
-pnpm build
-pnpm audit --audit-level low
-.\scripts\tests\stop-demo.test.ps1
-pnpm e2e:public-mvp
-pnpm exec playwright test e2e/internal-shaped-simulation.spec.ts
-pnpm --filter sdlc-workbench package
-```
-
-The VSIX is generated at `apps/vscode-extension/dist/sdlc-workbench.vsix` and intentionally ignored by Git. Install it from VS Code with **Extensions: Install from VSIX**.
-
-## Run the public demo
-
-```powershell
-.\scripts\start-demo.ps1
-```
-
-Open `http://127.0.0.1:4173`. Stop with `.\scripts\stop-demo.ps1`. See `docs/demo/public-mvp-walkthrough.md`.
-
-## Use with Copilot
-
-1. Build `@sdlc/workflow-mcp` and review `.vscode/mcp.example.json` before creating `.vscode/mcp.json`.
-2. In the VSIX Customization Center, install an extracted reviewed bundle root and verify Chat Customizations diagnostics. Installation is explicit and retains a last-known-good rollback.
-3. Open Copilot Chat, select **Requirement Analyst**, and invoke `/start-ticket DEMO-123`. On restart, use `/resume-workflow <task-id>`; server state and artifacts restore the next step.
-4. Use the VSIX for results, exact-version human confirmation, status, MCP health, and logs—not AI inference.
-
-## Documents
-
-- Approved seven-repository specification: `docs/superpowers/specs/2026-08-16-seven-repository-platform-design.md`
-- Machine-readable seven-repository output inventory: `docs/architecture/seven-repository-output-inventory.yaml`
-- Seven-repository gap audit: `docs/reviews/2026-08-16-seven-repository-gap-audit.md`
-- Human-readable design: `docs/superpowers/specs/2026-08-15-local-copilot-sdlc-platform-v2-design.html`
-- Pre-implementation review: `docs/reviews/2026-08-16-pre-implementation-review.md`
-- Public delivery manifest: `docs/handoff/PUBLIC_DELIVERY_MANIFEST.md`
-- Internal Agent handoff: `docs/handoff/INTERNAL_AGENT_HANDOFF.md`
-- Logging contract: `docs/operations/logging-and-diagnostics.md`
-- Implementation inventory: `docs/implementation/internal-shaped-implementation-inventory.md`
-- Contract reference: `docs/reference/internal-shaped-contract-reference.md`
-- Internal connection guide: `docs/handoff/INTERNAL_CONNECTION_GUIDE.md`
+- PARTIAL vs target design: 13-Agent catalog (3 exist), full MCP tool catalog,
+  eight distinct VSIX view models, complete Journey onboarding — tracked in the
+  gap audit and per-repo READMEs as post-split work.
+- `INTERNAL-AUD-001`: connect aggregate persistence to managed company MongoDB
+  during intranet adoption (intranet-only work).

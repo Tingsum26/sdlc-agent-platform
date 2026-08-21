@@ -1,8 +1,0 @@
-{
-  "id": "stage-skip",
-  "version": 2,
-  "rule": "A stage may be skipped only when an explicit human attestation records the actor, reason, timestamp, and accepted risks; a silent skip is never allowed.",
-  "when": { "event": "stage-skip" },
-  "effect": "BLOCK",
-  "evidence": "skip attestation record in the workflow audit trail"
-}

@@ -1,8 +1,0 @@
-{
-  "id": "stage-gates",
-  "version": 2,
-  "rule": "A workflow stage may only advance when its required artifact exists and its human approval is recorded (or an explicit skip attestation exists).",
-  "when": { "event": "stage-advance" },
-  "effect": "BLOCK",
-  "evidence": "workflow audit events and artifact metadata"
-}

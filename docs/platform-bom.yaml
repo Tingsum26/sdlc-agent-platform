@@ -1,4 +1,4 @@
-# Platform BOM â€” seven-repository split baseline
+# Platform BOM â€?seven-repository split baseline
 # Source snapshot: tag seven-repo-split-baseline = bf48e15 (branch agent/mvp-vertical-slice)
 # SemVer values are initial split-time snapshots; each repo versions independently from here.
 
@@ -11,42 +11,42 @@ repositories:
     role: overview-docs-bom-handoff
     version: 0.8.0
     commit-at-split: bf48e15
-    contains-runtime-code: false   # true until M7 cleanup completes
+    contains-runtime-code: false   # runtime code removed in M7
   sdlc-workflow-contracts:
     url: https://github.com/Tingsum26/sdlc-workflow-contracts
     role: contracts-schemas-clients
     version: 0.1.0
-    commit-at-split: pending-M1
+    commit-at-split: 38457cf
     source-path: packages/contracts
   sdlc-workflow-service:
     url: https://github.com/Tingsum26/sdlc-workflow-service
     role: workflow-state-machine-audit-projection
     version: 0.1.0
-    commit-at-split: pending-M2
+    commit-at-split: f69352a
     source-path: apps/workflow-service
   sdlc-workflow-mcp:
     url: https://github.com/Tingsum26/sdlc-workflow-mcp
     role: local-workflow-mcp-gateway
     version: 0.1.0
-    commit-at-split: pending-M3
+    commit-at-split: f0bfa80
     source-path: apps/workflow-mcp
   sdlc-copilot-customizations:
     url: https://github.com/Tingsum26/sdlc-copilot-customizations
     role: agents-skills-instructions-policies-evals-manifests
     version: 0.1.0
-    commit-at-split: pending-M4
+    commit-at-split: a029cd2
     source-path: central/
   sdlc-vscode-workbench:
     url: https://github.com/Tingsum26/sdlc-vscode-workbench
     role: vsix-ui-only-workbench
     version: 0.1.0
-    commit-at-split: pending-M5
+    commit-at-split: 9f40c53
     source-path: apps/vscode-extension
   sdlc-reference-demo:
     url: https://github.com/Tingsum26/sdlc-reference-demo
     role: fictional-cross-channel-reference-demo
     version: 0.1.0
-    commit-at-split: pending-M6
+    commit-at-split: 68862aa
     source-path: apps/web-ui + e2e + packages/ui + fixtures/journeys
 
 compatibility:
