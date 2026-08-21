@@ -7,5 +7,9 @@ public interface AuditEventRepository {
 
     void delete(String eventId);
 
+    void invalidate(String eventId);
+
+    boolean isInvalidated(String eventId);
+
     List<AuditEvent> findByTaskId(String taskId);
 }

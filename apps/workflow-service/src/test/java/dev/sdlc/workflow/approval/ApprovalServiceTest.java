@@ -18,6 +18,7 @@ import dev.sdlc.workflow.task.TaskStatus;
 import dev.sdlc.workflow.task.TaskTransitionPolicy;
 import dev.sdlc.workflow.task.TaskType;
 import dev.sdlc.workflow.task.WorkflowScope;
+import dev.sdlc.workflow.task.WorkflowTask;
 import dev.sdlc.workflow.task.WorkflowTaskService;
 import java.time.Clock;
 import java.time.Instant;
@@ -152,6 +153,73 @@ class ApprovalServiceTest {
                 .isEqualTo(valid.task());
     }
 
+    @Test
+    void undeletedAbortedApprovalCannotReuseALaterValidApprovalsTaskVersion() {
+        DeleteFailingAuditRepository audits = new DeleteFailingAuditRepository();
+        PersistApprovalThenFailAndRejectRestoreStore store = new PersistApprovalThenFailAndRejectRestoreStore();
+        ArtifactService artifacts = new ArtifactService(store, new ObjectMapper(), clock);
+        InMemoryWorkflowTaskRepository taskRepository = new InMemoryWorkflowTaskRepository();
+        WorkflowTaskService tasks = workflowReadyForApproval(taskRepository, audits, artifacts);
+        ApprovalService service = new ApprovalService(tasks, artifacts);
+        audits.failDelete = true;
+        store.countWrites = true;
+
+        assertThatThrownBy(() -> service.approve(
+                "TASK-ATOMIC", "ART-ATOMIC", 1, 3, "architect-1", "corr-aborted"))
+                .isInstanceOf(RuntimeException.class);
+        ArtifactMetadata aborted = artifacts.requireArtifact("ART-ATOMIC", 1);
+        assertThat(aborted.approved()).isTrue();
+        assertThat(audits.findByTaskId("TASK-ATOMIC"))
+                .anyMatch(event -> event.eventId().equals(aborted.approvalCommitEventId()));
+        assertThat(audits.isInvalidated(aborted.approvalCommitEventId())).isTrue();
+
+        artifacts.create("ART-VALID-AFTER-ABORT", "TASK-ATOMIC", ArtifactType.DESIGN_REPORT,
+                List.of(new ArtifactSection("summary", "Summary", "Valid replacement")), "author", null);
+        ApprovalDecision valid = service.approve(
+                "TASK-ATOMIC", "ART-VALID-AFTER-ABORT", 1, 3, "architect-2", "corr-valid");
+        assertThat(valid.task().version()).isEqualTo(aborted.approvedTaskVersion());
+
+        assertThatThrownBy(() -> tasks.requireCommittedApproval(
+                aborted.taskId(), aborted.approvedTaskVersion(), aborted.artifactId(), aborted.version(),
+                aborted.approvalCommitEventId()))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(tasks.requireCommittedApproval(
+                valid.artifact().taskId(), valid.artifact().approvedTaskVersion(),
+                valid.artifact().artifactId(), valid.artifact().version(),
+                valid.artifact().approvalCommitEventId()))
+                .isEqualTo(valid.task());
+    }
+
+    @Test
+    void committedApprovalRemainsValidThroughAContinuousNonInvalidatedTaskAuditChain() {
+        InMemoryAuditEventRepository audits = new InMemoryAuditEventRepository();
+        InMemoryWorkflowTaskRepository taskRepository = new InMemoryWorkflowTaskRepository();
+        ArtifactService artifacts = new ArtifactService(new FakeArtifactStore(), new ObjectMapper(), clock);
+        WorkflowTaskService tasks = new WorkflowTaskService(
+                taskRepository, audits, new TaskTransitionPolicy(), clock);
+        tasks.createTask("TASK-CHAIN", TaskType.IMPLEMENTATION,
+                new WorkflowScope("DEMO-CHAIN", "REPO_A", "chain-ref"),
+                "chain", "author", "corr");
+        tasks.claimTask("TASK-CHAIN", "author", java.time.Duration.ofMinutes(15), 0, "corr");
+        tasks.transition("TASK-CHAIN", TaskStatus.LOCAL_COPILOT_RUNNING,
+                TaskStatus.WAITING_FOR_USER_CONFIRMATION, 1, "author", "corr");
+        tasks.transition("TASK-CHAIN", TaskStatus.WAITING_FOR_USER_CONFIRMATION,
+                TaskStatus.WAITING_FOR_APPROVAL, 2, "author", "corr");
+        artifacts.create("ART-CHAIN", "TASK-CHAIN", ArtifactType.DELIVERY_REPORT,
+                List.of(new ArtifactSection("summary", "Summary", "Implementation evidence")), "author", null);
+        ApprovalDecision approval = new ApprovalService(tasks, artifacts).approve(
+                "TASK-CHAIN", "ART-CHAIN", 1, 3, "architect", "corr-approve");
+
+        WorkflowTask completed = tasks.transitionAfterPassedCi(
+                "TASK-CHAIN", approval.task().version(), "ci", "corr-ci");
+
+        assertThat(tasks.requireCommittedApproval(
+                approval.artifact().taskId(), approval.artifact().approvedTaskVersion(),
+                approval.artifact().artifactId(), approval.artifact().version(),
+                approval.artifact().approvalCommitEventId()))
+                .isEqualTo(completed);
+    }
+
     private WorkflowTaskService workflowReadyForApproval(
             InMemoryWorkflowTaskRepository taskRepository,
             AuditEventRepository audits,
@@ -193,6 +261,12 @@ class ApprovalServiceTest {
         public void delete(String eventId) { delegate.delete(eventId); }
 
         @Override
+        public void invalidate(String eventId) { delegate.invalidate(eventId); }
+
+        @Override
+        public boolean isInvalidated(String eventId) { return delegate.isInvalidated(eventId); }
+
+        @Override
         public List<AuditEvent> findByTaskId(String taskId) { return delegate.findByTaskId(taskId); }
     }
 
@@ -209,6 +283,35 @@ class ApprovalServiceTest {
 
         @Override
         public void delete(String eventId) { delegate.delete(eventId); }
+
+        @Override
+        public void invalidate(String eventId) { delegate.invalidate(eventId); }
+
+        @Override
+        public boolean isInvalidated(String eventId) { return delegate.isInvalidated(eventId); }
+
+        @Override
+        public List<AuditEvent> findByTaskId(String taskId) { return delegate.findByTaskId(taskId); }
+    }
+
+    private static final class DeleteFailingAuditRepository implements AuditEventRepository {
+        private final InMemoryAuditEventRepository delegate = new InMemoryAuditEventRepository();
+        private boolean failDelete;
+
+        @Override
+        public AuditEvent append(AuditEvent event) { return delegate.append(event); }
+
+        @Override
+        public void delete(String eventId) {
+            if (failDelete) throw new IllegalStateException("audit delete failed");
+            delegate.delete(eventId);
+        }
+
+        @Override
+        public void invalidate(String eventId) { delegate.invalidate(eventId); }
+
+        @Override
+        public boolean isInvalidated(String eventId) { return delegate.isInvalidated(eventId); }
 
         @Override
         public List<AuditEvent> findByTaskId(String taskId) { return delegate.findByTaskId(taskId); }

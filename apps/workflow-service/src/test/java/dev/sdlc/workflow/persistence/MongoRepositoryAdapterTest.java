@@ -66,4 +66,20 @@ class MongoRepositoryAdapterTest {
         assertEquals(3L, document.version());
         assertEquals(TaskStatus.WAITING_FOR_APPROVAL, document.status());
     }
+
+    @Test
+    void auditInvalidationUsesADurableIndependentTombstone() {
+        MongoOperations mongo = mock(MongoOperations.class);
+        MongoAuditEventRepository repository = new MongoAuditEventRepository(mongo);
+        when(mongo.exists(any(Query.class), eq("auditEventInvalidations"))).thenReturn(true);
+
+        repository.invalidate("AUDIT-ABORTED");
+        assertEquals(true, repository.isInvalidated("AUDIT-ABORTED"));
+
+        verify(mongo).save(new AuditEventInvalidationDocument("AUDIT-ABORTED"),
+                "auditEventInvalidations");
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongo).exists(query.capture(), eq("auditEventInvalidations"));
+        assertEquals("AUDIT-ABORTED", query.getValue().getQueryObject().getString("_id"));
+    }
 }

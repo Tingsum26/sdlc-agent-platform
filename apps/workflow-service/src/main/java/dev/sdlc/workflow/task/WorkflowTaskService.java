@@ -284,16 +284,33 @@ public final class WorkflowTaskService {
             throw new IllegalStateException("Committed task transition has no exact audit event");
         }
         RuntimeException recoveryFailure = null;
+        boolean invalidated = false;
         try {
-            auditEvents.delete(event.eventId());
+            auditEvents.invalidate(event.eventId());
+            invalidated = true;
         } catch (RuntimeException exception) {
             recoveryFailure = exception;
         }
+        boolean deleted = false;
         try {
-            tasks.restore(previous, committed.version());
+            auditEvents.delete(event.eventId());
+            deleted = true;
         } catch (RuntimeException exception) {
             if (recoveryFailure == null) recoveryFailure = exception;
             else recoveryFailure.addSuppressed(exception);
+        }
+        if (invalidated || deleted) {
+            try {
+                tasks.restore(previous, committed.version());
+            } catch (RuntimeException exception) {
+                if (recoveryFailure == null) recoveryFailure = exception;
+                else recoveryFailure.addSuppressed(exception);
+            }
+        } else {
+            IllegalStateException unsafeRestore = new IllegalStateException(
+                    "Task was not restored because the approval event could not be invalidated or deleted");
+            if (recoveryFailure == null) recoveryFailure = unsafeRestore;
+            else recoveryFailure.addSuppressed(unsafeRestore);
         }
         if (recoveryFailure != null) {
             throw new IllegalStateException("Workflow task compensation was incomplete", recoveryFailure);
@@ -313,12 +330,16 @@ public final class WorkflowTaskService {
         if (approvedTaskVersion == null || approvalCommitEventId == null) {
             throw new IllegalStateException("Artifact approval is not bound to a task commit");
         }
+        if (auditEvents.isInvalidated(approvalCommitEventId)) {
+            throw new IllegalStateException("Artifact approval commit was invalidated");
+        }
         WorkflowTask task = getTask(taskId);
         if (task.version() < approvedTaskVersion) {
             throw new IllegalStateException("Artifact approval task transition was compensated");
         }
         TaskStatus expectedTarget = transitionPolicy.targetAfterApproval(task.type());
-        boolean committed = auditEvents.findByTaskId(taskId).stream().anyMatch(event ->
+        List<AuditEvent> taskAudit = auditEvents.findByTaskId(taskId);
+        boolean committed = taskAudit.stream().anyMatch(event ->
                 event.eventId().equals(approvalCommitEventId)
                         && event.action().equals("TASK_TRANSITIONED")
                         && event.taskVersion() == approvedTaskVersion
@@ -329,7 +350,34 @@ public final class WorkflowTaskService {
         if (!committed) {
             throw new IllegalStateException("Artifact approval task transition is not committed");
         }
+        if (!hasValidAuditChain(task, approvedTaskVersion, expectedTarget, taskAudit)) {
+            throw new IllegalStateException("Current task state is not descended from the approval commit");
+        }
         return task;
+    }
+
+    private boolean hasValidAuditChain(
+            WorkflowTask task,
+            long approvedTaskVersion,
+            TaskStatus approvalTarget,
+            List<AuditEvent> taskAudit) {
+        long expectedVersion = approvedTaskVersion;
+        TaskStatus expectedStatus = approvalTarget;
+        if (task.version() == expectedVersion) return task.status() == expectedStatus;
+        while (expectedVersion < task.version()) {
+            long nextVersion = expectedVersion + 1;
+            TaskStatus previousStatus = expectedStatus;
+            AuditEvent next = taskAudit.stream()
+                    .filter(event -> event.taskVersion() == nextVersion
+                            && event.previousStatus() == previousStatus
+                            && !auditEvents.isInvalidated(event.eventId()))
+                    .findFirst()
+                    .orElse(null);
+            if (next == null) return false;
+            expectedVersion = nextVersion;
+            expectedStatus = next.newStatus();
+        }
+        return task.status() == expectedStatus;
     }
 
     private WorkflowTaskCommit persistWithAudit(

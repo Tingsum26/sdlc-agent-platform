@@ -106,6 +106,12 @@ class WorkflowTaskControllerAtomicityTest {
         public void delete(String eventId) { delegate.delete(eventId); }
 
         @Override
+        public void invalidate(String eventId) { delegate.invalidate(eventId); }
+
+        @Override
+        public boolean isInvalidated(String eventId) { return delegate.isInvalidated(eventId); }
+
+        @Override
         public List<AuditEvent> findByTaskId(String taskId) {
             return delegate.findByTaskId(taskId);
         }

@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.query.Query;
 
 public final class MongoAuditEventRepository implements AuditEventRepository {
     static final String COLLECTION = "auditEvents";
+    static final String INVALIDATIONS_COLLECTION = "auditEventInvalidations";
     private final MongoOperations mongo;
 
     public MongoAuditEventRepository(MongoOperations mongo) { this.mongo = mongo; }
@@ -22,6 +23,16 @@ public final class MongoAuditEventRepository implements AuditEventRepository {
     @Override
     public void delete(String eventId) {
         mongo.remove(Query.query(Criteria.where("_id").is(eventId)), AuditEventDocument.class, COLLECTION);
+    }
+
+    @Override
+    public void invalidate(String eventId) {
+        mongo.save(new AuditEventInvalidationDocument(eventId), INVALIDATIONS_COLLECTION);
+    }
+
+    @Override
+    public boolean isInvalidated(String eventId) {
+        return mongo.exists(Query.query(Criteria.where("_id").is(eventId)), INVALIDATIONS_COLLECTION);
     }
 
     @Override
