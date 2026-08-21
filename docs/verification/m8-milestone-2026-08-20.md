@@ -101,3 +101,45 @@ completion of the approved target platform.
   deterministic fictional run in the current fake-runtime process. It is not
   evidence of a human QA execution, a release, company connectivity, or
   provenance that survives/reconciles after a fake-runtime restart.
+
+## Pre-push re-verification (2026-08-22)
+
+The full gate matrix was re-run on Windows PowerShell from the same worktree on
+2026-08-22 before pushing the accumulated branch commits to Draft PR #1. The
+re-run covers all six post-plan security/atomicity commits that landed after
+the 2026-08-21 refresh (`56c6d4c`, `eb64f3b`, `750dc5e`, `6b962e2`, `73f2c20`,
+`5bbceac`), which is why several counts grew relative to the table above.
+
+| Gate | Command | Result |
+|---|---|---|
+| Java full suite | `./mvnw.cmd -q verify` | PASS — 42 Surefire reports, 175 tests, 0 failures, 0 errors |
+| Frozen dependency install | `pnpm install --frozen-lockfile` | PASS — lockfile current |
+| Node tests | `pnpm test` | PASS — 123 tests: contracts 35, Workflow MCP 13, VSIX 61, shared UI 8, Web UI 6 |
+| Node builds | `pnpm build` | PASS — all five runnable workspaces built |
+| Node lint gate | `pnpm lint` | PASS — no failing lint script |
+| Dependency advisory scan | `pnpm audit --audit-level low` | PASS — no known vulnerabilities at this run |
+| Public browser vertical slice | `pnpm e2e:public-mvp` | PASS — 1/1 (see flake note) |
+| M1 browser E2E | `pnpm e2e:m1` | PASS — 1/1 |
+| M2 browser E2E | `pnpm e2e:m2` | PASS — 1/1 |
+| M3 browser E2E | `pnpm e2e:m3` | PASS — 1/1 |
+| M4 browser E2E | `pnpm e2e:m4` | PASS — 1/1 |
+| M7 browser E2E | `pnpm e2e:m7` | PASS — 1/1 |
+| Bundle build test | `powershell -File scripts/tests/build-bundle.test.ps1` | PASS — exit 0 |
+| Bundle lifecycle test | `powershell -File scripts/tests/bundle-lifecycle.test.ps1` | PASS — exit 0 |
+| Stop-demo regression test | `powershell -File scripts/tests/stop-demo.test.ps1` | PASS — exit 0 |
+| VSIX package | `pnpm --filter sdlc-workbench package` | PASS — `dist/sdlc-workbench.vsix` (7 files, 18.78 KB) |
+| Registry unit tests | `node --test scripts/tests/internalTodoRegistry.test.mjs` | PASS — 11/11 |
+| Internal TODO registry validation | `pnpm verify:internal-todos` | PASS — 10 IDs, 19 source marker paths |
+| Canonical marker scan | `rg` over `apps packages central`, exclusions per commands above | PASS — exactly 19 hits |
+| Credential pattern scan | `rg --hidden` over full worktree, exclusions per commands above | PASS — 0 hits |
+| Demo lifecycle smoke | `start-demo.ps1` → health/Web → `stop-demo.ps1` | PASS — health `{"status":"UP"}` (200), Web 200, both PIDs stopped, ports 8080/4173 free afterwards |
+
+Flake note: during one batched sweep, `pnpm e2e:public-mvp` failed once
+(exit 1) while the other five suites passed; an immediate standalone re-run
+passed 1/1 in 8.2s. The failure mode is consistent with a server-startup/port
+race between back-to-back Playwright invocations rather than a product
+regression; no code change resulted.
+
+The known-benign noise persists unchanged: the pnpm `overrides` configuration
+warning and intentional fake-Splunk best-effort failure logs inside the Java
+suite. The explicit non-completion boundary above is likewise unchanged.

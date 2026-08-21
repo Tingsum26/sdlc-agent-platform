@@ -3,7 +3,7 @@
 ## 1. 交付信息
 
 - Release/Commit：`agent/mvp-vertical-slice`（以 Draft PR head commit 为准）
-- 日期：2026-08-21（M8 公网验证）
+- 日期：2026-08-21（M8 公网验证）；2026-08-22 推送前全矩阵复验
 - 设计文档版本：v2
 - 实施计划版本：2026-08-14, reviewed 2026-08-16
 - 兼容 Schema 版本：1.0
@@ -49,17 +49,17 @@
 
 ## 3. 公网已执行验证
 
-以下条目均在 2026-08-21 M8 验证中重新执行；旧里程碑统计不再作为当前交付结论。
+以下条目均在 2026-08-21 M8 验证中重新执行；并于 2026-08-22（推送前，覆盖六个安全/原子性收尾提交之后）全矩阵复验。旧里程碑统计不再作为当前交付结论。
 
 | 命令/场景 | 结果 | 数量/摘要 | 限制 |
 |---|---|---|---|
-| `./mvnw.cmd -q verify` | PASS | 163 tests in 41 Surefire reports; 0 failures, 0 errors, 0 skipped | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
-| `pnpm install --frozen-lockfile` + `pnpm test` | PASS | 119 tests: Contracts 35, Workflow MCP 12, VSIX 58, shared UI 8, Web UI 6 | deterministic public adapters only |
+| `./mvnw.cmd -q verify` | PASS | 2026-08-21: 163 tests/41 reports; 2026-08-22: 175 tests in 42 Surefire reports; 0 failures, 0 errors, 0 skipped | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
+| `pnpm install --frozen-lockfile` + `pnpm test` | PASS | 2026-08-22: 123 tests: Contracts 35, Workflow MCP 13, VSIX 61, shared UI 8, Web UI 6（08-21 为 119） | deterministic public adapters only |
 | `pnpm build` + `pnpm lint` | PASS | all five runnable workspaces built; no failing lint script | public build only |
-| `pnpm e2e:public-mvp`, `e2e:m1`, `e2e:m2`, `e2e:m3`, `e2e:m4`, `e2e:m7` | PASS | each suite 1/1, launched separately with ports 8080/4173 clean | fictional loopback demo |
+| `pnpm e2e:public-mvp`, `e2e:m1`, `e2e:m2`, `e2e:m3`, `e2e:m4`, `e2e:m7` | PASS | each suite 1/1, launched separately with ports 8080/4173 clean; public-mvp had one transient batched-run failure, standalone rerun green (flake note in M8 doc) | fictional loopback demo |
 | `powershell -File scripts/tests/build-bundle.test.ps1` + `bundle-lifecycle.test.ps1` | PASS | central bundle build and install/rollback lifecycle | no company release trust |
 | `powershell -File scripts/tests/stop-demo.test.ps1` | PASS | Windows PID-reuse, process-tree, and discovery-failure regression cases | Windows PowerShell process behavior |
-| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 6-file 18.01-KB `.vsix` | not signed/published internally |
+| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 2026-08-22: 7-file 18.78-KB `.vsix`（08-21 为 6-file 18.01-KB） | not signed/published internally |
 | `pnpm audit --audit-level low` | PASS | no known vulnerabilities | snapshot of registry advisory data at verification time |
 | start → health → stop → port release | PASS | Workflow `UP`, Web `200`, ports 8080/4173 released | Fake profile only |
 | TODO registry + static scans | PASS | registry tests 11/11; 10 IDs/19 canonical paths; marker scan 19; credential scan 0 | exact commands and exclusions in `docs/verification/m8-milestone-2026-08-20.md` |
