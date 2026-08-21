@@ -88,9 +88,7 @@ public final class WorkflowTaskService {
         Instant now = clock.instant();
         WorkflowTask task = new WorkflowTask(taskId, type, TaskStatus.WAITING_FOR_LOCAL_COPILOT,
                 evidenceClassification, scope, idempotencyKey, null, null, 0, now, now);
-        tasks.save(task);
-        audit(task, actorId, "TASK_CREATED", null, task.status(), correlationId);
-        return task;
+        return persistWithAudit(null, task, actorId, "TASK_CREATED", null, task.status(), correlationId);
     }
 
     private static boolean sameTaskIdentity(WorkflowTask task, TaskType type, WorkflowScope scope,
@@ -113,9 +111,8 @@ public final class WorkflowTaskService {
         transitionPolicy.requireAllowed(task.type(), task.status(), TaskStatus.LOCAL_COPILOT_RUNNING);
         Instant now = clock.instant();
         WorkflowTask claimed = task.claimedBy(actorId, now.plus(lease), now);
-        tasks.save(claimed);
-        audit(claimed, actorId, "TASK_CLAIMED", task.status(), claimed.status(), correlationId);
-        return claimed;
+        return persistWithAudit(task, claimed, actorId, "TASK_CLAIMED",
+                task.status(), claimed.status(), correlationId);
     }
 
     public synchronized WorkflowTask skipTask(
@@ -130,9 +127,8 @@ public final class WorkflowTaskService {
             throw new IllegalTaskTransitionException("Stage cannot be skipped from " + task.status());
         }
         WorkflowTask skipped = task.transitionedTo(TaskStatus.COMPLETED, clock.instant());
-        tasks.save(skipped);
-        audit(skipped, actorId, "TASK_SKIPPED", task.status(), skipped.status(), correlationId);
-        return skipped;
+        return persistWithAudit(task, skipped, actorId, "TASK_SKIPPED",
+                task.status(), skipped.status(), correlationId);
     }
 
     public synchronized WorkflowTask transition(
@@ -148,9 +144,8 @@ public final class WorkflowTaskService {
         }
         transitionPolicy.requireAllowed(task.type(), task.status(), targetStatus);
         WorkflowTask changed = task.transitionedTo(targetStatus, clock.instant());
-        tasks.save(changed);
-        audit(changed, actorId, "TASK_TRANSITIONED", task.status(), changed.status(), correlationId);
-        return changed;
+        return persistWithAudit(task, changed, actorId, "TASK_TRANSITIONED",
+                task.status(), changed.status(), correlationId);
     }
 
     public synchronized WorkflowTask validateTransition(
@@ -204,9 +199,8 @@ public final class WorkflowTaskService {
                     "Compatibility completion is not allowed for " + task.type() + " in " + task.status());
         }
         WorkflowTask changed = task.transitionedTo(TaskStatus.COMPLETED, clock.instant());
-        tasks.save(changed);
-        audit(changed, actorId, "LEGACY_STAGE_COMPLETED", task.status(), changed.status(), correlationId);
-        return changed;
+        return persistWithAudit(task, changed, actorId, "LEGACY_STAGE_COMPLETED",
+                task.status(), changed.status(), correlationId);
     }
 
     public synchronized int releaseExpiredLeases(Instant now, String actorId, String correlationId) {
@@ -216,23 +210,23 @@ public final class WorkflowTaskService {
                     && task.leaseExpiresAt() != null
                     && task.leaseExpiresAt().isBefore(now)) {
                 WorkflowTask returned = task.released(now);
-                tasks.save(returned);
-                audit(returned, actorId, "LEASE_EXPIRED", task.status(), returned.status(), correlationId);
+                persistWithAudit(task, returned, actorId, "LEASE_EXPIRED",
+                        task.status(), returned.status(), correlationId);
                 released++;
             }
         }
         return released;
     }
 
-    public WorkflowTask getTask(String taskId) {
+    public synchronized WorkflowTask getTask(String taskId) {
         return tasks.findById(taskId).orElseThrow(() -> new TaskNotFoundException(taskId));
     }
 
-    public List<WorkflowTask> listTasks() {
+    public synchronized List<WorkflowTask> listTasks() {
         return tasks.findAll();
     }
 
-    public List<AuditEvent> listAuditEvents(String taskId) {
+    public synchronized List<AuditEvent> listAuditEvents(String taskId) {
         getTask(taskId);
         return auditEvents.findByTaskId(taskId);
     }
@@ -246,15 +240,92 @@ public final class WorkflowTaskService {
         return task;
     }
 
-    private void audit(
-            WorkflowTask task,
+    public synchronized void compensateCommittedTransition(WorkflowTask previous, WorkflowTask committed) {
+        WorkflowTask current = requireVersion(committed.taskId(), committed.version());
+        if (!current.equals(committed) || !previous.taskId().equals(committed.taskId())) {
+            throw new StaleTaskVersionException("Workflow task changed before compensation");
+        }
+        AuditEvent event = auditEvents.findByTaskId(committed.taskId()).stream()
+                .filter(candidate -> candidate.taskVersion() == committed.version())
+                .reduce((first, second) -> second)
+                .orElseThrow(() -> new IllegalStateException("Committed task transition has no audit event"));
+        RuntimeException recoveryFailure = null;
+        try {
+            auditEvents.delete(event.eventId());
+        } catch (RuntimeException exception) {
+            recoveryFailure = exception;
+        }
+        try {
+            tasks.restore(previous, committed.version());
+        } catch (RuntimeException exception) {
+            if (recoveryFailure == null) recoveryFailure = exception;
+            else recoveryFailure.addSuppressed(exception);
+        }
+        if (recoveryFailure != null) {
+            throw new IllegalStateException("Workflow task compensation was incomplete", recoveryFailure);
+        }
+    }
+
+    /**
+     * Verifies the process-local approval commit fence used by Jira projection.
+     * This is not a distributed transaction or a cross-process lock.
+     */
+    public synchronized WorkflowTask requireCommittedApproval(String taskId, Long approvedTaskVersion) {
+        if (approvedTaskVersion == null) {
+            throw new IllegalStateException("Artifact approval is not bound to a task commit");
+        }
+        WorkflowTask task = getTask(taskId);
+        if (task.version() < approvedTaskVersion) {
+            throw new IllegalStateException("Artifact approval task transition was compensated");
+        }
+        TaskStatus expectedTarget = transitionPolicy.targetAfterApproval(task.type());
+        boolean committed = auditEvents.findByTaskId(taskId).stream().anyMatch(event ->
+                event.taskVersion() == approvedTaskVersion
+                        && event.previousStatus() == TaskStatus.WAITING_FOR_APPROVAL
+                        && event.newStatus() == expectedTarget);
+        if (!committed) {
+            throw new IllegalStateException("Artifact approval task transition is not committed");
+        }
+        return task;
+    }
+
+    private WorkflowTask persistWithAudit(
+            WorkflowTask previous,
+            WorkflowTask changed,
             String actorId,
             String action,
-            TaskStatus previous,
-            TaskStatus next,
+            TaskStatus previousStatus,
+            TaskStatus nextStatus,
             String correlationId) {
-        long sequence = auditEvents.findByTaskId(task.taskId()).size() + 1L;
-        auditEvents.append(new AuditEvent(UUID.randomUUID().toString(), task.taskId(), sequence, actorId,
-                action, task.evidenceClassification(), previous, next, task.version(), clock.instant(), correlationId));
+        long sequence = auditEvents.findByTaskId(changed.taskId()).size() + 1L;
+        AuditEvent event = new AuditEvent(UUID.randomUUID().toString(), changed.taskId(), sequence, actorId,
+                action, changed.evidenceClassification(), previousStatus, nextStatus,
+                changed.version(), clock.instant(), correlationId);
+        tasks.save(changed);
+        try {
+            auditEvents.append(event);
+            return changed;
+        } catch (RuntimeException failure) {
+            RuntimeException recoveryFailure = null;
+            try {
+                auditEvents.delete(event.eventId());
+            } catch (RuntimeException exception) {
+                recoveryFailure = exception;
+            }
+            try {
+                if (previous == null) tasks.delete(changed.taskId(), changed.version());
+                else tasks.restore(previous, changed.version());
+            } catch (RuntimeException exception) {
+                if (recoveryFailure == null) recoveryFailure = exception;
+                else recoveryFailure.addSuppressed(exception);
+            }
+            if (recoveryFailure != null) {
+                IllegalStateException incomplete = new IllegalStateException(
+                        "Workflow task and audit compensation was incomplete", failure);
+                incomplete.addSuppressed(recoveryFailure);
+                throw incomplete;
+            }
+            throw failure;
+        }
     }
 }

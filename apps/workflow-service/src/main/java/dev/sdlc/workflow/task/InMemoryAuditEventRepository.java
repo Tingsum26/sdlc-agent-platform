@@ -14,6 +14,11 @@ public final class InMemoryAuditEventRepository implements AuditEventRepository 
     }
 
     @Override
+    public synchronized void delete(String eventId) {
+        events.removeIf(event -> event.eventId().equals(eventId));
+    }
+
+    @Override
     public synchronized List<AuditEvent> findByTaskId(String taskId) {
         return events.stream().filter(event -> event.taskId().equals(taskId)).toList();
     }

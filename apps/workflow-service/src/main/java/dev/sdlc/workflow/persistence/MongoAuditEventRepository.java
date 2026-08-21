@@ -20,6 +20,11 @@ public final class MongoAuditEventRepository implements AuditEventRepository {
     }
 
     @Override
+    public void delete(String eventId) {
+        mongo.remove(Query.query(Criteria.where("_id").is(eventId)), AuditEventDocument.class, COLLECTION);
+    }
+
+    @Override
     public List<AuditEvent> findByTaskId(String taskId) {
         Query query = Query.query(Criteria.where("taskId").is(taskId)).with(Sort.by("sequence"));
         return mongo.find(query, AuditEventDocument.class, COLLECTION).stream().map(AuditEventDocument::toDomain).toList();

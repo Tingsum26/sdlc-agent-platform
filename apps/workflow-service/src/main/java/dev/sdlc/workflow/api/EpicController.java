@@ -156,11 +156,9 @@ public class EpicController {
             HttpServletRequest request) {
         CurrentUser user = CurrentUser.require(request);
         TicketWorkflow ticket = tickets.ticket(body.ticketId());
-        ArtifactMetadata artifact = artifacts.requireArtifact(body.artifactId(), body.artifactVersion());
-        if (!artifact.approved()) {
-            throw new IllegalArgumentException("Artifact must be approved before Jira projection");
-        }
-        WorkflowTask task = workflowTasks.getTask(artifact.taskId());
+        ArtifactMetadata artifact = artifacts.requireApprovedForProjection(body.artifactId(), body.artifactVersion());
+        WorkflowTask task = workflowTasks.requireCommittedApproval(
+                artifact.taskId(), artifact.approvedTaskVersion());
         if (!ticket.ticketId().equals(task.scope().ticketId())) {
             throw new IllegalArgumentException("Artifact task does not belong to ticket");
         }

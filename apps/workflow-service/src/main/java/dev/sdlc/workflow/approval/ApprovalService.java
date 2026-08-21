@@ -29,13 +29,38 @@ public final class ApprovalService {
                 throw new IllegalArgumentException("Artifact does not belong to the workflow task");
             }
             TaskArtifactPolicy.requireCompatible(task.type(), artifact.type());
-            ArtifactMetadata approved = artifacts.markApproved(artifactId, artifactVersion, actorId);
+            ArtifactMetadata pending = artifacts.beginApproval(artifactId, artifactVersion, actorId);
+            if (pending.approved()) {
+                throw new IllegalStateException("Artifact was approved without a committed task transition");
+            }
+            WorkflowTask advanced;
             try {
-                WorkflowTask advanced = tasks.transitionAfterApproval(
-                        taskId, expectedTaskVersion, actorId, correlationId);
+                advanced = tasks.transitionAfterApproval(taskId, expectedTaskVersion, actorId, correlationId);
+            } catch (RuntimeException exception) {
+                try {
+                    artifacts.restore(artifact);
+                } catch (RuntimeException recoveryFailure) {
+                    // The persisted PENDING state is deliberately retained. It
+                    // is never publishable by Jira because approved() is false.
+                    exception.addSuppressed(recoveryFailure);
+                }
+                throw exception;
+            }
+            try {
+                ArtifactMetadata approved = artifacts.commitApproval(
+                        artifactId, artifactVersion, actorId, advanced.version());
                 return new ApprovalDecision(actorId, "APPROVED", approved.approvedAt(), approved, advanced);
             } catch (RuntimeException exception) {
-                artifacts.restore(artifact);
+                try {
+                    tasks.compensateCommittedTransition(task, advanced);
+                } catch (RuntimeException recoveryFailure) {
+                    exception.addSuppressed(recoveryFailure);
+                }
+                try {
+                    artifacts.restore(artifact);
+                } catch (RuntimeException recoveryFailure) {
+                    exception.addSuppressed(recoveryFailure);
+                }
                 throw exception;
             }
         }

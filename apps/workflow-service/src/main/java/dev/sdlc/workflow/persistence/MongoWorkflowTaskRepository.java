@@ -52,4 +52,21 @@ public final class MongoWorkflowTaskRepository implements WorkflowTaskRepository
         if (saved == null) throw new StaleTaskVersionException("Workflow task version changed");
         return saved.toDomain();
     }
+
+    @Override
+    public void restore(WorkflowTask task, long expectedCurrentVersion) {
+        Query query = Query.query(Criteria.where("_id").is(task.taskId()).and("version").is(expectedCurrentVersion));
+        WorkflowTaskDocument restored = mongo.findAndReplace(query, WorkflowTaskDocument.fromDomain(task),
+                FindAndReplaceOptions.options().returnNew(), COLLECTION);
+        if (restored == null) throw new StaleTaskVersionException("Workflow task changed before compensation");
+    }
+
+    @Override
+    public void delete(String taskId, long expectedVersion) {
+        Query query = Query.query(Criteria.where("_id").is(taskId).and("version").is(expectedVersion));
+        if (mongo.remove(query, WorkflowTaskDocument.class, COLLECTION).getDeletedCount() == 0
+                && mongo.exists(Query.query(Criteria.where("_id").is(taskId)), COLLECTION)) {
+            throw new StaleTaskVersionException("Workflow task changed before compensation");
+        }
+    }
 }

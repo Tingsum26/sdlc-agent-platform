@@ -30,4 +30,23 @@ public final class InMemoryWorkflowTaskRepository implements WorkflowTaskReposit
         tasks.put(task.taskId(), task);
         return task;
     }
+
+    @Override
+    public synchronized void restore(WorkflowTask task, long expectedCurrentVersion) {
+        WorkflowTask current = tasks.get(task.taskId());
+        if (current == null || current.version() != expectedCurrentVersion) {
+            throw new StaleTaskVersionException("Workflow task changed before compensation");
+        }
+        tasks.put(task.taskId(), task);
+    }
+
+    @Override
+    public synchronized void delete(String taskId, long expectedVersion) {
+        WorkflowTask current = tasks.get(taskId);
+        if (current == null) return;
+        if (current.version() != expectedVersion) {
+            throw new StaleTaskVersionException("Workflow task changed before compensation");
+        }
+        tasks.remove(taskId);
+    }
 }

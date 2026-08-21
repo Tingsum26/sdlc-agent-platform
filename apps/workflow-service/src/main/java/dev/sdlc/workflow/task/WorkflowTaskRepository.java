@@ -11,4 +11,8 @@ public interface WorkflowTaskRepository {
     List<WorkflowTask> findAll();
 
     WorkflowTask save(WorkflowTask task);
+
+    void restore(WorkflowTask task, long expectedCurrentVersion);
+
+    void delete(String taskId, long expectedVersion);
 }

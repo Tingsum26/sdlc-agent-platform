@@ -2,6 +2,7 @@ package dev.sdlc.workflow.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import dev.sdlc.workflow.artifact.ArtifactApprovalStatus;
 import dev.sdlc.workflow.artifact.ArtifactMetadata;
 import dev.sdlc.workflow.artifact.ArtifactSection;
 import dev.sdlc.workflow.artifact.ArtifactType;
@@ -35,7 +36,7 @@ class MongoDocumentMappingTest {
                 TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.WAITING_FOR_CI, 7, NOW, "corr-1");
         ArtifactMetadata artifact = new ArtifactMetadata("ART-1", "TASK-1", ArtifactType.DESIGN_REPORT, 3,
                 "sha256:fictional", List.of(new ArtifactSection("summary", "Summary", "Safe body")),
-                "PRINCIPAL-1", NOW, null, null);
+                "PRINCIPAL-1", NOW, "ARCHITECT-1", NOW, ArtifactApprovalStatus.APPROVED, 7L);
         WebhookDelivery webhook = new WebhookDelivery("DELIVERY-1", "pull_request", NOW);
         PodRoster roster = new PodRoster("ACCOUNT_OPENING_DEMO", 4, List.of(new PodMembership(
                 "MEM-1", "EMP-1", "PRINCIPAL-1", "Fictional QA", "QA", "ACCOUNT_OPENING_DEMO",

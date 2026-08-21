@@ -41,4 +41,29 @@ class MongoRepositoryAdapterTest {
         assertEquals("TASK-1", filter.getString("_id"));
         assertEquals(6L, ((Number) filter.get("version")).longValue());
     }
+
+    @Test
+    void taskCompensationMatchesTheAdvancedVersionAndRestoresTheExactPriorDocument() {
+        MongoOperations mongo = mock(MongoOperations.class);
+        MongoWorkflowTaskRepository repository = new MongoWorkflowTaskRepository(mongo);
+        Instant now = Instant.parse("2026-08-16T00:00:00Z");
+        WorkflowTask prior = new WorkflowTask("TASK-RESTORE", TaskType.DESIGN,
+                TaskStatus.WAITING_FOR_APPROVAL,
+                new WorkflowScope("DEMO-123", "REPO_A", "0123456789abcdef0123456789abcdef01234567"),
+                "idem-restore", null, null, 3, now, now);
+        WorkflowTaskDocument document = WorkflowTaskDocument.fromDomain(prior);
+        when(mongo.findAndReplace(any(Query.class), any(WorkflowTaskDocument.class),
+                any(FindAndReplaceOptions.class), eq("workflowTasks"))).thenReturn(document);
+
+        repository.restore(prior, 4);
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongo).findAndReplace(query.capture(), eq(document),
+                any(FindAndReplaceOptions.class), eq("workflowTasks"));
+        Document filter = query.getValue().getQueryObject();
+        assertEquals("TASK-RESTORE", filter.getString("_id"));
+        assertEquals(4L, ((Number) filter.get("version")).longValue());
+        assertEquals(3L, document.version());
+        assertEquals(TaskStatus.WAITING_FOR_APPROVAL, document.status());
+    }
 }

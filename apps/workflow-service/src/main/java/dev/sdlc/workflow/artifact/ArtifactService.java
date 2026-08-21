@@ -47,11 +47,39 @@ public final class ArtifactService {
     }
 
     public synchronized ArtifactMetadata markApproved(String artifactId, int version, String actorId) {
+        ArtifactMetadata pending = beginApproval(artifactId, version, actorId);
+        if (pending.approved()) return pending;
+        return commitApprovalInternal(artifactId, version, actorId, null);
+    }
+
+    public synchronized ArtifactMetadata beginApproval(String artifactId, int version, String actorId) {
         ArtifactMetadata artifact = requireArtifact(artifactId, version);
         if (artifact.approved()) {
             return artifact;
         }
-        return store.save(artifact.approvedBy(actorId, clock.instant()));
+        if (artifact.approvalStatus() == ArtifactApprovalStatus.PENDING) {
+            if (!actorId.equals(artifact.approvedBy())) {
+                throw new IllegalStateException("Artifact approval is already pending for another actor");
+            }
+            return artifact;
+        }
+        return store.save(artifact.pendingApprovalBy(actorId));
+    }
+
+    public synchronized ArtifactMetadata commitApproval(
+            String artifactId, int version, String actorId, long approvedTaskVersion) {
+        return commitApprovalInternal(artifactId, version, actorId, approvedTaskVersion);
+    }
+
+    private ArtifactMetadata commitApprovalInternal(
+            String artifactId, int version, String actorId, Long approvedTaskVersion) {
+        ArtifactMetadata artifact = requireArtifact(artifactId, version);
+        if (artifact.approved()) return artifact;
+        if (artifact.approvalStatus() != ArtifactApprovalStatus.PENDING
+                || !actorId.equals(artifact.approvedBy())) {
+            throw new IllegalStateException("Artifact approval is not pending for this actor");
+        }
+        return store.save(artifact.commitApproval(clock.instant(), approvedTaskVersion));
     }
 
     public synchronized void restore(ArtifactMetadata artifact) {
@@ -77,6 +105,14 @@ public final class ArtifactService {
     public ArtifactMetadata requireArtifact(String artifactId, int version) {
         return store.find(artifactId, version)
                 .orElseThrow(() -> new ArtifactNotFoundException(artifactId, version));
+    }
+
+    public synchronized ArtifactMetadata requireApprovedForProjection(String artifactId, int version) {
+        ArtifactMetadata artifact = requireArtifact(artifactId, version);
+        if (!artifact.approved()) {
+            throw new IllegalArgumentException("Artifact must be committed before projection");
+        }
+        return artifact;
     }
 
     private void validateSections(List<ArtifactSection> sections) {

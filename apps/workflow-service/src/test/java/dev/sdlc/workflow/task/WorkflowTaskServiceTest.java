@@ -124,6 +124,31 @@ class WorkflowTaskServiceTest {
     }
 
     @Test
+    void restoresTheExactTaskAndAuditStateWhenAuditPersistenceFailsAfterAppend() {
+        InMemoryWorkflowTaskRepository faultTasks = new InMemoryWorkflowTaskRepository();
+        AppendThenFailAuditRepository faultAudits = new AppendThenFailAuditRepository();
+        WorkflowTaskService faultService = new WorkflowTaskService(
+                faultTasks, faultAudits, new TaskTransitionPolicy(), Clock.fixed(NOW, ZoneOffset.UTC));
+        WorkflowTask created = faultService.createTask("TASK-AUDIT-ROLLBACK", TaskType.REQUIREMENT_ANALYSIS,
+                new WorkflowScope("DEMO-AUDIT", "REPO_A", "audit-ref"),
+                "audit-rollback", "author", "corr-create");
+        faultAudits.failAfterAppend = true;
+
+        assertThatThrownBy(() -> faultService.claimTask(created.taskId(), "developer-1",
+                Duration.ofMinutes(15), created.version(), "corr-claim"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("audit persistence");
+
+        WorkflowTask restored = faultTasks.findById(created.taskId()).orElseThrow();
+        assertThat(restored.status()).isEqualTo(TaskStatus.WAITING_FOR_LOCAL_COPILOT);
+        assertThat(restored.version()).isZero();
+        assertThat(restored.assigneeId()).isNull();
+        assertThat(faultAudits.findByTaskId(created.taskId()))
+                .extracting(AuditEvent::action)
+                .containsExactly("TASK_CREATED");
+    }
+
+    @Test
     void rejectsRestartingACompletedTask() {
         WorkflowTask task = service.createTask(
                 "TASK-MANUAL-E2E",
@@ -228,5 +253,25 @@ class WorkflowTaskServiceTest {
                 "create-demo-123",
                 "user-1",
                 "corr-1");
+    }
+
+    private static final class AppendThenFailAuditRepository implements AuditEventRepository {
+        private final InMemoryAuditEventRepository delegate = new InMemoryAuditEventRepository();
+        private boolean failAfterAppend;
+
+        @Override
+        public AuditEvent append(AuditEvent event) {
+            AuditEvent appended = delegate.append(event);
+            if (failAfterAppend) throw new IllegalStateException("audit persistence failed after append");
+            return appended;
+        }
+
+        @Override
+        public void delete(String eventId) { delegate.delete(eventId); }
+
+        @Override
+        public java.util.List<AuditEvent> findByTaskId(String taskId) {
+            return delegate.findByTaskId(taskId);
+        }
     }
 }
