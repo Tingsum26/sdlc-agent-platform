@@ -283,23 +283,9 @@ public final class WorkflowTaskService {
         if (!exactEventExists) {
             throw new IllegalStateException("Committed task transition has no exact audit event");
         }
-        RuntimeException recoveryFailure = null;
-        boolean invalidated = false;
-        try {
-            auditEvents.invalidate(event.eventId());
-            invalidated = true;
-        } catch (RuntimeException exception) {
-            recoveryFailure = exception;
-        }
-        boolean deleted = false;
-        try {
-            auditEvents.delete(event.eventId());
-            deleted = true;
-        } catch (RuntimeException exception) {
-            if (recoveryFailure == null) recoveryFailure = exception;
-            else recoveryFailure.addSuppressed(exception);
-        }
-        if (invalidated || deleted) {
+        AuditRecovery auditRecovery = invalidateAndDeleteAuditEvent(event);
+        RuntimeException recoveryFailure = auditRecovery.failure();
+        if (auditRecovery.safeToRestoreTask()) {
             try {
                 tasks.restore(previous, committed.version());
             } catch (RuntimeException exception) {
@@ -404,17 +390,20 @@ public final class WorkflowTaskService {
             auditEvents.append(event);
             return new WorkflowTaskCommit(changed, event);
         } catch (RuntimeException failure) {
-            RuntimeException recoveryFailure = null;
-            try {
-                auditEvents.delete(event.eventId());
-            } catch (RuntimeException exception) {
-                recoveryFailure = exception;
-            }
-            try {
-                compensateUncertainTaskSave(previous, changed, failure);
-            } catch (RuntimeException exception) {
-                if (recoveryFailure == null) recoveryFailure = exception;
-                else recoveryFailure.addSuppressed(exception);
+            AuditRecovery auditRecovery = invalidateAndDeleteAuditEvent(event);
+            RuntimeException recoveryFailure = auditRecovery.failure();
+            if (auditRecovery.safeToRestoreTask()) {
+                try {
+                    compensateUncertainTaskSave(previous, changed, failure);
+                } catch (RuntimeException exception) {
+                    if (recoveryFailure == null) recoveryFailure = exception;
+                    else recoveryFailure.addSuppressed(exception);
+                }
+            } else {
+                IllegalStateException unsafeRestore = new IllegalStateException(
+                        "Task was not restored because the audit event could not be invalidated or deleted");
+                if (recoveryFailure == null) recoveryFailure = unsafeRestore;
+                else recoveryFailure.addSuppressed(unsafeRestore);
             }
             if (recoveryFailure != null) {
                 IllegalStateException incomplete = new IllegalStateException(
@@ -424,6 +413,29 @@ public final class WorkflowTaskService {
             }
             throw failure;
         }
+    }
+
+    private AuditRecovery invalidateAndDeleteAuditEvent(AuditEvent event) {
+        RuntimeException recoveryFailure = null;
+        boolean invalidated = false;
+        try {
+            auditEvents.invalidate(event.eventId());
+            invalidated = true;
+        } catch (RuntimeException exception) {
+            recoveryFailure = exception;
+        }
+        boolean deleted = false;
+        try {
+            auditEvents.delete(event.eventId());
+            deleted = true;
+        } catch (RuntimeException exception) {
+            if (recoveryFailure == null) recoveryFailure = exception;
+            else recoveryFailure.addSuppressed(exception);
+        }
+        return new AuditRecovery(invalidated || deleted, recoveryFailure);
+    }
+
+    private record AuditRecovery(boolean safeToRestoreTask, RuntimeException failure) {
     }
 
     /**

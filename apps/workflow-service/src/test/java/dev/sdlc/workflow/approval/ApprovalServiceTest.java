@@ -220,6 +220,57 @@ class ApprovalServiceTest {
                 .isEqualTo(completed);
     }
 
+    @Test
+    void genericOrphanEventIsInvalidatedBeforeTaskVersionIsReused() {
+        GenericAppendAndDeleteFailAuditRepository audits = new GenericAppendAndDeleteFailAuditRepository();
+        InMemoryWorkflowTaskRepository taskRepository = new InMemoryWorkflowTaskRepository();
+        ArtifactService artifacts = new ArtifactService(new FakeArtifactStore(), new ObjectMapper(), clock);
+        WorkflowTaskService tasks = new WorkflowTaskService(
+                taskRepository, audits, new TaskTransitionPolicy(), clock);
+        tasks.createTask("TASK-GENERIC-ORPHAN", TaskType.IMPLEMENTATION,
+                new WorkflowScope("DEMO-GENERIC", "REPO_A", "generic-ref"),
+                "generic-orphan", "author", "corr");
+        tasks.claimTask("TASK-GENERIC-ORPHAN", "author", java.time.Duration.ofMinutes(15), 0, "corr");
+        tasks.transition("TASK-GENERIC-ORPHAN", TaskStatus.LOCAL_COPILOT_RUNNING,
+                TaskStatus.WAITING_FOR_USER_CONFIRMATION, 1, "author", "corr");
+        tasks.transition("TASK-GENERIC-ORPHAN", TaskStatus.WAITING_FOR_USER_CONFIRMATION,
+                TaskStatus.WAITING_FOR_APPROVAL, 2, "author", "corr");
+        artifacts.create("ART-GENERIC-ORPHAN", "TASK-GENERIC-ORPHAN", ArtifactType.DELIVERY_REPORT,
+                List.of(new ArtifactSection("summary", "Summary", "Implementation evidence")), "author", null);
+        ApprovalDecision approval = new ApprovalService(tasks, artifacts).approve(
+                "TASK-GENERIC-ORPHAN", "ART-GENERIC-ORPHAN", 1, 3, "architect", "corr-approve");
+        audits.failNextAppendAfterPersist = true;
+        audits.failDelete = true;
+
+        assertThatThrownBy(() -> tasks.transitionAfterPassedCi(
+                "TASK-GENERIC-ORPHAN", approval.task().version(), "ci-failed", "corr-ci-failed"))
+                .isInstanceOf(RuntimeException.class);
+        AuditEvent orphan = audits.findByTaskId("TASK-GENERIC-ORPHAN").stream()
+                .filter(event -> event.taskVersion() == 5)
+                .findFirst()
+                .orElseThrow();
+        assertThat(taskRepository.findById("TASK-GENERIC-ORPHAN")).contains(approval.task());
+        assertThat(audits.isInvalidated(orphan.eventId())).isTrue();
+
+        audits.failDelete = false;
+        WorkflowTask completed = tasks.transitionAfterPassedCi(
+                "TASK-GENERIC-ORPHAN", approval.task().version(), "ci-valid", "corr-ci-valid");
+        List<AuditEvent> versionFiveEvents = audits.findByTaskId("TASK-GENERIC-ORPHAN").stream()
+                .filter(event -> event.taskVersion() == 5)
+                .toList();
+        assertThat(versionFiveEvents).hasSize(2);
+        assertThat(versionFiveEvents)
+                .filteredOn(event -> !audits.isInvalidated(event.eventId()))
+                .singleElement()
+                .extracting(AuditEvent::actorId)
+                .isEqualTo("ci-valid");
+        assertThat(tasks.requireCommittedApproval(
+                approval.artifact().taskId(), approval.artifact().approvedTaskVersion(),
+                approval.artifact().artifactId(), approval.artifact().version(),
+                approval.artifact().approvalCommitEventId()))
+                .isEqualTo(completed);
+    }
+
     private WorkflowTaskService workflowReadyForApproval(
             InMemoryWorkflowTaskRepository taskRepository,
             AuditEventRepository audits,
@@ -304,6 +355,37 @@ class ApprovalServiceTest {
         @Override
         public void delete(String eventId) {
             if (failDelete) throw new IllegalStateException("audit delete failed");
+            delegate.delete(eventId);
+        }
+
+        @Override
+        public void invalidate(String eventId) { delegate.invalidate(eventId); }
+
+        @Override
+        public boolean isInvalidated(String eventId) { return delegate.isInvalidated(eventId); }
+
+        @Override
+        public List<AuditEvent> findByTaskId(String taskId) { return delegate.findByTaskId(taskId); }
+    }
+
+    private static final class GenericAppendAndDeleteFailAuditRepository implements AuditEventRepository {
+        private final InMemoryAuditEventRepository delegate = new InMemoryAuditEventRepository();
+        private boolean failNextAppendAfterPersist;
+        private boolean failDelete;
+
+        @Override
+        public AuditEvent append(AuditEvent event) {
+            AuditEvent persisted = delegate.append(event);
+            if (failNextAppendAfterPersist) {
+                failNextAppendAfterPersist = false;
+                throw new IllegalStateException("generic audit append failed after persistence");
+            }
+            return persisted;
+        }
+
+        @Override
+        public void delete(String eventId) {
+            if (failDelete) throw new IllegalStateException("generic audit delete failed");
             delegate.delete(eventId);
         }
 

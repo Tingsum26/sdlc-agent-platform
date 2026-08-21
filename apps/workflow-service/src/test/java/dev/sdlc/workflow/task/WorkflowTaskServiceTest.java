@@ -149,6 +149,30 @@ class WorkflowTaskServiceTest {
     }
 
     @Test
+    void refusesToRestoreAReusableVersionWhenAuditInvalidationAndDeletionBothFail() {
+        InMemoryWorkflowTaskRepository faultTasks = new InMemoryWorkflowTaskRepository();
+        UnrecoverableAuditRepository faultAudits = new UnrecoverableAuditRepository();
+        WorkflowTaskService faultService = new WorkflowTaskService(
+                faultTasks, faultAudits, new TaskTransitionPolicy(), Clock.fixed(NOW, ZoneOffset.UTC));
+        WorkflowTask created = faultService.createTask("TASK-FAIL-CLOSED", TaskType.REQUIREMENT_ANALYSIS,
+                new WorkflowScope("DEMO-FAIL-CLOSED", "REPO_A", "fail-closed-ref"),
+                "fail-closed", "author", "corr-create");
+        faultAudits.failRecovery = true;
+
+        assertThatThrownBy(() -> faultService.claimTask(created.taskId(), "developer-1",
+                Duration.ofMinutes(15), created.version(), "corr-claim"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("compensation was incomplete");
+
+        WorkflowTask retained = faultTasks.findById(created.taskId()).orElseThrow();
+        assertThat(retained.version()).isEqualTo(1);
+        assertThat(retained.status()).isEqualTo(TaskStatus.LOCAL_COPILOT_RUNNING);
+        assertThatThrownBy(() -> faultService.claimTask(created.taskId(), "developer-2",
+                Duration.ofMinutes(15), created.version(), "corr-reuse"))
+                .isInstanceOf(StaleTaskVersionException.class);
+    }
+
+    @Test
     void rejectsRestartingACompletedTask() {
         WorkflowTask task = service.createTask(
                 "TASK-MANUAL-E2E",
@@ -271,6 +295,38 @@ class WorkflowTaskServiceTest {
 
         @Override
         public void invalidate(String eventId) { delegate.invalidate(eventId); }
+
+        @Override
+        public boolean isInvalidated(String eventId) { return delegate.isInvalidated(eventId); }
+
+        @Override
+        public java.util.List<AuditEvent> findByTaskId(String taskId) {
+            return delegate.findByTaskId(taskId);
+        }
+    }
+
+    private static final class UnrecoverableAuditRepository implements AuditEventRepository {
+        private final InMemoryAuditEventRepository delegate = new InMemoryAuditEventRepository();
+        private boolean failRecovery;
+
+        @Override
+        public AuditEvent append(AuditEvent event) {
+            AuditEvent persisted = delegate.append(event);
+            if (failRecovery) throw new IllegalStateException("audit append failed after persistence");
+            return persisted;
+        }
+
+        @Override
+        public void delete(String eventId) {
+            if (failRecovery) throw new IllegalStateException("audit delete failed");
+            delegate.delete(eventId);
+        }
+
+        @Override
+        public void invalidate(String eventId) {
+            if (failRecovery) throw new IllegalStateException("audit invalidation failed");
+            delegate.invalidate(eventId);
+        }
 
         @Override
         public boolean isInvalidated(String eventId) { return delegate.isInvalidated(eventId); }
