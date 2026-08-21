@@ -259,7 +259,16 @@ public final class WorkflowTaskService {
 
     public synchronized List<AuditEvent> listAuditEvents(String taskId) {
         getTask(taskId);
-        return auditEvents.findByTaskId(taskId);
+        return auditEvents.findByTaskId(taskId).stream()
+                .filter(event -> !auditEvents.isInvalidated(event.eventId()))
+                .toList();
+    }
+
+    public synchronized List<AuditEventDiagnostic> listAuditEventsDiagnostic(String taskId) {
+        getTask(taskId);
+        return auditEvents.findByTaskId(taskId).stream()
+                .map(event -> new AuditEventDiagnostic(event, auditEvents.isInvalidated(event.eventId())))
+                .toList();
     }
 
     private WorkflowTask requireVersion(String taskId, long expectedVersion) {

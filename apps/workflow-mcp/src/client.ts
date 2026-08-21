@@ -32,6 +32,10 @@ export class WorkflowApiClient {
     return this.request(`/api/v1/tasks/${encodeURIComponent(taskId)}`, { method: "GET" }, correlationId, signal);
   }
 
+  getTaskAudit(taskId: string, correlationId: string, signal: AbortSignal): Promise<unknown> {
+    return this.request(`/api/v1/tasks/${encodeURIComponent(taskId)}/audit`, { method: "GET" }, correlationId, signal);
+  }
+
   claimTask(taskId: string, expectedVersion: number, leaseMinutes: number,
     correlationId: string, signal: AbortSignal): Promise<unknown> {
     return this.request(`/api/v1/tasks/${encodeURIComponent(taskId)}/claim`, {

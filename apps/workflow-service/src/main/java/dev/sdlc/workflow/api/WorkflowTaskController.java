@@ -10,6 +10,7 @@ import dev.sdlc.workflow.security.CurrentUser;
 import dev.sdlc.workflow.evidence.EvidenceClassification;
 import dev.sdlc.workflow.task.TaskStatus;
 import dev.sdlc.workflow.task.AuditEvent;
+import dev.sdlc.workflow.task.AuditEventDiagnostic;
 import dev.sdlc.workflow.task.TaskType;
 import dev.sdlc.workflow.task.WorkflowScope;
 import dev.sdlc.workflow.task.WorkflowTask;
@@ -182,6 +183,12 @@ public class WorkflowTaskController {
     List<AuditEvent> audit(@PathVariable String taskId, HttpServletRequest request) {
         CurrentUser.require(request);
         return tasks.listAuditEvents(taskId);
+    }
+
+    @GetMapping("/tasks/{taskId}/audit/diagnostic")
+    List<AuditEventDiagnostic> auditDiagnostic(@PathVariable String taskId, HttpServletRequest request) {
+        CurrentUser.require(request);
+        return tasks.listAuditEventsDiagnostic(taskId);
     }
 
     @PostMapping("/approvals")

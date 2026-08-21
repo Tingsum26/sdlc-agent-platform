@@ -1,5 +1,6 @@
 package dev.sdlc.workflow.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,6 +12,8 @@ import dev.sdlc.workflow.artifact.ArtifactSection;
 import dev.sdlc.workflow.artifact.ArtifactService;
 import dev.sdlc.workflow.artifact.ArtifactType;
 import dev.sdlc.workflow.evidence.EvidenceClassification;
+import dev.sdlc.workflow.task.AuditEvent;
+import dev.sdlc.workflow.task.AuditEventRepository;
 import dev.sdlc.workflow.task.TaskType;
 import dev.sdlc.workflow.task.TaskStatus;
 import dev.sdlc.workflow.task.WorkflowScope;
@@ -34,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class WorkflowLifecycleIT {
     @Autowired MockMvc mvc;
     @Autowired WorkflowTaskRepository taskRepository;
+    @Autowired AuditEventRepository auditEvents;
     @Autowired ArtifactService artifacts;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -73,6 +77,37 @@ class WorkflowLifecycleIT {
         mvc.perform(get("/api/v1/tasks/{id}/audit", taskId).header("X-Demo-User", "developer-1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(7))
                 .andExpect(jsonPath("$[6].actorId").value("qa-1"));
+    }
+
+    @Test
+    void normalAuditHidesInvalidatedSameVersionEventWhileDiagnosticIdentifiesIt() throws Exception {
+        String taskId = "TASK-AUDIT-VISIBILITY";
+        Instant occurredAt = Instant.parse("2026-08-16T08:00:00Z");
+        taskRepository.save(new WorkflowTask(taskId, TaskType.IMPLEMENTATION, TaskStatus.COMPLETED,
+                new WorkflowScope("AUDIT-VISIBILITY", "REPO_A", "audit-ref"),
+                "audit-visibility", "developer-1", null, 5, occurredAt, occurredAt));
+        AuditEvent invalidated = new AuditEvent("AUDIT-OLD-V5", taskId, 1, "old-worker", "TASK_TRANSITIONED",
+                TaskStatus.WAITING_FOR_CI, TaskStatus.COMPLETED, 5, occurredAt, "corr-old");
+        AuditEvent committed = new AuditEvent("AUDIT-VALID-V5", taskId, 2, "valid-worker", "TASK_TRANSITIONED",
+                TaskStatus.WAITING_FOR_CI, TaskStatus.COMPLETED, 5, occurredAt.plusSeconds(1), "corr-valid");
+        auditEvents.append(invalidated);
+        auditEvents.invalidate(invalidated.eventId());
+        auditEvents.append(committed);
+
+        JsonNode normal = json(mvc.perform(get("/api/v1/tasks/{id}/audit", taskId)
+                        .header("X-Demo-User", "developer-1"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(normal).hasSize(1);
+        assertThat(normal.get(0).path("eventId").asText()).isEqualTo("AUDIT-VALID-V5");
+
+        JsonNode diagnostic = json(mvc.perform(get("/api/v1/tasks/{id}/audit/diagnostic", taskId)
+                        .header("X-Demo-User", "diagnostic-operator"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(diagnostic).hasSize(2);
+        assertThat(diagnostic.get(0).path("event").path("eventId").asText()).isEqualTo("AUDIT-OLD-V5");
+        assertThat(diagnostic.get(0).path("invalidated").asBoolean()).isTrue();
+        assertThat(diagnostic.get(1).path("event").path("eventId").asText()).isEqualTo("AUDIT-VALID-V5");
+        assertThat(diagnostic.get(1).path("invalidated").asBoolean()).isFalse();
     }
 
     @Test

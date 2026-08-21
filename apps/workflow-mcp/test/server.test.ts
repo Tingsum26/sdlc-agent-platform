@@ -31,6 +31,7 @@ describe("workflow MCP", () => {
       "workflow_get_identity",
       "workflow_get_integration_diagnostics",
       "workflow_get_next_internal_validation",
+      "workflow_get_task_audit",
       "workflow_get_task_context",
       "workflow_import_pod_roster",
       "workflow_list_my_tasks",
@@ -60,6 +61,40 @@ describe("workflow MCP", () => {
         "X-Demo-User": "developer-1",
       }),
     }));
+  });
+
+  it("reads the valid-only task audit stream and never the diagnostic stream", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify([{
+      eventId: "AUDIT-VALID-V5",
+      taskId: "TASK-AUDIT-VISIBILITY",
+      taskVersion: 5,
+    }]), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    const server = createWorkflowMcpServer(new WorkflowApiClient("http://127.0.0.1:8080", fetcher));
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const result = await client.callTool({
+      name: "workflow_get_task_audit",
+      arguments: { taskId: "TASK-AUDIT-VISIBILITY" },
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://127.0.0.1:8080/api/v1/tasks/TASK-AUDIT-VISIBILITY/audit",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetcher.mock.calls[0]?.[0]).not.toContain("diagnostic");
+    expect(result.content).toEqual([{ type: "text", text: JSON.stringify([{
+      eventId: "AUDIT-VALID-V5",
+      taskId: "TASK-AUDIT-VISIBILITY",
+      taskVersion: 5,
+    }]) }]);
+    await client.close();
+    await server.close();
   });
 
   it("maps failures safely and redacts secrets", async () => {

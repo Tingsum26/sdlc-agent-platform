@@ -54,6 +54,13 @@ export function registerWorkflowTools(server: McpServer, api: WorkflowApiClient)
     annotations: { readOnlyHint: true },
   }, ({ taskId }, extra) => safe("workflow_get_task_context", (correlationId) => api.getTaskContext(taskId, correlationId, extra.signal)));
 
+  server.registerTool("workflow_get_task_audit", {
+    description: "Read the valid task audit stream. Compensated and invalidated events are excluded by Workflow Service.",
+    inputSchema: z.object({ taskId: z.string().min(1) }),
+    annotations: { readOnlyHint: true },
+  }, ({ taskId }, extra) => safe("workflow_get_task_audit", (correlationId) =>
+    api.getTaskAudit(taskId, correlationId, extra.signal)));
+
   server.registerTool("workflow_claim_task", {
     description: "Claim a task with a bounded lease before local Copilot reasoning begins.",
     inputSchema: z.object({
