@@ -1,0 +1,54 @@
+# Platform BOM — seven-repository split baseline
+# Source snapshot: tag seven-repo-split-baseline = bf48e15 (branch agent/mvp-vertical-slice)
+# SemVer values are initial split-time snapshots; each repo versions independently from here.
+
+schema: 1
+generated: 2026-08-22
+
+repositories:
+  sdlc-agent-platform:
+    url: https://github.com/Tingsum26/sdlc-agent-platform
+    role: overview-docs-bom-handoff
+    version: 0.8.0
+    commit-at-split: bf48e15
+    contains-runtime-code: false   # true until M7 cleanup completes
+  sdlc-workflow-contracts:
+    url: https://github.com/Tingsum26/sdlc-workflow-contracts
+    role: contracts-schemas-clients
+    version: 0.1.0
+    commit-at-split: pending-M1
+    source-path: packages/contracts
+  sdlc-workflow-service:
+    url: https://github.com/Tingsum26/sdlc-workflow-service
+    role: workflow-state-machine-audit-projection
+    version: 0.1.0
+    commit-at-split: pending-M2
+    source-path: apps/workflow-service
+  sdlc-workflow-mcp:
+    url: https://github.com/Tingsum26/sdlc-workflow-mcp
+    role: local-workflow-mcp-gateway
+    version: 0.1.0
+    commit-at-split: pending-M3
+    source-path: apps/workflow-mcp
+  sdlc-copilot-customizations:
+    url: https://github.com/Tingsum26/sdlc-copilot-customizations
+    role: agents-skills-instructions-policies-evals-manifests
+    version: 0.1.0
+    commit-at-split: pending-M4
+    source-path: central/
+  sdlc-vscode-workbench:
+    url: https://github.com/Tingsum26/sdlc-vscode-workbench
+    role: vsix-ui-only-workbench
+    version: 0.1.0
+    commit-at-split: pending-M5
+    source-path: apps/vscode-extension
+  sdlc-reference-demo:
+    url: https://github.com/Tingsum26/sdlc-reference-demo
+    role: fictional-cross-channel-reference-demo
+    version: 0.1.0
+    commit-at-split: pending-M6
+    source-path: apps/web-ui + e2e + packages/ui + fixtures/journeys
+
+compatibility:
+  contracts-lock: contracts.lock.json   # maintained by sdlc-workflow-contracts after M1
+  rule: consumers pin contracts SemVer range; breaking changes require major bump + migration note
