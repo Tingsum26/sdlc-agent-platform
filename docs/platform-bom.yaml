@@ -34,7 +34,7 @@ repositories:
     url: https://github.com/Tingsum26/sdlc-copilot-customizations
     role: agents-skills-instructions-policies-evals-manifests
     version: 0.1.0
-    commit-at-split: a029cd2
+    commit-at-split: 89ddc65
     source-path: central/
   sdlc-vscode-workbench:
     url: https://github.com/Tingsum26/sdlc-vscode-workbench

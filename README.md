@@ -1,4 +1,4 @@
-# Local Copilot SDLC Platform — Overview, BOM & Handoff
+﻿# Local Copilot SDLC Platform — Overview, BOM & Handoff
 
 This repository is the **overview / documentation / BOM / handoff** hub of the
 seven-public-repository Local Copilot SDLC platform. It intentionally contains
