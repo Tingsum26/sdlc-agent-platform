@@ -1,16 +1,16 @@
-ï»¿# PUBLIC DELIVERY MANIFEST
+# PUBLIC DELIVERY MANIFEST
 
-## 1. äº¤ä»˜ä¿¡æ¯
+## 1. ½»¸¶ĞÅÏ¢
 
-- Release/Commitï¼š`agent/mvp-vertical-slice`ï¼ˆä»¥ Draft PR head commit ä¸ºå‡†ï¼‰
-- æ—¥æœŸï¼š2026-08-21ï¼ˆM8 å…¬ç½‘éªŒè¯ï¼‰ï¼›2026-08-22 æ¨é€å‰å…¨çŸ©é˜µå¤éªŒ
-- è®¾è®¡æ–‡æ¡£ç‰ˆæœ¬ï¼šv2
-- å®æ–½è®¡åˆ’ç‰ˆæœ¬ï¼š2026-08-14, reviewed 2026-08-16
-- å…¼å®¹ Schema ç‰ˆæœ¬ï¼š1.0
+- Release/Commit£º`agent/mvp-vertical-slice`£¨ÒÔ Draft PR head commit Îª×¼£©
+- ÈÕÆÚ£º2026-08-21£¨M8 ¹«ÍøÑéÖ¤£©£»2026-08-22 ÍÆËÍÇ°È«¾ØÕó¸´Ñé
+- Éè¼ÆÎÄµµ°æ±¾£ºv2
+- ÊµÊ©¼Æ»®°æ±¾£º2026-08-14, reviewed 2026-08-16
+- ¼æÈİ Schema °æ±¾£º1.0
 
-## 2. å…¬ç½‘å·²å®Œæˆ
+## 2. ¹«ÍøÒÑÍê³É
 
-| Component/Work Item | çŠ¶æ€ | æ–‡ä»¶/åˆ¶å“ | å…¬ç½‘éªŒè¯è¯æ® |
+| Component/Work Item | ×´Ì¬ | ÎÄ¼ş/ÖÆÆ· | ¹«ÍøÑéÖ¤Ö¤¾İ |
 |---|---|---|---|
 | Pre-implementation review | COMPLETE | `docs/reviews` | PROCEED decision; version/threat/constraint review |
 | Workflow state, leases, audit | COMPLETE | `apps/workflow-service` | Java unit/integration tests |
@@ -32,41 +32,41 @@
 | LLM Wiki | NOT_STARTED | extension backlog | deliberately excluded from MVP |
 | Cross-repository Journey manifest/analyzer | PARTIAL | schema, Java analyzer, fixture and HTML | fictional analyzer passes; complete onboarding, graph freshness and impact workflow remain missing |
 | M8 internal TODO registry and CI gate | COMPLETE | `docs/handoff/internal-todo-registry.json`, validator, GitHub Actions workflow | 10 IDs / 19 canonical source marker paths; JSON/Markdown/source parity tests pass |
-| M2â€“M4 aggregate Mongo persistence (`INTERNAL-AUD-001`) | NOT_STARTED | internal-only implementation | public fake runtime remains intentionally in-memory; managed Mongo validation is pending |
+| M2¨CM4 aggregate Mongo persistence (`INTERNAL-AUD-001`) | NOT_STARTED | internal-only implementation | public fake runtime remains intentionally in-memory; managed Mongo validation is pending |
 | Approved seven-repository split | NOT_STARTED | target delivery structure | public run-first monorepo is verified; the seven independent repositories are pending |
 
-çŠ¶æ€åªä½¿ç”¨ï¼š`COMPLETE`ã€`PARTIAL`ã€`NOT_STARTED`ã€`NOT_APPLICABLE`ã€‚
+×´Ì¬Ö»Ê¹ÓÃ£º`COMPLETE`¡¢`PARTIAL`¡¢`NOT_STARTED`¡¢`NOT_APPLICABLE`¡£
 
-### 2.1 å®é™…å¯æ‰§è¡Œæ¸…å•ï¼ˆç”±æºç é‡æ–°æ ¸å¯¹ï¼‰
+### 2.1 Êµ¼Ê¿ÉÖ´ĞĞÇåµ¥£¨ÓÉÔ´ÂëÖØĞÂºË¶Ô£©
 
-- Workflow MCPï¼ˆ23ï¼‰ï¼š`workflow_list_my_tasks`, `workflow_get_task_context`, `workflow_claim_task`, `workflow_submit_artifact`, `workflow_request_approval`, `workflow_complete_task`, `workflow_get_identity`, `workflow_validate_pod_roster`, `workflow_import_pod_roster`, `workflow_get_integration_diagnostics`, `workflow_analyze_journey`, `workflow_get_next_internal_validation`, `workflow_epic_create`, `workflow_epic_activate`, `workflow_epic_attach_ticket`, `workflow_ticket_advance`, `workflow_ticket_add_repo_task`, `advance_repo_task`, `workflow_epic_add_dependency`, `workflow_epic_create_change_request`, `workflow_epic_approve_change_request`, `workflow_task_skip`, `workflow_epic_resume`ã€‚
-- Central Agentsï¼ˆ13ï¼‰ï¼šAccessibility QAã€Android Implementerã€Code Context Analystã€Delivery Coordinatorã€Epic Delivery Analystã€iOS Implementerã€Java Implementerã€Plannerã€PR Reviewerã€Requirement Analystã€Solution Architectã€Test Designerã€Web Implementerã€‚
-- VSIX Viewsï¼ˆ8ï¼‰ï¼šMy Workã€Scrum Masterã€Epicã€Ticketï¼ˆå†…åµŒ Repo Taskï¼‰ã€Identity / Podã€Customization Centerã€MCP Centerã€Diagnosticsã€‚
+- Workflow MCP£¨23£©£º`workflow_list_my_tasks`, `workflow_get_task_context`, `workflow_claim_task`, `workflow_submit_artifact`, `workflow_request_approval`, `workflow_complete_task`, `workflow_get_identity`, `workflow_validate_pod_roster`, `workflow_import_pod_roster`, `workflow_get_integration_diagnostics`, `workflow_analyze_journey`, `workflow_get_next_internal_validation`, `workflow_epic_create`, `workflow_epic_activate`, `workflow_epic_attach_ticket`, `workflow_ticket_advance`, `workflow_ticket_add_repo_task`, `advance_repo_task`, `workflow_epic_add_dependency`, `workflow_epic_create_change_request`, `workflow_epic_approve_change_request`, `workflow_task_skip`, `workflow_epic_resume`¡£
+- Central Agents£¨13£©£ºAccessibility QA¡¢Android Implementer¡¢Code Context Analyst¡¢Delivery Coordinator¡¢Epic Delivery Analyst¡¢iOS Implementer¡¢Java Implementer¡¢Planner¡¢PR Reviewer¡¢Requirement Analyst¡¢Solution Architect¡¢Test Designer¡¢Web Implementer¡£
+- VSIX Views£¨8£©£ºMy Work¡¢Scrum Master¡¢Epic¡¢Ticket£¨ÄÚÇ¶ Repo Task£©¡¢Identity / Pod¡¢Customization Center¡¢MCP Center¡¢Diagnostics¡£
 
-ä¸Šè¿°æ•°é‡è¯´æ˜å½“å‰ä»“åº“çœŸå®å­˜åœ¨ä¸”å¯æµ‹è¯•çš„è¡¨é¢ï¼Œå¹¶ä¸æŠŠç›®æ ‡å¹³å°è¯¯æŠ¥ä¸ºå®Œæˆï¼šLocal MCP å°šæœªè¦†ç›–å…¨éƒ¨ä¸­å¤® Skill çš„ä¸“ç”¨å·¥å…·ï¼ŒVSIX å°šæœªæ¥å…¥å…¬å¸è®¤è¯/å‘å¸ƒç­–ç•¥ï¼Œä¸­å¤®é…ç½®ä¹Ÿå°šæœªå®Œæˆå†…ç½‘æ¨¡å‹ã€æƒé™å’Œäº§å“ç‰ˆæœ¬éªŒè¯ã€‚
+ÉÏÊöÊıÁ¿ËµÃ÷µ±Ç°²Ö¿âÕæÊµ´æÔÚÇÒ¿É²âÊÔµÄ±íÃæ£¬²¢²»°ÑÄ¿±êÆ½Ì¨Îó±¨ÎªÍê³É£ºLocal MCP ÉĞÎ´¸²¸ÇÈ«²¿ÖĞÑë Skill µÄ×¨ÓÃ¹¤¾ß£¬VSIX ÉĞÎ´½ÓÈë¹«Ë¾ÈÏÖ¤/·¢²¼²ßÂÔ£¬ÖĞÑëÅäÖÃÒ²ÉĞÎ´Íê³ÉÄÚÍøÄ£ĞÍ¡¢È¨ÏŞºÍ²úÆ·°æ±¾ÑéÖ¤¡£
 
 > 2026-08-16 re-audit: `COMPLETE` means complete only where the row describes a bounded deliverable. It must not be read as completion of the target platform. The authoritative target and gap inventory are `docs/superpowers/specs/2026-08-16-seven-repository-platform-design.md` and `docs/reviews/2026-08-16-seven-repository-gap-audit.md`.
 
-## 3. å…¬ç½‘å·²æ‰§è¡ŒéªŒè¯
+## 3. ¹«ÍøÒÑÖ´ĞĞÑéÖ¤
 
-ä»¥ä¸‹æ¡ç›®å‡åœ¨ 2026-08-21 M8 éªŒè¯ä¸­é‡æ–°æ‰§è¡Œï¼›å¹¶äº 2026-08-22ï¼ˆæ¨é€å‰ï¼Œè¦†ç›–å…­ä¸ªå®‰å…¨/åŸå­æ€§æ”¶å°¾æäº¤ä¹‹åï¼‰å…¨çŸ©é˜µå¤éªŒã€‚æ—§é‡Œç¨‹ç¢‘ç»Ÿè®¡ä¸å†ä½œä¸ºå½“å‰äº¤ä»˜ç»“è®ºã€‚
+ÒÔÏÂÌõÄ¿¾ùÔÚ 2026-08-21 M8 ÑéÖ¤ÖĞÖØĞÂÖ´ĞĞ£»²¢ÓÚ 2026-08-22£¨ÍÆËÍÇ°£¬¸²¸ÇÁù¸ö°²È«/Ô­×ÓĞÔÊÕÎ²Ìá½»Ö®ºó£©È«¾ØÕó¸´Ñé¡£¾ÉÀï³Ì±®Í³¼Æ²»ÔÙ×÷Îªµ±Ç°½»¸¶½áÂÛ¡£
 
-| å‘½ä»¤/åœºæ™¯ | ç»“æœ | æ•°é‡/æ‘˜è¦ | é™åˆ¶ |
+| ÃüÁî/³¡¾° | ½á¹û | ÊıÁ¿/ÕªÒª | ÏŞÖÆ |
 |---|---|---|---|
 | `./mvnw.cmd -q verify` | PASS | 2026-08-21: 163 tests/41 reports; 2026-08-22: 175 tests in 42 Surefire reports; 0 failures, 0 errors, 0 skipped | Fake runtime and mocked Mongo operations; no real Mongo connectivity |
-| `pnpm install --frozen-lockfile` + `pnpm test` | PASS | 2026-08-22: 123 tests: Contracts 35, Workflow MCP 13, VSIX 61, shared UI 8, Web UI 6ï¼ˆ08-21 ä¸º 119ï¼‰ | deterministic public adapters only |
+| `pnpm install --frozen-lockfile` + `pnpm test` | PASS | 2026-08-22: 123 tests: Contracts 35, Workflow MCP 13, VSIX 61, shared UI 8, Web UI 6£¨08-21 Îª 119£© | deterministic public adapters only |
 | `pnpm build` + `pnpm lint` | PASS | all five runnable workspaces built; no failing lint script | public build only |
 | `pnpm e2e:public-mvp`, `e2e:m1`, `e2e:m2`, `e2e:m3`, `e2e:m4`, `e2e:m7` | PASS | each suite 1/1, launched separately with ports 8080/4173 clean; public-mvp had one transient batched-run failure, standalone rerun green (flake note in M8 doc) | fictional loopback demo |
 | `powershell -File scripts/tests/build-bundle.test.ps1` + `bundle-lifecycle.test.ps1` | PASS | central bundle build and install/rollback lifecycle | no company release trust |
 | `powershell -File scripts/tests/stop-demo.test.ps1` | PASS | Windows PID-reuse, process-tree, and discovery-failure regression cases | Windows PowerShell process behavior |
-| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 2026-08-22: 7-file 18.78-KB `.vsix`ï¼ˆ08-21 ä¸º 6-file 18.01-KBï¼‰ | not signed/published internally |
+| `pnpm --filter sdlc-workbench package` | PASS | typecheck/build/package; 2026-08-22: 7-file 18.78-KB `.vsix`£¨08-21 Îª 6-file 18.01-KB£© | not signed/published internally |
 | `pnpm audit --audit-level low` | PASS | no known vulnerabilities | snapshot of registry advisory data at verification time |
-| start â†’ health â†’ stop â†’ port release | PASS | Workflow `UP`, Web `200`, ports 8080/4173 released | Fake profile only |
+| start ¡ú health ¡ú stop ¡ú port release | PASS | Workflow `UP`, Web `200`, ports 8080/4173 released | Fake profile only |
 | TODO registry + static scans | PASS | registry tests 11/11; 10 IDs/19 canonical paths; marker scan 19; credential scan 0 | exact commands and exclusions in `docs/verification/m8-milestone-2026-08-20.md` |
 
-## 4. Mock ä¸å‡è®¾
+## 4. Mock Óë¼ÙÉè
 
-| å¤–éƒ¨ç³»ç»Ÿ | å…¬ç½‘ Mock è¡Œä¸º | å‡è®¾ | å†…ç½‘å¿…é¡»éªŒè¯ |
+| Íâ²¿ÏµÍ³ | ¹«Íø Mock ĞĞÎª | ¼ÙÉè | ÄÚÍø±ØĞëÑéÖ¤ |
 |---|---|---|---|
 | GitHub Enterprise Server | fictional SCM event + signed webhook | API/webhook available | auth, versions, permissions, replay, checks |
 | Jira | adapter port and pending projection status | API token/delegation available | comments, attachments, limits, sanitization |
@@ -77,25 +77,25 @@
 | Pod import Workflow MCP | central Skill/templates/evals | admin roster source available | employee mapping, dates, duplicates, Teambook future |
 | Copilot/VS Code | static customizations and local MCP | Agent/Skill/MCP features enabled | policy, actual models, install/discovery, SM path |
 
-## 5. å†…ç½‘ Agent å¿…é¡»å®Œæˆ
+## 5. ÄÚÍø Agent ±ØĞëÍê³É
 
-| Internal Work Item | å‰ç½®æ¡ä»¶ | éªŒæ”¶æ ‡å‡† | æŠ¥å‘Šè¯æ®è¦æ±‚ |
+| Internal Work Item | Ç°ÖÃÌõ¼ş | ÑéÊÕ±ê×¼ | ±¨¸æÖ¤¾İÒªÇó |
 |---|---|---|---|
 | Enterprise identity and audit mapping | GHES/SSO decision | developer and non-GitHub SM paths work | role-only result + evidence IDs |
 | Mongo connection validation | managed Mongo config | restart/resume, optimistic lock, indices, backup tested | counts, latency bands, restore result |
 | Jira/Confluence/GHES/Jenkins/Splunk adapter connection | delegated credentials | context, comments, PR/check/build/search reads work | abstract contract deviation table |
 | Signed bundle GHES release | release policy/certificate | hash/signature, compatibility, rollback | install/rollback scenario IDs |
-| Account Opening Journey pilot | approved repo/Journey list | pageâ†’API/payload/header/native compatibility map | coverage summary, no repo/API names publicly |
+| Account Opening Journey pilot | approved repo/Journey list | page¡úAPI/payload/header/native compatibility map | coverage summary, no repo/API names publicly |
 | Splunk operations | approved source types | correlation search, alerts, redacted support bundle | event counts and evidence IDs |
 | Security/accessibility/QA | internal environments | threat, WCAG, manual E2E, browser/native evidence | completed internal report sections |
 
-## 6. ä¸å¯ç”±å…¬ç½‘éªŒè¯
+## 6. ²»¿ÉÓÉ¹«ÍøÑéÖ¤
 
-çœŸå®å†…ç½‘è®¤è¯/RBAC/ç½‘ç»œã€GHES/Jira/Confluence/Jenkins versionsã€Copilot enterprise policy/modelsã€çœŸå® repository/Journey/API relationshipsã€Mongo performance/backup/security/retentionã€Jira attachment policyã€Splunk routingã€company security/license/production approvalsã€‚
+ÕæÊµÄÚÍøÈÏÖ¤/RBAC/ÍøÂç¡¢GHES/Jira/Confluence/Jenkins versions¡¢Copilot enterprise policy/models¡¢ÕæÊµ repository/Journey/API relationships¡¢Mongo performance/backup/security/retention¡¢Jira attachment policy¡¢Splunk routing¡¢company security/license/production approvals¡£
 
-## 7. å·²çŸ¥é™åˆ¶ä¸é£é™©
+## 7. ÒÑÖªÏŞÖÆÓë·çÏÕ
 
-| ID | é™åˆ¶/é£é™© | å½±å“ | å…¬ç½‘ç¼“è§£ | å†…ç½‘åŠ¨ä½œ |
+| ID | ÏŞÖÆ/·çÏÕ | Ó°Ïì | ¹«Íø»º½â | ÄÚÍø¶¯×÷ |
 |---|---|---|---|---|
 | R-01 | Fake runtime resets on restart | public state is non-durable | deterministic E2E | implement Mongo ports |
 | R-02 | MVP demo header is not enterprise auth | no production identity | loopback enforcement | GHES + employee binding/SSO |
@@ -106,24 +106,24 @@
 | R-07 | LLM Wiki excluded | no synthesized wiki memory | source-first onboarding + classified knowledge plan | separately approve provenance/ACL experiment |
 | R-08 | `SIMULATED_PASS` provenance is session-scoped | no real QA/release/company proof or cross-restart provenance | visible simulated classification and fake-runtime tests | obtain internal evidence IDs from actual systems and retain them in managed Mongo |
 
-## 8. å†…ç½‘æ‰§è¡Œå…¥å£
+## 8. ÄÚÍøÖ´ĞĞÈë¿Ú
 
-- å®‰è£…æ–‡æ¡£ï¼š`README.md`, `docs/demo/public-mvp-walkthrough.md`
-- é…ç½® Schemaï¼š`packages/contracts/schemas`, `policies`, `mcp/catalog.json`
-- Mongo ç¤ºä¾‹ï¼š`apps/workflow-service/src/main/resources/application-mongodb.example.yml`
-- éªŒè¯å‘½ä»¤ï¼šREADME **Verify** section
-- å›æ»šï¼šuninstall VSIX; use **Roll Back Customization Bundle**; restore previous internal service release
-- ç§»äº¤ï¼š`docs/handoff/INTERNAL_AGENT_HANDOFF.md`
-- å®ŒæˆæŠ¥å‘Šï¼š`docs/handoff/internal-agent-completion-report-template.md`
+- °²×°ÎÄµµ£º`README.md`, `docs/demo/public-mvp-walkthrough.md`
+- ÅäÖÃ Schema£º`packages/contracts/schemas`, `policies`, `mcp/catalog.json`
+- Mongo Ê¾Àı£º`apps/workflow-service/src/main/resources/application-mongodb.example.yml`
+- ÑéÖ¤ÃüÁî£ºREADME **Verify** section
+- »Ø¹ö£ºuninstall VSIX; use **Roll Back Customization Bundle**; restore previous internal service release
+- ÒÆ½»£º`docs/handoff/INTERNAL_AGENT_HANDOFF.md`
+- Íê³É±¨¸æ£º`docs/handoff/internal-agent-completion-report-template.md`
 
-## 9. æ•°æ®è¾¹ç•Œå£°æ˜
+## 9. Êı¾İ±ß½çÉùÃ÷
 
-- [x] ä¸å«å…¬å¸ä»£ç ã€åŸŸåã€Tokenã€è¯ä¹¦æˆ–ä¸šåŠ¡æ•°æ®ã€‚
-- [x] ç¤ºä¾‹åªä½¿ç”¨è™šæ„åç§°ä¸æ•°æ®ã€‚
-- [x] æ—¥å¿—ã€é”™è¯¯å’Œæµ‹è¯•åˆ¶å“ä½¿ç”¨è„±æ•/ç»“æ„åŒ–å¥‘çº¦ã€‚
-- [x] ä¾èµ–ç‰ˆæœ¬è®°å½•åœ¨ Maven/npm lockfilesï¼›å†…ç½‘ä»é¡»å®Œæˆè®¸å¯è¯å®¡æ‰¹ã€‚
+- [x] ²»º¬¹«Ë¾´úÂë¡¢ÓòÃû¡¢Token¡¢Ö¤Êé»òÒµÎñÊı¾İ¡£
+- [x] Ê¾ÀıÖ»Ê¹ÓÃĞé¹¹Ãû³ÆÓëÊı¾İ¡£
+- [x] ÈÕÖ¾¡¢´íÎóºÍ²âÊÔÖÆÆ·Ê¹ÓÃÍÑÃô/½á¹¹»¯ÆõÔ¼¡£
+- [x] ÒÀÀµ°æ±¾¼ÇÂ¼ÔÚ Maven/npm lockfiles£»ÄÚÍøÈÔĞëÍê³ÉĞí¿ÉÖ¤ÉóÅú¡£
 
-## 5. ä¸ƒä»“ç»ˆæ€ï¼ˆ2026-08-22 M0â€“M7 å®Œæˆï¼‰
+## 5. Æß²ÖÖÕÌ¬£¨2026-08-22 M0¨CM7 Íê³É£©
 
-è¿è¡Œæ—¶ä»£ç å·²æŒ‰ `seven-repo-split-baseline`ï¼ˆbf48e15ï¼‰æ‹†åˆ†è‡³å…­ä¸ªç‹¬ç«‹å…¬å¼€ä»“åº“ï¼Œå…¨éƒ¨ç‹¬ç«‹éªŒè¯åæ¨é€ï¼š
-contracts 38457cf Â· service f69352aï¼ˆ123 å•æµ‹+57 ITï¼‰Â· mcp f0bfa80ï¼ˆ13ï¼‰Â· customizations a029cd2ï¼ˆ20 å®ˆæŠ¤æµ‹è¯•ï¼‰Â· vscode-workbench 9f40c53ï¼ˆ61+VSIXï¼‰Â· reference-demo 68862aaï¼ˆ14+buildï¼‰ã€‚æœ¬ä»“ä¿ç•™ overview/docs/BOM/handoffï¼Œæ— è¿è¡Œæ—¶ä»£ç ï¼›å†…éƒ¨ TODO registry å·²éšæ ‡è®°è¿ç§»ï¼ˆè§ docs/handoff/internal-todo-relocation.mdï¼‰ã€‚PARTIAL ç¼ºå£ï¼ˆ13 Agents å·²è¡¥é½ @89ddc65ï¼›å‰©ä½™ï¼šå®Œæ•´ MCP ç›®å½•ã€8 è§†å›¾æ¨¡å‹ç­‰ï¼‰ä¸ INTERNAL-AUD-001 ä¿æŒä¸ºç™»è®°åœ¨æ¡ˆçš„åç»­å·¥ä½œã€‚
+ÔËĞĞÊ±´úÂëÒÑ°´ `seven-repo-split-baseline`£¨bf48e15£©²ğ·ÖÖÁÁù¸ö¶ÀÁ¢¹«¿ª²Ö¿â£¬È«²¿¶ÀÁ¢ÑéÖ¤ºóÍÆËÍ£º
+contracts 38457cf£¨15£©¡¤ service 0ea8bf3£¨158 µ¥²â+65 IT£¬Journey È«Õ»+persistence seam£©¡¤ mcp 91e8fb1£¨42 ¹¤¾ß£¬55 ²âÊÔ£©¡¤ customizations 89ddc65£¨13 Agents Æë±¸£¬20 ÊØ»¤²âÊÔ£©¡¤ vscode-workbench 18c9edc£¨75 ²âÊÔ£¬8 ÊÓÍ¼¶¯×÷»¯£©¡¤ reference-demo 86cfc6d£¨14+build£¬e2e:m4 Áù³¡¾°£©¡£±¾²Ö±£Áô overview/docs/BOM/handoff£¬ÎŞÔËĞĞÊ±´úÂë£»ÄÚ²¿ TODO registry ÒÑËæ±ê¼ÇÇ¨ÒÆ£¨¼û docs/handoff/internal-todo-relocation.md£©¡£PARTIAL È±¿Ú£¨13 Agents ÒÑ²¹Æë @89ddc65£»Ê£Óà£ºÍêÕû MCP Ä¿Â¼¡¢8 ÊÓÍ¼Ä£ĞÍµÈ£©Óë INTERNAL-AUD-001 ±£³ÖÎªµÇ¼ÇÔÚ°¸µÄºóĞø¹¤×÷¡£

@@ -1,4 +1,4 @@
-ï»¿# Local Copilot SDLC Platform â€” Overview, BOM & Handoff
+# Local Copilot SDLC Platform ¡ª Overview, BOM & Handoff
 
 This repository is the **overview / documentation / BOM / handoff** hub of the
 seven-public-repository Local Copilot SDLC platform. It intentionally contains
@@ -12,11 +12,11 @@ extracted from this repo at baseline tag `seven-repo-split-baseline`
 |---|---|---|---|
 | [`sdlc-agent-platform`](https://github.com/Tingsum26/sdlc-agent-platform) (this repo) | overview, docs, BOM, handoff | 0.8.0 | `bf48e15` |
 | [`sdlc-workflow-contracts`](https://github.com/Tingsum26/sdlc-workflow-contracts) | versioned JSON Schemas + TypeScript contracts, `contracts.lock.json` | 0.1.0 | `38457cf` |
-| [`sdlc-workflow-service`](https://github.com/Tingsum26/sdlc-workflow-service) | Spring Boot workflow state machine, audit, freshness, Jira projection; no model client, no container dependency | 0.1.0 | `f69352a` |
-| [`sdlc-workflow-mcp`](https://github.com/Tingsum26/sdlc-workflow-mcp) | stdio Local Workflow MCP gateway (deterministic tools, safe errors, correlation IDs) | 0.1.0 | `f0bfa80` |
+| [`sdlc-workflow-service`](https://github.com/Tingsum26/sdlc-workflow-service) | Spring Boot workflow state machine, audit, freshness, Jira projection; no model client, no container dependency | 0.2.0 | `0ea8bf3` |
+| [`sdlc-workflow-mcp`](https://github.com/Tingsum26/sdlc-workflow-mcp) | stdio Local Workflow MCP gateway (deterministic tools, safe errors, correlation IDs) | 0.2.0 | `91e8fb1` |
 | [`sdlc-copilot-customizations`](https://github.com/Tingsum26/sdlc-copilot-customizations) | central Agents/Skills/Instructions/Policies/Evals/Templates/Hooks/manifests + guardrail tests | 0.1.0 | `a029cd2` |
-| [`sdlc-vscode-workbench`](https://github.com/Tingsum26/sdlc-vscode-workbench) | UI-only VSIX workbench (no model API invoked), bundle install/rollback | 0.1.0 | `9f40c53` |
-| [`sdlc-reference-demo`](https://github.com/Tingsum26/sdlc-reference-demo) | fictional cross-channel reference demo (Web UI + shared UI + Playwright E2E) | 0.1.0 | `68862aa` |
+| [`sdlc-vscode-workbench`](https://github.com/Tingsum26/sdlc-vscode-workbench) | UI-only VSIX workbench (no model API invoked), bundle install/rollback | 0.2.0 | `18c9edc` |
+| [`sdlc-reference-demo`](https://github.com/Tingsum26/sdlc-reference-demo) | fictional cross-channel reference demo (Web UI + shared UI + Playwright E2E) | 0.2.0 | `86cfc6d` |
 
 Compatibility rule: consumers pin `@sdlc` contracts by SemVer range;
 breaking changes require a major bump and a migration note
@@ -31,7 +31,7 @@ registry 10 IDs / 19 markers, credential scan 0 hits), then re-verified
 standalone:
 
 - contracts: vitest green (15 tests) + `contracts.lock.json`
-- service: `./mvnw verify` green â€” 123 unit + 57 failsafe IT, 0 failures
+- service: `./mvnw verify` green ¡ª 123 unit + 57 failsafe IT, 0 failures
 - mcp: vitest green (13 tests)
 - copilot-customizations: guardrail ports green (20 tests)
 - vscode-workbench: vitest green (61 tests) + packaged VSIX
@@ -60,12 +60,12 @@ see `docs/handoff/internal-todo-relocation.md`.
   `docs/handoff/public-to-internal-handoff.md`,
   `docs/handoff/internal-agent-completion-report-template.md`,
   `docs/handoff/public-delivery-manifest-template.md`
-- Verification evidence M1â€“M8: `docs/verification/`
+- Verification evidence M1¨CM8: `docs/verification/`
 
 ## Known open items
 
 - PARTIAL vs target design: 13-Agent catalog (3 exist), full MCP tool catalog,
-  eight distinct VSIX view models, complete Journey onboarding â€” tracked in the
+  eight distinct VSIX view models, complete Journey onboarding ¡ª tracked in the
   gap audit and per-repo READMEs as post-split work.
 - `INTERNAL-AUD-001`: connect aggregate persistence to managed company MongoDB
   during intranet adoption (intranet-only work).
