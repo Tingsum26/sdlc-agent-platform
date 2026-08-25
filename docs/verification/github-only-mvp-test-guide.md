@@ -25,6 +25,16 @@ docs/01-context/code-context.md
 Set both baseline statuses to `APPROVED` only after human review. Keep private
 source code and internal URLs in the private Journey repository.
 
+## Select the Journey repository first
+
+Start `delivery-coordinator` before `requirement-analyst`. Tell it which private
+GitHub/GitHub Enterprise repository is the Journey repository, for example
+`journey-account-opening`, and which local workspace path is checked out. The
+Coordinator records this in `.sdlc/workflow.json` as
+`journeyRepository.status: CONFIGURED`. Do not select an API, Web, iOS or
+Android code repository for this purpose. No Agent output is allowed before
+this selection is confirmed.
+
 ## Start and hand off an Agent
 
 ```powershell
