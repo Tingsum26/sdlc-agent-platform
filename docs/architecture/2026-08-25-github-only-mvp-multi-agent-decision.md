@@ -35,6 +35,17 @@ state. The VSIX is a UI for the checked-out workspace, reports, PR/check
 status and next-step prompts; it does not invoke a model or become a workflow
 server.
 
+An **Agent** is a role with ownership, boundaries, input/output and stop
+conditions. A **Skill** is a reusable procedure. Their relationship is
+many-to-many: the central `agent-skill-routing.json` declares required and
+allowed Skills for each Agent. The Journey Coordinator is the default main
+Agent: it creates/resumes the Journey, checks gates and routes to specialists;
+it does not replace the requirement, architecture, implementation, test or
+review Agents. A human still starts each Agent in Copilot. The artifact records
+`appliedSkills` and the Context Receipt records the stage route; the PR check
+verifies declared Skill use, while human review evaluates whether the method
+was applied correctly.
+
 ## Context handoff and enforcement
 
 Markdown alone is not a safe multi-Agent protocol. The MVP requires a
@@ -60,8 +71,8 @@ The scripts reject missing, unapproved or stale upstream inputs. A stage may
 be skipped only as `SKIPPED_WITH_EVIDENCE`, recording actor, reason and
 accepted risk. GitHub cannot prove that a language model semantically
 understood a document; the receipt proves the much narrower, auditable fact
-that the required version-pinned inputs were supplied. Human PR review remains
-the control for semantic quality.
+that the required version-pinned inputs and required Skill route were supplied.
+Human PR review remains the control for semantic quality.
 
 ## Why this is multi-Agent collaboration rather than multiple chats
 
