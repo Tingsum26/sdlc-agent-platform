@@ -57,6 +57,27 @@ Agent in Copilot. The artifact records
 verifies declared Skill use, while human review evaluates whether the method
 was applied correctly.
 
+## Sequential gates and shared Markdown context
+
+The MVP has a hard, deterministic hand-off gate between stages. A specialist
+Agent writes only its declared Markdown output and leaves that artifact in
+`PENDING_APPROVAL`. The human reviews the commit/PR and either approves it or
+records `SKIPPED_WITH_EVIDENCE` with an actor, reason and accepted risk. The
+main `delivery-coordinator` then invokes `advance-stage`, which checks the
+output status and advances only to the next item in `stageOrder`. It does not
+accept a user-supplied target stage, so Requirements cannot jump directly to
+Plan. If the output is missing, stale, unapproved or blocked, the gate stops
+and the next Agent is not started.
+
+The Coordinator, every specialist Agent and the VSIX read the same committed
+`.sdlc/workflow.json` and Journey Markdown. They therefore show the same
+`currentStage`, gate state and `nextAgent`; this is a file-based protocol, not
+shared Copilot chat memory. All committed Markdown is discoverable shared
+context. A Context Receipt makes only the stage-relevant upstream documents
+mandatory, with exact hashes, to avoid forcing every Agent to load an
+oversized or stale document set. The output remains available to all later
+Agents and people through the Journey branch.
+
 ## Context handoff and enforcement
 
 Markdown alone is not a safe multi-Agent protocol. The MVP requires a

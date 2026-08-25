@@ -60,6 +60,23 @@ git push -u origin journey/AO-123-open-account
 The PR check rejects missing, stale or incomplete receipts and missing required
 Skills. A human must approve the artifact before its status becomes `APPROVED`.
 
+## Exercise the forced hand-off gate
+
+The specialist does not start the next role after writing its Markdown. Set
+the output artifact status to `PENDING_APPROVAL` and verify that
+`advance-stage` refuses to proceed. After a human reviews the PR, set the
+artifact status to `APPROVED` (or use `SKIPPED_WITH_EVIDENCE` with actor,
+reason, evidence and risk), commit it, and ask `delivery-coordinator` to
+resume. The Coordinator invokes the internal `advance-stage` Skill and then
+prepares the next role's Context Receipt. The user does not run the Node
+command or choose an arbitrary target stage.
+
+The VSIX `My Work`, `Scrum Master View` and Journey views should now show the
+same gate state and next Agent because they read the committed
+`.sdlc/workflow.json`. All Agent outputs remain shared Markdown in the Journey
+repository; the Context Receipt is the mandatory, hash-pinned subset for the
+next stage, not a second chat-memory channel.
+
 ## Resume and test the VSIX
 
 After a restart, open the Journey repository and select `delivery-coordinator`
