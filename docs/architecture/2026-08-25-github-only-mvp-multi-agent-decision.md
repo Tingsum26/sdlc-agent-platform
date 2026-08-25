@@ -19,6 +19,12 @@ Receipts, approvals and links to code-repository PRs. API/Web/iOS/Android code
 continues to live in its own repository and uses its own ticket-based code
 branch. A channel name such as `api` alone is never the shared Journey branch.
 
+Context preparation is an internal prerequisite Skill, not a user command.
+When the user starts the Coordinator or a specialist Agent, that Agent (or the
+Coordinator on behalf of the next specialist) automatically creates or
+validates the Context Receipt. The user is interrupted only when required
+evidence is absent or unapproved.
+
 The three retained workflows are protocols over that repository:
 
 1. **Journey / Epic:** intake, repository context, cross-channel contract,

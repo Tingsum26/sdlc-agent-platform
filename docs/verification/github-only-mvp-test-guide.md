@@ -29,13 +29,14 @@ source code and internal URLs in the private Journey repository.
 
 ```powershell
 git switch -c journey/AO-123-open-account
-node scripts/prepare-journey-context.mjs --stage REQUIREMENTS --role requirement-analyst
 ```
 
 In Copilot Chat select `requirement-analyst` and ask it to follow the GitHub
-Journey collaboration instruction, read the generated Context Receipt and all
+Journey collaboration instruction. It must automatically run the internal
+`prepare-stage-context` Skill, read the generated Context Receipt and all
 listed inputs, use `start-ticket` and `grill-requirement`, and write only the
-requirement artifact with `appliedSkills` and the receipt hash.
+requirement artifact with `appliedSkills` and the receipt hash. The user does
+not run the Node command.
 
 Validate before opening the PR:
 
