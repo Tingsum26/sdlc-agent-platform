@@ -72,18 +72,29 @@ approval, invokes the internal `advance-stage` Skill and prepares the next
 role's Context Receipt. The user does not edit JSON, run the Node command or
 choose an arbitrary target stage.
 
-The VSIX `My Work`, `Scrum Master View` and Journey views should now show the
-same gate state and next Agent because they read the committed
-`.sdlc/workflow.json`. All Agent outputs remain shared Markdown in the Journey
-repository; the Context Receipt is the mandatory, hash-pinned subset for the
-next stage, not a second chat-memory channel.
+Create or update the one Journey PR after the validated artifact commit. Its
+description must link the report, show the current `PENDING_APPROVAL` decision,
+and recommend `delivery-coordinator` plus `/resume-workflow AO-123`. Its
+marked Agent report comment must show the same handoff and inline the report
+when it fits the configured comment size. The GitHub PR is the required shared
+human UI. All Agent outputs remain shared Markdown in the Journey repository;
+the Context Receipt is the mandatory, hash-pinned subset for the next stage,
+not a second chat-memory channel.
 
-## Resume and test the VSIX
+## Resume and test the GitHub PR workbench
 
 After a restart, open the Journey repository and select `delivery-coordinator`
 in Copilot Chat, then run `/resume-workflow AO-123`. It reads GitHub files and
-the latest PR instead of old chat history, chooses the next specialist Agent,
-and never performs AI work automatically.
+the latest PR instead of old chat history, reports the human gate and suggested
+next specialist Agent, and never performs AI work automatically.
+
+Confirm in GitHub that a reviewer without VSIX can open the linked Markdown
+report, inspect its commit diff, read the marked report comment and see the
+same `delivery-coordinator` / `/resume-workflow AO-123` handoff. After human
+approval, ask the Coordinator to resume; it alone advances the declared order
+and routes the next specialist.
+
+## Optional VSIX companion
 
 Build the GitHub-only VSIX:
 
@@ -110,5 +121,6 @@ instead of failing or rendering arbitrary files. Mermaid is intentionally
 shown as source text in this MVP.
 
 The MVP proof is: a second Agent can use the same branch, a changed upstream
-document makes the receipt stale and fails the PR check, and work resumes after
-closing VS Code without MongoDB or Workflow Service.
+document makes the receipt stale and fails the PR check, reports are reviewable
+directly in GitHub without VSIX, and work resumes after closing VS Code without
+MongoDB or Workflow Service.

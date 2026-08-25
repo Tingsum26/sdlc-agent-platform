@@ -41,29 +41,33 @@ The three retained workflows are protocols over that repository:
 Only a developer manually starting GitHub Copilot Agent in VS Code performs AI
 reasoning. Local MCPs are optional read/write connectors for Jira, Confluence,
 GitHub Enterprise, Figma and code-graph tools; they do not persist workflow
-state. The VSIX is a UI for the checked-out workspace, reports, PR/check
-status and next-step prompts; it does not invoke a model or become a workflow
-server.
+state. The Journey GitHub PR is the required shared human UI: its description
+indexes committed reports, and each specialist upserts a marked report comment
+with the immediate approval decision, next Agent after approval and
+`/resume-workflow <workflowId>`. The VSIX is an optional UI for the checked-out
+workspace, reports, PR/check status and next-step prompts; it does not invoke a
+model or become a workflow server.
 
-### VSIX report renderer boundary
+### GitHub-first report workbench and optional VSIX
 
-The VSIX is also the local human-facing **Agent Report Workbench** for
-presentation-heavy outputs. Agents remain responsible for producing canonical
-Markdown artifacts in the Journey repository; each artifact carries the
-central report front matter (`reportType`, `stage`, `role`, `status`, revision,
-evidence level and Context Receipt hash). The VSIX renders that artifact into a
-consistent HTML view with metadata, tables, code and Mermaid source blocks,
-including reports such as requirements, page/API surface maps, design,
-testing and review.
+The Journey GitHub PR is the shared **Agent Report Workbench** for MVP. Agents
+produce canonical Markdown artifacts in the Journey repository; each carries
+the central report front matter (`reportType`, `stage`, `role`, `status`,
+revision, evidence level and Context Receipt hash). After deterministic
+validation, the Agent commits/pushes its artifact to the unprotected Journey
+branch, creates or updates the one Journey PR, and upserts a report comment.
+GitHub renders the committed Markdown, tables, native code diffs and, when the
+enterprise version/configuration supports it, Mermaid diagrams. The committed
+file remains canonical; the PR description and comment are review projections.
 
-An open report watches the artifact and `.sdlc/workflow.json`, so a Copilot
-commit, pull or Coordinator status change is reflected without reopening the
-view. This is a presentation and review boundary only: the VSIX does not call
-an LLM, decide whether content is correct, approve an artifact, advance a
-stage, or replace the GitHub PR gate. The renderer escapes untrusted Markdown,
-restricts links, prevents artifact path escape and keeps Mermaid as safe source
-text in MVP; graphical diagram rendering can be added later as a trusted local
-enhancement.
+The VSIX remains the optional local **Agent Report Workbench** companion. Its
+eight views, report rendering, next-Agent guidance and suggested command are
+retained. An open local report watches the artifact and `.sdlc/workflow.json`,
+so a Copilot commit, pull or Coordinator status change is reflected without
+reopening the view. Neither GitHub presentation nor VSIX calls an LLM, decides
+whether content is correct, approves an artifact, advances a stage, or replaces
+the GitHub PR gate. VSIX escapes untrusted Markdown, restricts links and keeps
+Mermaid as safe source text in MVP.
 
 An **Agent** is a role with ownership, boundaries, input/output and stop
 conditions. A **Skill** is a reusable procedure. Their relationship is
@@ -89,14 +93,14 @@ accept a user-supplied target stage, so Requirements cannot jump directly to
 Plan. If the output is missing, stale, unapproved or blocked, the gate stops
 and the next Agent is not started.
 
-The Coordinator, every specialist Agent and the VSIX read the same committed
-`.sdlc/workflow.json` and Journey Markdown. They therefore show the same
-`currentStage`, gate state and `nextAgent`; this is a file-based protocol, not
-shared Copilot chat memory. All committed Markdown is discoverable shared
-context. A Context Receipt makes only the stage-relevant upstream documents
-mandatory, with exact hashes, to avoid forcing every Agent to load an
-oversized or stale document set. The output remains available to all later
-Agents and people through the Journey branch.
+The Coordinator, every specialist Agent, the Journey PR and optional VSIX read
+the same committed `.sdlc/workflow.json` and Journey Markdown. They therefore
+show the same `currentStage`, gate state and `nextAgent`; this is a file-based
+protocol, not shared Copilot chat memory. All committed Markdown is
+discoverable shared context. A Context Receipt makes only the stage-relevant
+upstream documents mandatory, with exact hashes, to avoid forcing every Agent
+to load an oversized or stale document set. The output remains available to all
+later Agents and people through the Journey branch and PR.
 
 ## Context handoff and enforcement
 
@@ -163,9 +167,10 @@ become material for team scale.
 - A PR check rejects a missing or stale receipt.
 - A user can close VS Code, clone/pull the Journey branch elsewhere, run
   `resume-workflow`, and reconstruct the next action without chat history.
-- The VSIX clearly shows the checked-out branch, last commit, current stage,
-  receipt freshness, linked PRs and `LIVE`/`STALE` status.
-- Clicking an artifact in My Work, Scrum Master, Epic or Ticket views opens a
-  local HTML Agent Report with its type, stage, role, evidence and receipt
-  metadata, and the open report refreshes after a file pull/edit or workflow
-  status update.
+- Every verified output is visible in the active Journey PR through a canonical
+  Markdown link and marked report comment containing the current approval gate,
+  next Agent and `/resume-workflow` command.
+- The optional VSIX clearly shows the checked-out branch, last commit, current
+  stage, receipt freshness, linked PRs and `LIVE`/`STALE` status. Clicking an
+  artifact opens a local HTML report that refreshes after a file pull/edit or
+  workflow status update.
