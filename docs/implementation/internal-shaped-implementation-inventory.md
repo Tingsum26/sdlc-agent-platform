@@ -8,7 +8,7 @@ This inventory describes what the public branch actually implements. `SIMULATED_
 |---|---|---|
 | Workflow Service | state, audit, artifacts, identity binding, Pod rosters, assignment, adapters, Journey analysis, HTML | no model client |
 | Workflow MCP | 12 bounded tools, validation, confirmation, cancellation, safe errors | invokes Workflow Service only |
-| VSIX | nine views, polling/manual refresh, readiness evidence, reports, approvals, MCP onboarding, diagnostics | no Language Model API |
+| VSIX | nine views, polling/manual refresh, readiness evidence, structured live Agent Report Workbench, approvals, MCP onboarding, diagnostics | no Language Model API |
 | Web UI | fictional demonstrator and human-readable report preview | no model client |
 | Central customization | Agents, Skills, Instructions, policies, schemas, evals and bundle manifest | Copilot is started by a person |
 
@@ -48,7 +48,7 @@ The existing six task tools are joined by `workflow_get_identity`, `workflow_val
 
 ## UI implementation
 
-VSIX Diagnostics displays identity, provider, evidence text, source, observation time and next internal action. It polls through Workflow Service with the same foreground/background rules as task state and supports manual/focus refresh. Journey reports are selected from a local JSON manifest and opened in a script-disabled panel.
+VSIX Diagnostics displays identity, provider, evidence text, source, observation time and next internal action. It polls through Workflow Service with the same foreground/background rules as task state and supports manual/focus refresh. Journey reports are selected from the checked-out Journey repository and opened as escaped HTML. In GitHub-only MVP mode, an artifact panel watches the report and `.sdlc/workflow.json` so a Copilot commit, pull or status update is visible without reopening the panel. The VSIX is still presentation-only: it does not call a model, approve content or advance a stage.
 
 The public Web UI contains an explicitly fictional `EPIC-DEMO-1` Account Opening scenario. Its semantic table has text plus icon status, keyboard focus, responsive overflow, 44 px narrow-screen controls, reduced-motion handling and a sandboxed report iframe.
 
