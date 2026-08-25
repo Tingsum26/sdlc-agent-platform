@@ -99,6 +99,16 @@ show stage, artifacts, linked repositories, receipt health and the Coordinator
 command. MCP Center reports that Workflow MCP is not required. Changes under
 `.sdlc/` and `docs/` refresh the views.
 
+Click an artifact row (for example the requirement contract or a surface map)
+to open the local HTML Agent Report. Confirm that the report header shows
+`reportType`, stage, role, status, revision, evidence and Context Receipt
+metadata, and that Markdown tables and code are readable. With the panel open,
+edit the artifact or run `git pull`; the report should refresh automatically.
+Change the committed workflow status and verify the status badge changes. If
+the artifact is deleted, the panel must show a safe missing-artifact warning
+instead of failing or rendering arbitrary files. Mermaid is intentionally
+shown as source text in this MVP.
+
 The MVP proof is: a second Agent can use the same branch, a changed upstream
 document makes the receipt stale and fails the PR check, and work resumes after
 closing VS Code without MongoDB or Workflow Service.

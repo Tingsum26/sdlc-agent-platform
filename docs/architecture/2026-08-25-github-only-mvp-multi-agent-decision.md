@@ -45,6 +45,26 @@ state. The VSIX is a UI for the checked-out workspace, reports, PR/check
 status and next-step prompts; it does not invoke a model or become a workflow
 server.
 
+### VSIX report renderer boundary
+
+The VSIX is also the local human-facing **Agent Report Workbench** for
+presentation-heavy outputs. Agents remain responsible for producing canonical
+Markdown artifacts in the Journey repository; each artifact carries the
+central report front matter (`reportType`, `stage`, `role`, `status`, revision,
+evidence level and Context Receipt hash). The VSIX renders that artifact into a
+consistent HTML view with metadata, tables, code and Mermaid source blocks,
+including reports such as requirements, page/API surface maps, design,
+testing and review.
+
+An open report watches the artifact and `.sdlc/workflow.json`, so a Copilot
+commit, pull or Coordinator status change is reflected without reopening the
+view. This is a presentation and review boundary only: the VSIX does not call
+an LLM, decide whether content is correct, approve an artifact, advance a
+stage, or replace the GitHub PR gate. The renderer escapes untrusted Markdown,
+restricts links, prevents artifact path escape and keeps Mermaid as safe source
+text in MVP; graphical diagram rendering can be added later as a trusted local
+enhancement.
+
 An **Agent** is a role with ownership, boundaries, input/output and stop
 conditions. A **Skill** is a reusable procedure. Their relationship is
 many-to-many: the central `agent-skill-routing.json` declares required and
@@ -145,3 +165,7 @@ become material for team scale.
   `resume-workflow`, and reconstruct the next action without chat history.
 - The VSIX clearly shows the checked-out branch, last commit, current stage,
   receipt freshness, linked PRs and `LIVE`/`STALE` status.
+- Clicking an artifact in My Work, Scrum Master, Epic or Ticket views opens a
+  local HTML Agent Report with its type, stage, role, evidence and receipt
+  metadata, and the open report refreshes after a file pull/edit or workflow
+  status update.
