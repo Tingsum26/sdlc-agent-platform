@@ -38,10 +38,11 @@ server.
 An **Agent** is a role with ownership, boundaries, input/output and stop
 conditions. A **Skill** is a reusable procedure. Their relationship is
 many-to-many: the central `agent-skill-routing.json` declares required and
-allowed Skills for each Agent. The Journey Coordinator is the default main
-Agent: it creates/resumes the Journey, checks gates and routes to specialists;
-it does not replace the requirement, architecture, implementation, test or
-review Agents. A human still starts each Agent in Copilot. The artifact records
+allowed Skills for each Agent. The existing `delivery-coordinator` Agent is
+the default main Journey Coordinator: it creates/resumes the Journey, checks
+gates and routes to specialists; it does not replace the requirement,
+architecture, implementation, test or review Agents. A human still starts each
+Agent in Copilot. The artifact records
 `appliedSkills` and the Context Receipt records the stage route; the PR check
 verifies declared Skill use, while human review evaluates whether the method
 was applied correctly.
