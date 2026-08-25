@@ -65,11 +65,12 @@ Skills. A human must approve the artifact before its status becomes `APPROVED`.
 The specialist does not start the next role after writing its Markdown. Set
 the output artifact status to `PENDING_APPROVAL` and verify that
 `advance-stage` refuses to proceed. After a human reviews the PR, set the
-artifact status to `APPROVED` (or use `SKIPPED_WITH_EVIDENCE` with actor,
-reason, evidence and risk), commit it, and ask `delivery-coordinator` to
-resume. The Coordinator invokes the internal `advance-stage` Skill and then
-prepares the next role's Context Receipt. The user does not run the Node
-command or choose an arbitrary target stage.
+artifact status to `APPROVED` (or ask `delivery-coordinator` to record
+`SKIPPED_WITH_EVIDENCE` with actor, reason, evidence and risk), commit it, and
+ask the Coordinator to resume. The Coordinator records an explicit human
+approval, invokes the internal `advance-stage` Skill and prepares the next
+role's Context Receipt. The user does not edit JSON, run the Node command or
+choose an arbitrary target stage.
 
 The VSIX `My Work`, `Scrum Master View` and Journey views should now show the
 same gate state and next Agent because they read the committed
