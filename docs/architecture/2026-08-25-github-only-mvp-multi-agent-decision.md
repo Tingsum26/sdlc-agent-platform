@@ -1,5 +1,10 @@
 # ADR: GitHub-only multi-Agent collaboration for MVP
 
+> **Current reading path:** this ADR records the decision. For the complete,
+> shareable implementation model, workflow rules, role boundaries and MVP
+> scope, use [the 2026-08-26 consolidated design](2026-08-26-github-only-mvp-consolidated-design.md)
+> and its [HTML report](../reports/2026-08-26-github-only-mvp-design-report.html).
+
 **Status:** Accepted for MVP on 2026-08-25  
 **Supersedes for MVP:** the MongoDB / Workflow Service / Workflow MCP runtime
 path in the earlier platform design. Those components remain Phase 2 options;
