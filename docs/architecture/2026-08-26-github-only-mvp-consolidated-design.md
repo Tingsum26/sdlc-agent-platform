@@ -82,8 +82,11 @@ symbols, contracts and PR links.
 
 An **Agent** is a role: it has an owner boundary, inputs, output, stop
 conditions and approval expectation. A **Skill** is a reusable procedure that
-an Agent is allowed or required to follow. The relationship is many-to-many;
-central routing is the policy source.
+an Agent is allowed or required to follow. A **Prompt File** is a versioned,
+manually invoked entry interaction that collects only current inputs and binds
+to the intended Agent; it cannot replace the Agent's rules or bypass a gate.
+The Agent/Skill relationship is many-to-many; central routing is the policy
+source.
 
 The shared context is not a Copilot conversation. It is committed Markdown,
 workflow state and Context Receipts in Git. Every later Agent can recover it
@@ -127,9 +130,12 @@ advance a stage.
 | Diff and evidence review | `pr-reviewer` | Dedicated review model may be configured later; no self-approval |
 
 The central customization package is the reusable catalog of Agents, Skills,
-instructions, schemas, policies, report templates, hooks and evals. Teams do
-not redefine an Agent per repository unless their business rule truly differs;
-they configure Journey/repository facts in the Journey repository instead.
+Prompt Files, instructions, schemas, policies, report templates, hooks and
+evals. It ships 14 Prompt Files for the MVP entry points, including onboarding,
+Epic start/resume, requirements, design, planning, four implementation
+channels, test/accessibility and PR review. Teams do not redefine an Agent per
+repository unless their business rule truly differs; they configure
+Journey/repository facts in the Journey repository instead.
 
 ## 6. Onboarding is a separate dependency, not an Epic stage
 
@@ -149,14 +155,24 @@ request/payload/header evidence where known, WebView/hybrid boundary,
 feature-flag/release observations, source commit, file/symbol and a label:
 `CODE_PROVEN`, `UNVERIFIED`, or `KNOWN_GAP`.
 
+The Agent first builds a commit-pinned repository map, assesses context
+freshness, and traces client/server contracts from both sides. `CODE_PROVEN`
+requires caller and callee source evidence (or a checked generated/OpenAPI
+contract); a route or client found on only one side remains an endpoint/client
+fact, not a Journey edge. Optional local tools such as SCIP, CodeQL or Joern
+may add provenance when already available, but no scanner, Docker, CI change,
+server or code upload is an MVP dependency. Their output must agree with the
+checked source and be recorded with tool/version/command/commit.
+
 The `epic-delivery-analyst` may use the approved graph to make the delivery
 DAG, ticket/channel matrix and risk register. It must return
 `BLOCKED_BY_ONBOARDING` rather than invent an API relationship.
 
 `start-epic` internally runs `check-journey-onboarding` against the named
-repositories. Missing, stale or unapproved evidence blocks the start and
-states exactly what must be refreshed. A failing check must not create the
-Epic branch, workflow file, baseline or PR.
+repositories and their currently selected immutable commits. Missing,
+unapproved, unpinned or commit-mismatched evidence blocks the start and states
+exactly what must be refreshed. A failing check must not create the Epic
+branch, workflow file, baseline or PR.
 
 ## 7. The three workflows
 
@@ -213,8 +229,11 @@ paths, hashes and the required Skill route. The Agent embeds the receipt path
 and hash and `appliedSkills` in its output.
 
 Each result starts as `PENDING_APPROVAL`. A human uses the Journey PR to
-approve it, request changes, or declare `SKIPPED_WITH_EVIDENCE`. Only then is
-the coordinator allowed to run `advance-stage`, which follows `stageOrder` and
+approve it, request changes, or declare `SKIPPED_WITH_EVIDENCE`. The
+Coordinator records that decision through the deterministic
+`record-human-decision` step; an approval records actor/evidence/timestamp and
+a skip additionally requires reason and accepted risk. Only then is the
+coordinator allowed to run `advance-stage`, which follows `stageOrder` and
 selects the next declared Agent. Missing, stale, blocked or unapproved inputs
 stop the workflow.
 
@@ -347,6 +366,9 @@ when an API service exists.
   clear human decision and next route.
 - A closed/reopened local environment reconstructs state from Git alone.
 - A design skip is explicit, attributed and risk-recorded.
+- Ticket workflows enforce `Requirements → Design → Plan → Implement → Test
+  → Review`; Test and Review both consume verified implementation evidence and
+  linked code-PR evidence.
 - Test output distinguishes proposed, executed, passed, failed and blocked.
 - VSIX can display the same checked-out evidence without becoming mandatory.
 
