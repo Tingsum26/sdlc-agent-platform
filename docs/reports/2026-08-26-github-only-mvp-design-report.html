@@ -124,7 +124,7 @@
         <div class="step"><strong>Test</strong><code>test-designer</code></div><div class="arrow">→</div>
         <div class="step"><strong>Review</strong><code>pr-reviewer</code></div>
       </div>
-      <p>Every output begins <code>PENDING_APPROVAL</code>. The human approves it in the Journey PR, requests changes, or records an attributed <code>SKIPPED_WITH_EVIDENCE</code> decision. The coordinator then advances one declared stage only; missing, stale, blocked or unapproved context stops the route.</p>
+      <p>Every output begins <code>PENDING_APPROVAL</code>. The human approves it in the Journey PR, requests changes, or records an attributed <code>SKIPPED_WITH_EVIDENCE</code> decision. The coordinator persists that decision through <code>record-human-decision</code> with actor/evidence/timestamp (plus reason and accepted risk for a skip), then advances one declared stage only; missing, stale, blocked or unapproved context stops the route.</p>
     </section>
 
     <section>

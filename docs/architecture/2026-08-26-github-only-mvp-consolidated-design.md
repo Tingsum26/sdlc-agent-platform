@@ -154,9 +154,10 @@ DAG, ticket/channel matrix and risk register. It must return
 `BLOCKED_BY_ONBOARDING` rather than invent an API relationship.
 
 `start-epic` internally runs `check-journey-onboarding` against the named
-repositories. Missing, stale or unapproved evidence blocks the start and
-states exactly what must be refreshed. A failing check must not create the
-Epic branch, workflow file, baseline or PR.
+repositories and their currently selected immutable commits. Missing,
+unapproved, unpinned or commit-mismatched evidence blocks the start and states
+exactly what must be refreshed. A failing check must not create the Epic
+branch, workflow file, baseline or PR.
 
 ## 7. The three workflows
 
@@ -213,8 +214,11 @@ paths, hashes and the required Skill route. The Agent embeds the receipt path
 and hash and `appliedSkills` in its output.
 
 Each result starts as `PENDING_APPROVAL`. A human uses the Journey PR to
-approve it, request changes, or declare `SKIPPED_WITH_EVIDENCE`. Only then is
-the coordinator allowed to run `advance-stage`, which follows `stageOrder` and
+approve it, request changes, or declare `SKIPPED_WITH_EVIDENCE`. The
+Coordinator records that decision through the deterministic
+`record-human-decision` step; an approval records actor/evidence/timestamp and
+a skip additionally requires reason and accepted risk. Only then is the
+coordinator allowed to run `advance-stage`, which follows `stageOrder` and
 selects the next declared Agent. Missing, stale, blocked or unapproved inputs
 stop the workflow.
 
@@ -347,6 +351,9 @@ when an API service exists.
   clear human decision and next route.
 - A closed/reopened local environment reconstructs state from Git alone.
 - A design skip is explicit, attributed and risk-recorded.
+- Ticket workflows enforce `Requirements → Design → Plan → Implement → Test
+  → Review`; Test and Review both consume verified implementation evidence and
+  linked code-PR evidence.
 - Test output distinguishes proposed, executed, passed, failed and blocked.
 - VSIX can display the same checked-out evidence without becoming mandatory.
 
