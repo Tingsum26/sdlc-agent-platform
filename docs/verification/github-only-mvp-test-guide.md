@@ -35,6 +35,27 @@ Coordinator records this in `.sdlc/workflow.json` as
 Android code repository for this purpose. No Agent output is allowed before
 this selection is confirmed.
 
+## Complete Journey onboarding before Start Epic
+
+Journey onboarding is a separate reusable PR, not the first output of an
+Epic. On the Journey repository's onboarding/default branch, select
+`code-context-analyst` and use `onboard-journey`. It creates the approved
+baseline, repository landscape, API call graph, code context and
+`.sdlc/journey-onboarding.json`. Run `onboard-repository` for every API/Web/
+iOS/Android repository that the Journey may use; record its approved source
+commit in the Journey onboarding manifest.
+
+When starting an Epic, `delivery-coordinator` runs this internal preflight:
+
+```powershell
+node scripts/check-journey-onboarding.mjs --repositories account-opening-api,account-opening-web
+```
+
+The user does not run it manually. If it returns `BLOCKED_BY_ONBOARDING`, the
+Coordinator names the missing baseline artifact or repository and routes to
+the relevant onboarding Skill. It must not create an Epic branch/PR or a new
+baseline to bypass the gate.
+
 ## Start and hand off an Agent
 
 ```powershell

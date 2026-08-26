@@ -38,6 +38,17 @@ The three retained workflows are protocols over that repository:
 3. **Onboarding / Sync:** versioned Journey/repository baseline and a manual
    re-analysis when code or dependency evidence becomes stale.
 
+Onboarding / Sync is a separate, reusable dependency of Journey / Epic. It is
+completed on the Journey repository's onboarding/default branch and merged
+before an Epic branch exists. `.sdlc/journey-onboarding.json` records approved
+Journey baseline, repository landscape, API call graph, code context and an
+approved, source-commit-pinned entry for each repository. `start-epic` first
+runs `check-journey-onboarding.mjs` for the repositories named by the Epic. A
+missing, unapproved or stale entry returns `BLOCKED_BY_ONBOARDING`, names the
+specific repository/artifact to create or refresh, and does **not** create an
+Epic branch, workflow file or PR. Only a passing check permits the new Epic
+branch to inherit and reference the onboarding baseline.
+
 Only a developer manually starting GitHub Copilot Agent in VS Code performs AI
 reasoning. Local MCPs are optional read/write connectors for Jira, Confluence,
 GitHub Enterprise, Figma and code-graph tools; they do not persist workflow

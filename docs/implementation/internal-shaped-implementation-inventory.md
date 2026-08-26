@@ -50,6 +50,12 @@ The existing six task tools are joined by `workflow_get_identity`, `workflow_val
 
 GitHub Journey PR is the shared report UI in GitHub-only MVP: validated artifacts are committed to the Journey branch, indexed in the PR description, and projected into marked Agent report comments with the human approval gate and next-Agent command. VSIX Diagnostics displays identity, provider, evidence text, source, observation time and next internal action. It remains an optional local companion: Journey reports are selected from the checked-out Journey repository and opened as escaped HTML. In GitHub-only MVP mode, an artifact panel watches the report and `.sdlc/workflow.json` so a Copilot commit, pull or status update is visible without reopening the panel. The VSIX is still presentation-only: it does not call a model, approve content or advance a stage.
 
+Journey onboarding is a separate reusable baseline stored in
+`.sdlc/journey-onboarding.json` and context Markdown. A deterministic local
+check verifies its status, required documents and affected-repository entries
+before `start-epic` may create a branch or PR. No workflow service, MongoDB,
+Docker or server-side Agent is involved.
+
 The public Web UI contains an explicitly fictional `EPIC-DEMO-1` Account Opening scenario. Its semantic table has text plus icon status, keyboard focus, responsive overflow, 44 px narrow-screen controls, reduced-motion handling and a sandboxed report iframe.
 
 ## Deliberately not implemented publicly
