@@ -1,4 +1,0 @@
-interface:
-  display_name: "Import Pod Members"
-  short_description: "Validate and import Pod membership rosters"
-  default_prompt: "Use $importing-pod-members to validate and import this Pod roster through Workflow MCP."

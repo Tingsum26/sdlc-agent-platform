@@ -36,6 +36,27 @@
 |---|---|---|---|
 | | | | |
 
+### 3.1 证据状态转换
+
+| Area | 公网初始状态 | 内网最终状态 | Internal Evidence ID | Observation Time | Source Type |
+|---|---|---|---|---|---|
+| Identity/SSO | INTERNAL_VALIDATION_REQUIRED | | | | |
+| Company MongoDB | INTERNAL_VALIDATION_REQUIRED | | | | |
+| Jira | SIMULATED_PASS | | | | |
+| Confluence | SIMULATED_PASS | | | | |
+| GHES | SIMULATED_PASS | | | | |
+| Jenkins | SIMULATED_PASS | | | | |
+| Splunk | SIMULATED_PASS | | | | |
+| Pilot Journey | CONTRACT_PASS（仅虚构 Fixture） | | | | |
+
+### 3.2 Internal TODO 逐项完成记录
+
+对每一个适用的 `INTERNAL-…` ID 填一行。未执行必须说明原因；不要将代码提交当作证据。
+
+| Internal TODO ID | Status (PASS/PARTIAL/FAIL/BLOCKED/NOT RUN) | Evidence ID（仅内网） | 实际偏差/替代方案 | 已执行或验证的回滚 | Owner 角色 |
+|---|---|---|---|---|---|
+| INTERNAL-XXX | | | | | |
+
 ## 4. 测试摘要
 
 | 测试类别 | 总数 | 通过 | 失败 | 阻塞 | 跳过 | 耗时 |
@@ -87,6 +108,7 @@
 - [ ] Jira 报告摘要/附件没有泄露源码、Prompt、客户数据或完整人员名单。
 - [ ] 大附件能力不可用时已明确标记，未把完整报告塞入 Jira Comment。
 - [ ] Prompt Injection 和不可信知识源已经过测试。
+- [ ] 每个 SIMULATED_PASS/CONTRACT_PASS 均未被直接当成内网 PASS。
 - [ ] Support Bundle 已脱敏。
 - [ ] 公网仓库未包含内网配置。
 

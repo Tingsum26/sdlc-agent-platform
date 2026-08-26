@@ -1,0 +1,255 @@
+schemaVersion: "1.0"
+status: APPROVED_TARGET
+approvedAt: "2026-08-16"
+visibility: PUBLIC
+constraints:
+  aiRuntime: LOCAL_VSCODE_GITHUB_COPILOT_CHAT_ONLY
+  dockerDependency: FORBIDDEN
+  companyDataInPublicRepos: FORBIDDEN
+repositories:
+  - name: sdlc-agent-platform
+    purpose: architecture-and-cross-repository-governance
+    outputs:
+      - id: PLATFORM-ARCH-001
+        name: approved Markdown architecture specification
+      - id: PLATFORM-ARCH-002
+        name: human-readable HTML architecture report
+      - id: PLATFORM-ADR-001
+        name: architecture decision records
+      - id: PLATFORM-BOM-001
+        name: platform-bom.yaml compatible release set
+      - id: PLATFORM-MATRIX-001
+        name: repository ownership and compatibility matrices
+      - id: PLATFORM-ROADMAP-001
+        name: cross-repository implementation roadmap
+      - id: PLATFORM-RELEASE-001
+        name: cross-repository release and rollback checklist
+      - id: PLATFORM-HANDOFF-001
+        name: public-to-internal handoff guide
+      - id: PLATFORM-HANDOFF-002
+        name: redacted internal completion report template
+      - id: PLATFORM-VERIFY-001
+        name: cross-repository verification index
+      - id: PLATFORM-VERIFY-002
+        name: public runnable end-to-end acceptance and Quick Start
+      - id: PLATFORM-HANDOFF-003
+        name: TODO(INTERNAL) registry for internal configuration points
+      - id: PLATFORM-SEC-001
+        name: threat, privacy, and public-fixture rules
+
+  - name: sdlc-workflow-contracts
+    purpose: shared-versioned-contracts
+    outputs:
+      - id: CONTRACT-OPENAPI-001
+        name: Workflow Service OpenAPI
+      - id: CONTRACT-DOMAIN-001
+        name: Epic Ticket RepoTask Journey identity assignment schemas
+      - id: CONTRACT-ARTIFACT-001
+        name: complete artifact JSON Schemas
+      - id: CONTRACT-EVENT-001
+        name: lifecycle and integration event schemas
+      - id: CONTRACT-JAVA-001
+        name: generated Java DTO and API client
+      - id: CONTRACT-TS-001
+        name: generated TypeScript types and API client
+      - id: CONTRACT-LOCK-001
+        name: contracts.lock.json specification
+      - id: CONTRACT-COMPAT-001
+        name: backward-compatibility test suite
+      - id: CONTRACT-FIXTURE-001
+        name: fictional fixtures and examples
+      - id: CONTRACT-RELEASE-001
+        name: SemVer release and migration guide
+
+  - name: sdlc-workflow-service
+    purpose: deterministic-workflow-state-policy-audit-and-integrations
+    outputs:
+      - id: SERVICE-EPIC-001
+        name: Epic workflow aggregate and revisions
+      - id: SERVICE-TICKET-001
+        name: Ticket workflow aggregate and stages
+      - id: SERVICE-REPO-001
+        name: Repo Task aggregate and PR CI lifecycle
+      - id: SERVICE-ARTIFACT-001
+        name: artifact versioning supersession and chunk storage
+      - id: SERVICE-GATE-001
+        name: stage gate skip approval and decision engine
+      - id: SERVICE-DEPENDENCY-001
+        name: cross-ticket and cross-repository dependency DAG
+      - id: SERVICE-FRESH-001
+        name: freshness and stale-impact processing
+      - id: SERVICE-IDENTITY-001
+        name: audit-only Principal and DirectoryPerson onboarding
+      - id: SERVICE-POD-001
+        name: Pod membership routing and assignment
+      - id: SERVICE-SCRUM-001
+        name: Scrum Master query and artifact APIs
+      - id: SERVICE-JIRA-001
+        name: idempotent Jira projection queue
+      - id: SERVICE-GHES-001
+        name: GitHub Enterprise metadata webhook and check adapter
+      - id: SERVICE-JENKINS-001
+        name: Jenkins status adapter
+      - id: SERVICE-CONFLUENCE-001
+        name: Confluence reference adapter
+      - id: SERVICE-MONGO-001
+        name: company MongoDB YAML indices optimistic locking and retention contract
+      - id: SERVICE-LOG-001
+        name: redacted structured JSON and Splunk mapping
+      - id: SERVICE-TEST-001
+        name: unit integration contract security and recovery tests
+      - id: SERVICE-PACKAGE-001
+        name: executable JAR without Docker dependency
+
+  - name: sdlc-workflow-mcp
+    purpose: local-stdio-copilot-tool-gateway
+    outputs:
+      - id: MCP-WORKFLOW-001
+        name: Epic Ticket RepoTask workflow tools
+      - id: MCP-CONTEXT-001
+        name: bounded context and artifact tools
+      - id: MCP-DECISION-001
+        name: stage approval skip decision and assignment tools
+      - id: MCP-QA-001
+        name: manual E2E accessibility and tagging tools
+      - id: MCP-ONBOARD-001
+        name: repository and Journey onboarding tools
+      - id: MCP-GRAPH-001
+        name: pluggable code-context and HTTP graph providers
+      - id: MCP-OUTBOX-001
+        name: schema-valid offline Outbox and explicit synchronization
+      - id: MCP-DIAG-001
+        name: health compatibility and support diagnostics
+      - id: MCP-LOG-001
+        name: rolling redacted correlated local logs
+      - id: MCP-SEC-001
+        name: input bounds cancellation timeout retry and safe errors
+      - id: MCP-INSTALL-001
+        name: no-Docker install package and onboarding documentation
+      - id: MCP-TEST-001
+        name: tool schema contract and degraded-mode tests
+
+  - name: sdlc-copilot-customizations
+    purpose: versioned-copilot-behavior-and-governance-bundle
+    outputs:
+      - id: CUSTOM-AGENT-001
+        name: Epic Delivery Analyst
+      - id: CUSTOM-AGENT-002
+        name: Delivery Coordinator
+      - id: CUSTOM-AGENT-003
+        name: Requirement Analyst
+      - id: CUSTOM-AGENT-004
+        name: Code Context Analyst
+      - id: CUSTOM-AGENT-005
+        name: Solution Architect
+      - id: CUSTOM-AGENT-006
+        name: Planner
+      - id: CUSTOM-AGENT-007
+        name: Java Implementer
+      - id: CUSTOM-AGENT-008
+        name: Web Implementer
+      - id: CUSTOM-AGENT-009
+        name: iOS Implementer
+      - id: CUSTOM-AGENT-010
+        name: Android Implementer
+      - id: CUSTOM-AGENT-011
+        name: Test Designer
+      - id: CUSTOM-AGENT-012
+        name: Accessibility QA
+      - id: CUSTOM-AGENT-013
+        name: PR Reviewer
+      - id: CUSTOM-SKILL-WORKFLOW-001
+        name: Epic Ticket resume analysis design plan implementation test PR skills
+      - id: CUSTOM-SKILL-ONBOARD-001
+        name: repository Journey graph sync and Pod import skills
+      - id: CUSTOM-SKILL-QA-001
+        name: manual E2E accessibility tagging and compatibility skills
+      - id: CUSTOM-SKILL-SCRUM-001
+        name: risk stand-up blocker release and Jira update skills
+      - id: CUSTOM-INSTRUCTION-001
+        name: global evidence Java Reactor Web iOS Android hybrid and quality instructions
+      - id: CUSTOM-POLICY-001
+        name: gates skip compatibility freshness privacy QA routing and projection policies
+      - id: CUSTOM-TEMPLATE-001
+        name: complete artifact HTML and handoff templates
+      - id: CUSTOM-HOOK-001
+        name: deterministic lifecycle hook declarations
+      - id: CUSTOM-EVAL-001
+        name: per-core-Agent-and-Skill regression and safety evals
+      - id: CUSTOM-MCP-001
+        name: Local MCP catalog profiles and installation metadata
+      - id: CUSTOM-ROUTING-001
+        name: stack Journey Pod and reviewer routing rules
+      - id: CUSTOM-BUNDLE-001
+        name: versioned checksummed compatible rollback-capable bundle
+
+  - name: sdlc-vscode-workbench
+    purpose: human-ui-onboarding-status-and-diagnostics
+    outputs:
+      - id: VSIX-VIEW-001
+        name: My Work
+      - id: VSIX-VIEW-002
+        name: Scrum Master View
+      - id: VSIX-VIEW-003
+        name: Epic View
+      - id: VSIX-VIEW-004
+        name: Ticket View with nested Repo Task Detail
+      - id: VSIX-VIEW-005
+        name: Identity and Pod Configuration
+      - id: VSIX-VIEW-006
+        name: Customization Center
+      - id: VSIX-VIEW-007
+        name: MCP Center
+      - id: VSIX-VIEW-008
+        name: Diagnostics
+      - id: VSIX-HTML-001
+        name: accessible human-readable HTML report renderer
+      - id: VSIX-REFRESH-001
+        name: focus open polling manual ETag and offline freshness behavior
+      - id: VSIX-COPILOT-001
+        name: explicit Agent command preparation and resume flow
+      - id: VSIX-INSTALL-001
+        name: customization install verify activate rollback flow
+      - id: VSIX-MCP-001
+        name: MCP install provenance health upgrade disable and uninstall flow
+      - id: VSIX-LOG-001
+        name: Output Channel rolling logs and redacted support bundle
+      - id: VSIX-A11Y-001
+        name: keyboard contrast screen-reader and large-text baseline
+      - id: VSIX-PACKAGE-001
+        name: installable VSIX without model API or Docker dependency
+
+  - name: sdlc-reference-demo
+    purpose: fictional-cross-repository-reference-and-acceptance-harness
+    outputs:
+      - id: DEMO-JOURNEY-001
+        name: fictional hybrid Account Opening Journey
+      - id: DEMO-EPIC-001
+        name: Epic API Web iOS Android Tickets and Repo Tasks
+      - id: DEMO-COMPAT-001
+        name: Native-later Feature Flag and breaking-change scenarios
+      - id: DEMO-QA-001
+        name: automated and manual E2E scenarios
+      - id: DEMO-A11Y-001
+        name: accessibility and analytics tagging scenarios
+      - id: DEMO-DEGRADED-001
+        name: MCP unavailable Service offline stale and skip scenarios
+      - id: DEMO-BROWSER-001
+        name: browser E2E for the complete workflow
+      - id: DEMO-CONTRACT-001
+        name: seven-repository contract smoke harness
+      - id: DEMO-REPORT-001
+        name: fictional HTML reports and QA handoff examples
+      - id: DEMO-NODOCKER-001
+        name: no-Docker local verification scripts
+deferred:
+  - LLM_WIKI
+  - S3_ARTIFACT_PROVIDER
+  - TEAMBOOK_SYNC
+  - CORPORATE_SSO
+  - ENFORCED_RBAC
+  - SERVER_SIDE_MCP
+  - BACKGROUND_OR_CLOUD_AGENTS
+  - SSE_OR_WEBSOCKET_UI
+  - FULL_ENTERPRISE_KNOWLEDGE_GRAPH
+

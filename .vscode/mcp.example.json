@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "sdlc-workflow": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/apps/workflow-mcp/dist/index.js"],
+      "env": {
+        "WORKFLOW_SERVICE_URL": "http://127.0.0.1:8080",
+        "WORKFLOW_DEMO_USER": "developer-1"
+      }
+    }
+  }
+}

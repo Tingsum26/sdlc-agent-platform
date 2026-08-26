@@ -575,3 +575,28 @@ The internal agent returns a redacted non-code completion report with environmen
 - VS Code MCP Developer Guide: https://code.visualstudio.com/api/extension-guides/ai/mcp
 - Figma Desktop MCP: https://help.figma.com/hc/en-us/articles/39890361040535-VS-Code-and-Figma-Set-up-the-MCP-server
 - WCAG 2.2: https://www.w3.org/WAI/standards-guidelines/wcag/
+
+## 21. Implemented internal-shaped public increment (2026-08-16)
+
+The approved increment is implemented without changing the architecture boundary: only interactive local GitHub Copilot performs AI reasoning. Workflow Service, MCP, VSIX, Web UI, Mongo adapters and CI contain no model client.
+
+```mermaid
+flowchart LR
+  U["Human in VS Code"] --> C["GitHub Copilot Agent"]
+  C --> M["Local Workflow MCP · 12 tools"]
+  V["VSIX views and HTML"] --> W["Workflow Service"]
+  M --> W
+  W --> D["Managed Mongo profile"]
+  W --> E["Jira · Confluence · GHES · Jenkins · Splunk adapters"]
+  W --> J["Journey analyzer and report"]
+  E -. "public deterministic fake" .-> S["SIMULATED_PASS"]
+  J -. "schema and gap checks" .-> P["CONTRACT_PASS"]
+  S --> I["INTERNAL_VALIDATION_REQUIRED"]
+  P --> I
+```
+
+The data path is identity binding → Pod roster → Ticket assignment → integration observations → pinned Journey manifest → ordered gap analysis → standalone escaped HTML → explicit internal validation action. Runtime state and audit use Mongo documents; Jira is a projection, not the source of truth. VSIX refreshes Workflow state on foreground/background intervals, focus and user command, and always shows status text, source and observation time.
+
+Account Opening alone carries the approved Web/API-first and Native-later assumption. The manifest requires API/Web/iOS/Android repositories, hybrid screen mapping, request/response schema refs, common header, authentication class, compatibility, provenance, Native train, AWS feature-flag ownership and QA E2E ownership. Other Journeys must ask the user for release/flag policy.
+
+The fictional browser flow demonstrates `EPIC-DEMO-1 → EMP-100 → Pod revision 1 → DEMO-123 assignment → five SIMULATED_PASS adapters → ACCOUNT_OPENING CONTRACT_PASS → safe HTML`. It is intentionally not evidence of company connectivity or real code relationships. The exact source inventory, contract reference, simulation report and internal connection procedure are in `docs/implementation`, `docs/reference`, `docs/reports` and `docs/handoff`.

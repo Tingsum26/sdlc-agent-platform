@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Local Copilot SDLC Platform v2 — 详细设计报告</title>
+  <title>Local Copilot SDLC Platform — 设计、流程与内网交接报告</title>
   <style>
     :root {
       --bg: var(--vscode-editor-background, #f7f8fa);
@@ -135,7 +135,7 @@
 <body>
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="hero">
-    <div class="eyebrow">Design baseline · updated 2026-08-16</div>
+    <div class="eyebrow">Design baseline · updated 2026-08-24</div>
     <h1>Local Copilot SDLC Platform v2</h1>
     <p class="lead">以本地 VS Code GitHub Copilot 为唯一 AI 推理入口，连接 Jira、Figma、代码、Journey、GitHub、Jenkins 和团队知识，构建可见、可审计、可恢复的端到端 SDLC 工作流。</p>
     <div class="meta" aria-label="关键设计标签">
@@ -635,6 +635,18 @@ Workflow Service → Managed Mongo profile
           <li><a href="https://help.figma.com/hc/en-us/articles/39890361040535-VS-Code-and-Figma-Set-up-the-MCP-server">Figma Desktop MCP</a></li>
           <li><a href="https://www.w3.org/WAI/standards-guidelines/wcag/">WCAG 2.2</a></li>
         </ul>
+      </section>
+      <section id="latest-status">
+        <h2>17. 2026-08-24 全量审查状态</h2>
+        <div class="callout warning"><strong>当前结论：</strong>公共 run-first 代码和文档已完成多轮安全、状态机、VSIX、Windows 生命周期与证据审查；最新修复仍处于未推送审查链中，不能把本报告当作生产平台完成证明。</div>
+        <div class="table-wrap"><table><caption>分享时必须强调的边界</caption><thead><tr><th>项目</th><th>当前结论</th><th>内网后续</th></tr></thead><tbody>
+          <tr><td>公共测试与 HTML UI</td><td>Java、pnpm、VSIX、M1/M2/M3/M4/M7 公共场景有验证记录</td><td>在公司环境重跑并附报告</td></tr>
+          <tr><td>AI 与 Agent</td><td>只允许用户本机 VS Code Copilot Chat；服务端不调用模型</td><td>确认企业 Copilot policy、可用模型和 Agent 安装方式</td></tr>
+          <tr><td>MongoDB</td><td><code>INTERNAL-AUD-001</code>：公共 fake profile 非重启持久化</td><td>配置真实 Mongo、TLS、索引、备份、恢复、并发与保留策略</td></tr>
+          <tr><td>证据分类</td><td><code>SIMULATED_PASS</code> 只能表示当前 fictional session，不是 QA/发布证据</td><td>由内网 QA/发布流程产生真实 evidence ID</td></tr>
+          <tr><td>七仓结构</td><td>当前仍是可运行公共 monorepo</td><td>按批准清单拆分 7 个独立 GitHub Enterprise 仓库</td></tr>
+        </tbody></table></div>
+        <h3>讲解主线</h3><ol><li>先讲“谁能推理、谁不能推理”。</li><li>再讲 Epic → Ticket → Repo Task 的父子关系。</li><li>展示 VSIX 如何发现任务、显示 HTML、保留 warning/stale/offline 和恢复。</li><li>最后展示公网/内网交接表，明确哪些结论必须由内网 Agent 通过报告证明。</li></ol>
       </section>
     </main>
   </div>

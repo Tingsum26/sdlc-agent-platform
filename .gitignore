@@ -14,7 +14,10 @@ out/
 coverage/
 playwright-report/
 test-results/
+.demo/
 *.log
 *.vsix
 .DS_Store
 Thumbs.db
+
+_tmp_*
