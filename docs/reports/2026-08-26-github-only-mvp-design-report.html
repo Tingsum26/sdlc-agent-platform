@@ -95,7 +95,7 @@
       </div>
       <div class="grid two">
         <article class="card"><h3>Required onboarding outputs</h3><ul><li><code>.sdlc/journey-onboarding.json</code></li><li>Journey baseline and repository landscape</li><li>API/HTTP call graph</li><li>Code context with entry points and constraints</li><li>Approval and source-commit pins per repository</li></ul></article>
-        <article class="card bad"><h3>Single technical ownership</h3><p>Only <code>code-context-analyst</code> derives cross-repository HTTP/API relationships. <code>epic-delivery-analyst</code> consumes the approved graph for delivery planning; it must block rather than invent a call edge.</p></article>
+        <article class="card bad"><h3>Single technical ownership</h3><p>Only <code>code-context-analyst</code> derives cross-repository HTTP/API relationships. It maps repositories and freshness, then proves client/server contracts from both sides. Optional local SCIP/CodeQL/Joern output is supplementary provenance, never a required MVP dependency. <code>epic-delivery-analyst</code> consumes the approved graph for delivery planning; it must block rather than invent a call edge.</p></article>
       </div>
     </section>
 

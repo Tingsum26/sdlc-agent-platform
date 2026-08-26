@@ -149,6 +149,15 @@ request/payload/header evidence where known, WebView/hybrid boundary,
 feature-flag/release observations, source commit, file/symbol and a label:
 `CODE_PROVEN`, `UNVERIFIED`, or `KNOWN_GAP`.
 
+The Agent first builds a commit-pinned repository map, assesses context
+freshness, and traces client/server contracts from both sides. `CODE_PROVEN`
+requires caller and callee source evidence (or a checked generated/OpenAPI
+contract); a route or client found on only one side remains an endpoint/client
+fact, not a Journey edge. Optional local tools such as SCIP, CodeQL or Joern
+may add provenance when already available, but no scanner, Docker, CI change,
+server or code upload is an MVP dependency. Their output must agree with the
+checked source and be recorded with tool/version/command/commit.
+
 The `epic-delivery-analyst` may use the approved graph to make the delivery
 DAG, ticket/channel matrix and risk register. It must return
 `BLOCKED_BY_ONBOARDING` rather than invent an API relationship.
