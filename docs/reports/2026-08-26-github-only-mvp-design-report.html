@@ -111,7 +111,7 @@
           <tr><td>Plan, implementation, testing and review</td><td><code>planner</code>, channel implementers, <code>test-designer</code>, <code>pr-reviewer</code></td><td>Each owns a typed report/evidence; none self-approves.</td></tr>
         </tbody>
       </table>
-      <p><strong>Agent vs Skill:</strong> an Agent owns a result and boundary; a Skill is a reusable procedure. Central policy routes required/allowed Skills to Agents, and each report records the Skills it applied.</p>
+      <p><strong>Agent vs Skill vs Prompt File:</strong> an Agent owns a result and boundary; a Skill is a reusable procedure; a Prompt File is a versioned slash-command entry point that collects current inputs and selects the intended Agent. The central catalog ships 14 role-bound Prompt Files. They cannot bypass required Skills, Context Receipts or approval gates.</p>
     </section>
 
     <section>

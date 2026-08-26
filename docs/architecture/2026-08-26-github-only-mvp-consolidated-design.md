@@ -82,8 +82,11 @@ symbols, contracts and PR links.
 
 An **Agent** is a role: it has an owner boundary, inputs, output, stop
 conditions and approval expectation. A **Skill** is a reusable procedure that
-an Agent is allowed or required to follow. The relationship is many-to-many;
-central routing is the policy source.
+an Agent is allowed or required to follow. A **Prompt File** is a versioned,
+manually invoked entry interaction that collects only current inputs and binds
+to the intended Agent; it cannot replace the Agent's rules or bypass a gate.
+The Agent/Skill relationship is many-to-many; central routing is the policy
+source.
 
 The shared context is not a Copilot conversation. It is committed Markdown,
 workflow state and Context Receipts in Git. Every later Agent can recover it
@@ -127,9 +130,12 @@ advance a stage.
 | Diff and evidence review | `pr-reviewer` | Dedicated review model may be configured later; no self-approval |
 
 The central customization package is the reusable catalog of Agents, Skills,
-instructions, schemas, policies, report templates, hooks and evals. Teams do
-not redefine an Agent per repository unless their business rule truly differs;
-they configure Journey/repository facts in the Journey repository instead.
+Prompt Files, instructions, schemas, policies, report templates, hooks and
+evals. It ships 14 Prompt Files for the MVP entry points, including onboarding,
+Epic start/resume, requirements, design, planning, four implementation
+channels, test/accessibility and PR review. Teams do not redefine an Agent per
+repository unless their business rule truly differs; they configure
+Journey/repository facts in the Journey repository instead.
 
 ## 6. Onboarding is a separate dependency, not an Epic stage
 
