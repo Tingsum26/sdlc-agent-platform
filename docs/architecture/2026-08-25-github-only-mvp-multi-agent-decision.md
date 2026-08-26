@@ -49,6 +49,15 @@ specific repository/artifact to create or refresh, and does **not** create an
 Epic branch, workflow file or PR. Only a passing check permits the new Epic
 branch to inherit and reference the onboarding baseline.
 
+`code-context-analyst` is the sole technical owner of Journey onboarding and
+the cross-repository HTTP/API graph. It uses `onboard-journey`,
+`onboard-repository` and `analyze-http-call-graph`, producing code-proven
+repository/channel, caller/callee, endpoint, payload/header and source-commit
+evidence. `epic-delivery-analyst` consumes that approved graph only to create
+the business delivery dependency DAG, ticket/channel matrix and risk register;
+it returns `BLOCKED_BY_ONBOARDING` rather than inventing or editing a technical
+call edge.
+
 Only a developer manually starting GitHub Copilot Agent in VS Code performs AI
 reasoning. Local MCPs are optional read/write connectors for Jira, Confluence,
 GitHub Enterprise, Figma and code-graph tools; they do not persist workflow

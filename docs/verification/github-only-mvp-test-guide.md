@@ -45,6 +45,10 @@ baseline, repository landscape, API call graph, code context and
 iOS/Android repository that the Journey may use; record its approved source
 commit in the Journey onboarding manifest.
 
+Do not select `epic-delivery-analyst` to infer HTTP/API relationships. That
+Agent only consumes the approved technical graph to split tickets, identify
+business/release dependencies and surface risks.
+
 When starting an Epic, `delivery-coordinator` runs this internal preflight:
 
 ```powershell
